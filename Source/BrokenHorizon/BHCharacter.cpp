@@ -10,6 +10,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "BHInteractable.h"
 
 ABHCharacter::ABHCharacter()
 {
@@ -284,8 +285,9 @@ void ABHCharacter::Tick(float DeltaTime)
 
 void ABHCharacter::Interact()
 {
-    FVector Start = FirstPersonCamera->GetComponentLocation();
-    FVector End = Start + (FirstPersonCamera->GetForwardVector() * 300.0f);
+    const FVector Start = FirstPersonCamera->GetComponentLocation();
+    const FVector End =
+        Start + (FirstPersonCamera->GetForwardVector() * 300.0f);
 
     FHitResult Hit;
 
@@ -299,8 +301,22 @@ void ABHCharacter::Interact()
         ECC_Visibility,
         Params))
     {
-        UE_LOG(LogTemp, Warning, TEXT("Hit: %s"),
-            *Hit.GetActor()->GetName());
+        AActor* HitActor = Hit.GetActor();
+
+        if (IsValid(HitActor) &&
+            HitActor->Implements<UBHInteractable>())
+        {
+            IBHInteractable::Execute_Interact(HitActor, this);
+        }
+        else if (IsValid(HitActor))
+        {
+            UE_LOG(
+                LogTemp,
+                Warning,
+                TEXT("%s is not interactable"),
+                *HitActor->GetName()
+            );
+        }
     }
 
     DrawDebugLine(
@@ -311,5 +327,6 @@ void ABHCharacter::Interact()
         false,
         2.0f,
         0,
-        2.0f);
+        2.0f
+    );
 }
