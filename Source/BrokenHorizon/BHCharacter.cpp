@@ -8,6 +8,8 @@
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "DrawDebugHelpers.h"
+#include "Engine/World.h"
 
 ABHCharacter::ABHCharacter()
 {
@@ -282,5 +284,32 @@ void ABHCharacter::Tick(float DeltaTime)
 
 void ABHCharacter::Interact()
 {
-    UE_LOG(LogTemp, Warning, TEXT("Interaction button pressed"));
+    FVector Start = FirstPersonCamera->GetComponentLocation();
+    FVector End = Start + (FirstPersonCamera->GetForwardVector() * 300.0f);
+
+    FHitResult Hit;
+
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this);
+
+    if (GetWorld()->LineTraceSingleByChannel(
+        Hit,
+        Start,
+        End,
+        ECC_Visibility,
+        Params))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Hit: %s"),
+            *Hit.GetActor()->GetName());
+    }
+
+    DrawDebugLine(
+        GetWorld(),
+        Start,
+        End,
+        FColor::Green,
+        false,
+        2.0f,
+        0,
+        2.0f);
 }
