@@ -36,6 +36,8 @@ protected:
     void StartCrouch();
     void StopCrouch();
 
+    virtual void Tick(float DeltaTime) override;
+
     UPROPERTY(
         VisibleAnywhere,
         BlueprintReadOnly,
@@ -89,6 +91,24 @@ protected:
         BlueprintReadOnly,
         Category = "Broken Horizon|Movement")
     float SprintSpeed = 700.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Stamina")
+    float MaxStamina = 100.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Broken Horizon|Stamina")
+    float CurrentStamina = 100.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Stamina")
+    float StaminaDrainRate = 25.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Stamina")
+    float StaminaRecoveryRate = 20.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Stamina")
+    float StaminaRecoveryDelay = 1.0f;
+
+    bool bIsSprinting = false;
+    float TimeSinceSprintStopped = 0.0f;
 
   
 };

@@ -32,6 +32,10 @@ ABHCharacter::ABHCharacter()
     GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 
     GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
+
+    PrimaryActorTick.bCanEverTick = true;
+
+    CurrentStamina = MaxStamina;
 }
 
 void ABHCharacter::BeginPlay()
@@ -210,13 +214,25 @@ void ABHCharacter::StopJump()
 
 void ABHCharacter::StartSprint()
 {
+    if (CurrentStamina <= 0.0f)
+    {
+        return;
+    }
+
+    bIsSprinting = true;
+    TimeSinceSprintStopped = 0.0f;
+
     GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
 }
 
 void ABHCharacter::StopSprint()
 {
+    bIsSprinting = false;
+    TimeSinceSprintStopped = 0.0f;
+
     GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 }
+
 
 void ABHCharacter::StartCrouch()
 {
@@ -226,4 +242,31 @@ void ABHCharacter::StartCrouch()
 void ABHCharacter::StopCrouch()
 {
     UnCrouch();
+}
+
+
+void ABHCharacter::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    if (bIsSprinting && GetVelocity().SizeSquared2D() > 0.0f)
+    {
+        CurrentStamina -= StaminaDrainRate * DeltaTime;
+        CurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, MaxStamina);
+
+        if (CurrentStamina <= 0.0f)
+        {
+            StopSprint();
+        }
+    }
+    else
+    {
+        TimeSinceSprintStopped += DeltaTime;
+
+        if (TimeSinceSprintStopped >= StaminaRecoveryDelay)
+        {
+            CurrentStamina += StaminaRecoveryRate * DeltaTime;
+            CurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, MaxStamina);
+        }
+    }
 }
