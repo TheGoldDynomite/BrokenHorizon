@@ -151,6 +151,15 @@ void ABHCharacter::SetupPlayerInputComponent(
             this,
             &ABHCharacter::StopCrouch);
     }
+    
+     if (InteractAction)
+    {
+        EnhancedInputComponent->BindAction(
+            InteractAction,
+            ETriggerEvent::Started,
+            this,
+            &ABHCharacter::Interact);
+    }
 }
 
 
@@ -269,4 +278,9 @@ void ABHCharacter::Tick(float DeltaTime)
             CurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, MaxStamina);
         }
     }
+}
+
+void ABHCharacter::Interact()
+{
+    UE_LOG(LogTemp, Warning, TEXT("Interaction button pressed"));
 }

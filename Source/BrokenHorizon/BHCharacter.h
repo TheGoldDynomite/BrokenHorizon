@@ -37,6 +37,8 @@ protected:
     void StopCrouch();
 
     virtual void Tick(float DeltaTime) override;
+    
+    void Interact();
 
     UPROPERTY(
         VisibleAnywhere,
@@ -109,6 +111,9 @@ protected:
 
     bool bIsSprinting = false;
     float TimeSinceSprintStopped = 0.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Input")
+    TObjectPtr<UInputAction> InteractAction;
 
   
 };
