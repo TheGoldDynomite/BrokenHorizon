@@ -7,6 +7,7 @@
 #include "GameFramework/PlayerController.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 ABHCharacter::ABHCharacter()
 {
@@ -27,6 +28,10 @@ ABHCharacter::ABHCharacter()
     bUseControllerRotationPitch = false;
     bUseControllerRotationYaw = true;
     bUseControllerRotationRoll = false;
+
+    GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+
+    GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 }
 
 void ABHCharacter::BeginPlay()
@@ -112,6 +117,36 @@ void ABHCharacter::SetupPlayerInputComponent(
     {
         UE_LOG(LogTemp, Error, TEXT("JumpAction is NOT assigned"));
     }
+
+    if (SprintAction)
+    {
+        EnhancedInputComponent->BindAction(
+            SprintAction,
+            ETriggerEvent::Started,
+            this,
+            &ABHCharacter::StartSprint);
+
+        EnhancedInputComponent->BindAction(
+            SprintAction,
+            ETriggerEvent::Completed,
+            this,
+            &ABHCharacter::StopSprint);
+    }
+
+    if (CrouchAction)
+    {
+        EnhancedInputComponent->BindAction(
+            CrouchAction,
+            ETriggerEvent::Started,
+            this,
+            &ABHCharacter::StartCrouch);
+
+        EnhancedInputComponent->BindAction(
+            CrouchAction,
+            ETriggerEvent::Completed,
+            this,
+            &ABHCharacter::StopCrouch);
+    }
 }
 
 
@@ -171,4 +206,24 @@ void ABHCharacter::StartJump()
 void ABHCharacter::StopJump()
 {
     StopJumping();
+}
+
+void ABHCharacter::StartSprint()
+{
+    GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+}
+
+void ABHCharacter::StopSprint()
+{
+    GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+}
+
+void ABHCharacter::StartCrouch()
+{
+    Crouch();
+}
+
+void ABHCharacter::StopCrouch()
+{
+    UnCrouch();
 }

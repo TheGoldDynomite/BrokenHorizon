@@ -1,11 +1,7 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
-
 #include "BrokenHorizonCameraManager.h"
 
 ABrokenHorizonCameraManager::ABrokenHorizonCameraManager()
 {
-	// set the min/max pitch
-	ViewPitchMin = -70.0f;
-	ViewPitchMax = 80.0f;
+    ViewPitchMin = -89.0f;
+    ViewPitchMax = 89.0f;
 }

@@ -1,22 +1,15 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Camera/PlayerCameraManager.h"
 #include "BrokenHorizonCameraManager.generated.h"
 
-/**
- *  Basic First Person camera manager.
- *  Limits min/max look pitch.
- */
 UCLASS()
-class ABrokenHorizonCameraManager : public APlayerCameraManager
+class BROKENHORIZON_API ABrokenHorizonCameraManager
+    : public APlayerCameraManager
 {
-	GENERATED_BODY()
-	
-public:
+    GENERATED_BODY()
 
-	/** Constructor */
-	ABrokenHorizonCameraManager();
+public:
+    ABrokenHorizonCameraManager();
 };

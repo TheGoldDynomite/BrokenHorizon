@@ -30,6 +30,12 @@ protected:
     void StartJump();
     void StopJump();
 
+    void StartSprint();
+    void StopSprint();
+
+    void StartCrouch();
+    void StopCrouch();
+
     UPROPERTY(
         VisibleAnywhere,
         BlueprintReadOnly,
@@ -59,4 +65,30 @@ protected:
         BlueprintReadOnly,
         Category = "Broken Horizon|Input")
     TObjectPtr<UInputAction> LookAction;
+
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category = "Broken Horizon|Input")
+    TObjectPtr<UInputAction> SprintAction;
+
+    UPROPERTY(
+        EditDefaultsOnly, 
+        BlueprintReadOnly,
+        Category = "Broken Horizon|Input")
+    TObjectPtr<UInputAction> CrouchAction;
+
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category = "Broken Horizon|Movement")
+    float WalkSpeed = 400.0f;
+
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category = "Broken Horizon|Movement")
+    float SprintSpeed = 700.0f;
+
+  
 };
