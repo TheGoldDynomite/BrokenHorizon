@@ -25,7 +25,10 @@ protected:
         UInputComponent* PlayerInputComponent) override;
 
     void Move(const FInputActionValue& Value);
-    void Look(const FInputActionValue& Value);
+    void Look(const FInputActionValue& Value);\
+
+    void StartJump();
+    void StopJump();
 
     UPROPERTY(
         VisibleAnywhere,
@@ -44,6 +47,12 @@ protected:
         BlueprintReadOnly,
         Category = "Broken Horizon|Input")
     TObjectPtr<UInputAction> MoveAction;
+
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category = "Broken Horizon|Input")
+    TObjectPtr<UInputAction> JumpAction;
 
     UPROPERTY(
         EditDefaultsOnly,

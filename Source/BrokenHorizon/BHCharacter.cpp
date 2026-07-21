@@ -91,7 +91,29 @@ void ABHCharacter::SetupPlayerInputComponent(
             this,
             &ABHCharacter::Look);
     }
+    
+    if (JumpAction)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("JumpAction is assigned"));
+
+        EnhancedInputComponent->BindAction(
+            JumpAction,
+            ETriggerEvent::Triggered,
+            this,
+            &ABHCharacter::StartJump);
+
+        EnhancedInputComponent->BindAction(
+            JumpAction,
+            ETriggerEvent::Completed,
+            this,
+            &ABHCharacter::StopJump);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("JumpAction is NOT assigned"));
+    }
 }
+
 
 void ABHCharacter::Move(const FInputActionValue& Value)
 {
@@ -135,4 +157,18 @@ void ABHCharacter::Look(const FInputActionValue& Value)
 
     AddControllerYawInput(LookInput.X);
     AddControllerPitchInput(LookInput.Y);
+}
+
+void StartJump();
+void StopJump();
+
+void ABHCharacter::StartJump()
+{
+    UE_LOG(LogTemp, Warning, TEXT("StartJump was called"));
+    Jump();
+}
+
+void ABHCharacter::StopJump()
+{
+    StopJumping();
 }
