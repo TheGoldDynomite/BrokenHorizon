@@ -9,6 +9,7 @@ class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 class UInputComponent;
+class UUserWidget;
 
 UCLASS()
 class BROKENHORIZON_API ABHCharacter : public ACharacter
@@ -37,6 +38,7 @@ protected:
     void StopCrouch();
 
     virtual void Tick(float DeltaTime) override;
+    
     
     void Interact();
 
@@ -114,6 +116,12 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Input")
     TObjectPtr<UInputAction> InteractAction;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Interaction")
+    TSubclassOf<UUserWidget> InteractionPromptClass;
+
+    UPROPERTY()
+    TObjectPtr<UUserWidget> InteractionPromptWidget;
 
   
 };

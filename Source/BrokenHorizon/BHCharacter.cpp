@@ -11,6 +11,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "BHInteractable.h"
+#include "Blueprint/UserWidget.h"
 
 ABHCharacter::ABHCharacter()
 {
@@ -44,6 +45,22 @@ ABHCharacter::ABHCharacter()
 void ABHCharacter::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (InteractionPromptClass)
+    {
+        InteractionPromptWidget = CreateWidget<UUserWidget>(
+            GetWorld(),
+            InteractionPromptClass
+        );
+
+        if (InteractionPromptWidget)
+        {
+            InteractionPromptWidget->AddToViewport();
+            InteractionPromptWidget->SetVisibility(
+                ESlateVisibility::Collapsed
+            );
+        }
+    }
 
     APlayerController* PlayerController =
         Cast<APlayerController>(GetController());
