@@ -39,6 +39,7 @@ protected:
 
     virtual void Tick(float DeltaTime) override;
     
+    void UpdateInteractionPrompt();
     
     void Interact();
 

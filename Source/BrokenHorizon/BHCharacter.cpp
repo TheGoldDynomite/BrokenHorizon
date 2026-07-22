@@ -298,6 +298,49 @@ void ABHCharacter::Tick(float DeltaTime)
             CurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, MaxStamina);
         }
     }
+
+    UpdateInteractionPrompt();
+}
+
+void ABHCharacter::UpdateInteractionPrompt()
+{
+    if (!InteractionPromptWidget || !FirstPersonCamera)
+    {
+        return;
+    }
+
+    const FVector Start = FirstPersonCamera->GetComponentLocation();
+    const FVector End =
+        Start + (FirstPersonCamera->GetForwardVector() * 300.0f);
+
+    FHitResult Hit;
+
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this);
+
+    bool bLookingAtInteractable = false;
+
+    if (GetWorld()->LineTraceSingleByChannel(
+        Hit,
+        Start,
+        End,
+        ECC_Visibility,
+        Params))
+    {
+        AActor* HitActor = Hit.GetActor();
+
+        if (IsValid(HitActor) &&
+            HitActor->Implements<UBHInteractable>())
+        {
+            bLookingAtInteractable = true;
+        }
+    }
+
+    InteractionPromptWidget->SetVisibility(
+        bLookingAtInteractable
+        ? ESlateVisibility::Visible
+        : ESlateVisibility::Collapsed
+    );
 }
 
 void ABHCharacter::Interact()
@@ -346,4 +389,4 @@ void ABHCharacter::Interact()
         0,
         2.0f
     );
-}
+} 
