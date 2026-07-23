@@ -17,12 +17,13 @@ class BROKENHORIZON_API ABHInteractionTestActor
 public:
     ABHInteractionTestActor();
 
-protected:
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-    TObjectPtr<UStaticMeshComponent> Mesh;
-
-public:
     virtual void Interact_Implementation(
         AActor* InteractingActor
     ) override;
+
+    virtual FText GetInteractionText_Implementation() const override;
+
+protected:
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    TObjectPtr<UStaticMeshComponent> Mesh;
 };

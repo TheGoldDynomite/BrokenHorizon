@@ -8,8 +8,8 @@
 class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
-class UInputComponent;
-class UUserWidget;
+class UInputComponent; 
+class UBHInteractionPromptWidget;
 
 UCLASS()
 class BROKENHORIZON_API ABHCharacter : public ACharacter
@@ -42,6 +42,7 @@ protected:
     void UpdateInteractionPrompt();
     
     void Interact();
+  
 
     UPROPERTY(
         VisibleAnywhere,
@@ -119,10 +120,10 @@ protected:
     TObjectPtr<UInputAction> InteractAction;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Interaction")
-    TSubclassOf<UUserWidget> InteractionPromptClass;
+    TSubclassOf<UBHInteractionPromptWidget> InteractionPromptClass;
 
     UPROPERTY()
-    TObjectPtr<UUserWidget> InteractionPromptWidget;
+    TObjectPtr<UBHInteractionPromptWidget> InteractionPromptWidget;
 
   
 };

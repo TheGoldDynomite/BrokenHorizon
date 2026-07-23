@@ -35,3 +35,11 @@ void ABHInteractionTestActor::Interact_Implementation(
         );
     }
 }
+
+FText ABHInteractionTestActor::GetInteractionText_Implementation() const
+{
+    return FText::FromString(
+        TEXT("Press [F] to Test Interaction")
+    );
+}
+

@@ -15,7 +15,9 @@ class BROKENHORIZON_API IBHInteractable
     GENERATED_BODY()
 
 public:
-
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
     void Interact(AActor* InteractingActor);
+
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+    FText GetInteractionText() const;
 };

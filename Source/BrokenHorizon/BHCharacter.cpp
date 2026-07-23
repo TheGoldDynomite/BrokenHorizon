@@ -12,6 +12,7 @@
 #include "Engine/World.h"
 #include "BHInteractable.h"
 #include "Blueprint/UserWidget.h"
+#include "BHInteractionPromptWidget.h"
 
 ABHCharacter::ABHCharacter()
 {
@@ -48,7 +49,7 @@ void ABHCharacter::BeginPlay()
 
     if (InteractionPromptClass)
     {
-        InteractionPromptWidget = CreateWidget<UUserWidget>(
+        InteractionPromptWidget = CreateWidget<UBHInteractionPromptWidget>(
             GetWorld(),
             InteractionPromptClass
         );
@@ -334,6 +335,10 @@ void ABHCharacter::UpdateInteractionPrompt()
         {
             bLookingAtInteractable = true;
         }
+        const FText PromptText =
+            IBHInteractable::Execute_GetInteractionText(HitActor);
+
+        InteractionPromptWidget->SetInteractionText(PromptText);
     }
 
     InteractionPromptWidget->SetVisibility(
