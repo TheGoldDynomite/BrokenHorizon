@@ -1,8 +1,9 @@
 #include "BHDoor.h"
 
+#include "BHCharacter.h"
+#include "BHMissionData.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "BHCharacter.h"
 
 ABHDoor::ABHDoor()
 {
@@ -34,8 +35,8 @@ void ABHDoor::Interact_Implementation(AActor* InteractingActor)
 
         bLocked = false;
 
-        Character->SetObjective(
-            FText::FromString(TEXT("Explore Beyond the Security Door"))
+        Character->CompleteObjective(
+            BHObjectiveIds::UnlockSecurityDoor
         );
 
         UE_LOG(LogTemp, Warning, TEXT("Door Unlocked"));

@@ -14,6 +14,7 @@ class UBHInteractionPromptWidget;
 class UBHObjectiveWidget;
 class UBHObjectiveComponent;
 class UBHObjectiveNotificationWidget;
+class UBHMissionData;
 
 UCLASS()
 class BROKENHORIZON_API ABHCharacter : public ACharacter
@@ -30,11 +31,14 @@ public:
     UFUNCTION(BlueprintPure, Category = "Inventory")
     bool HasKeycard(FName KeycardID) const;
 
-    UFUNCTION(BlueprintCallable, Category = "Objective")
-    void SetObjective(const FText& NewObjective);
+    UFUNCTION(BlueprintCallable, Category = "Objectives")
+    bool CompleteObjective(FName ObjectiveID);
 
     UFUNCTION()
-    void OnObjectiveCompleted(FText CompletedObjective);
+    void OnObjectiveCompleted(
+        FName CompletedObjectiveID,
+        FText CompletedObjectiveText
+    );
 
 protected:
     virtual void BeginPlay() override;
@@ -59,6 +63,8 @@ protected:
     void UpdateInteractionPrompt();
     
     void Interact();
+
+    void RefreshObjectiveWidget();
   
 
     UPROPERTY(
@@ -154,6 +160,9 @@ protected:
 
     UPROPERTY()
     TObjectPtr<UBHObjectiveWidget> ObjectiveWidget;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Objectives")
+    TObjectPtr<UBHMissionData> MissionData;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Objectives", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UBHObjectiveComponent> ObjectiveComponent;

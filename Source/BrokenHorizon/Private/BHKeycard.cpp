@@ -1,6 +1,7 @@
 #include "BHKeycard.h"
 
 #include "BHCharacter.h"
+#include "BHMissionData.h"
 #include "Components/StaticMeshComponent.h"
 
 ABHKeycard::ABHKeycard()
@@ -29,8 +30,8 @@ void ABHKeycard::Interact_Implementation(AActor* InteractingActor)
     }
 
     Character->AddKeycard(KeycardID);
-    Character->SetObjective(
-        FText::FromString(TEXT("Unlock the Security Door"))
+    Character->CompleteObjective(
+        BHObjectiveIds::FindRedKeycard
     );
 
     Destroy();

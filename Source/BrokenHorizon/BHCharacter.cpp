@@ -17,6 +17,7 @@
 #include "BHObjectiveWidget.h"
 #include "BHObjectiveComponent.h"
 #include "BHObjectiveNotificationWidget.h"
+#include "BHMissionData.h"
 
 
 ABHCharacter::ABHCharacter()
@@ -67,9 +68,6 @@ void ABHCharacter::BeginPlay()
         if (ObjectiveWidget)
         {
             ObjectiveWidget->AddToViewport();
-            SetObjective(
-                FText::FromString(TEXT("Find the Red Keycard"))
-            );
         }
     }
 
@@ -98,6 +96,9 @@ void ABHCharacter::BeginPlay()
             this,
             &ABHCharacter::OnObjectiveCompleted
         );
+
+        ObjectiveComponent->StartMission(MissionData);
+        RefreshObjectiveWidget();
     }
 
     APlayerController* PlayerController =
@@ -457,27 +458,28 @@ bool ABHCharacter::HasKeycard(const FName KeycardID) const
     return OwnedKeycards.Contains(KeycardID);
 }
 
-void ABHCharacter::SetObjective(const FText& NewObjective)
+bool ABHCharacter::CompleteObjective(FName ObjectiveID)
 {
-    if (IsValid(ObjectiveComponent))
+    if (!IsValid(ObjectiveComponent))
     {
-        ObjectiveComponent->SetObjective(NewObjective);
+        return false;
     }
 
-    if (IsValid(ObjectiveWidget) &&
-        IsValid(ObjectiveComponent))
-    {
-        ObjectiveWidget->SetObjectiveList(
-            ObjectiveComponent->GetCompletedObjectives(),
-            ObjectiveComponent->GetCurrentObjective()
-        );
-    }
+    return ObjectiveComponent->CompleteObjectiveByID(ObjectiveID);
 }
 
 void ABHCharacter::OnObjectiveCompleted(
-    FText CompletedObjective
+    FName CompletedObjectiveID,
+    FText CompletedObjectiveText
 )
 {
+    UE_LOG(
+        LogTemp,
+        Log,
+        TEXT("Completed objective %s."),
+        *CompletedObjectiveID.ToString()
+    );
+
     if (!ObjectiveNotificationWidget &&
         ObjectiveNotificationWidgetClass)
     {
@@ -503,16 +505,21 @@ void ABHCharacter::OnObjectiveCompleted(
                     "ObjectiveCompletedNotification",
                     "OBJECTIVE COMPLETE\n\n\u2713 {0}"
                 ),
-                CompletedObjective
+                CompletedObjectiveText
             )
         );
     }
 
+    RefreshObjectiveWidget();
+}
+
+void ABHCharacter::RefreshObjectiveWidget()
+{
     if (IsValid(ObjectiveWidget) && IsValid(ObjectiveComponent))
     {
         ObjectiveWidget->SetObjectiveList(
-            ObjectiveComponent->GetCompletedObjectives(),
-            ObjectiveComponent->GetCurrentObjective()
+            ObjectiveComponent->GetCompletedObjectiveTexts(),
+            ObjectiveComponent->GetCurrentObjectiveText()
         );
     }
 }
