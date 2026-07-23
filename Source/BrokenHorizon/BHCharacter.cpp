@@ -13,6 +13,7 @@
 #include "BHInteractable.h"
 #include "Blueprint/UserWidget.h"
 #include "BHInteractionPromptWidget.h"
+#include "BHObjectiveWidget.h"
 
 ABHCharacter::ABHCharacter()
 {
@@ -46,6 +47,22 @@ ABHCharacter::ABHCharacter()
 void ABHCharacter::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (ObjectiveWidgetClass)
+    {
+        ObjectiveWidget = CreateWidget<UBHObjectiveWidget>(
+            GetWorld(),
+            ObjectiveWidgetClass
+        );
+
+        if (ObjectiveWidget)
+        {
+            ObjectiveWidget->AddToViewport();
+            ObjectiveWidget->SetObjectiveText(
+                FText::FromString(TEXT("Find the Red Keycard"))
+            );
+        }
+    }
 
     if (InteractionPromptClass)
     {
@@ -305,48 +322,59 @@ void ABHCharacter::Tick(float DeltaTime)
 
 void ABHCharacter::UpdateInteractionPrompt()
 {
-    if (!InteractionPromptWidget || !FirstPersonCamera)
+    if (!IsValid(InteractionPromptWidget) || !IsValid(FirstPersonCamera))
     {
         return;
     }
 
-    const FVector Start = FirstPersonCamera->GetComponentLocation();
-    const FVector End =
-        Start + (FirstPersonCamera->GetForwardVector() * 300.0f);
+    const FVector TraceStart = FirstPersonCamera->GetComponentLocation();
+    const FVector TraceEnd =
+        TraceStart +
+        (FirstPersonCamera->GetForwardVector() * InteractionDistance);
 
-    FHitResult Hit;
+    FHitResult HitResult;
 
-    FCollisionQueryParams Params;
-    Params.AddIgnoredActor(this);
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(this);
 
-    bool bLookingAtInteractable = false;
-
-    if (GetWorld()->LineTraceSingleByChannel(
-        Hit,
-        Start,
-        End,
+    const bool bHit = GetWorld()->LineTraceSingleByChannel(
+        HitResult,
+        TraceStart,
+        TraceEnd,
         ECC_Visibility,
-        Params))
-    {
-        AActor* HitActor = Hit.GetActor();
+        QueryParams
+    );
 
-        if (IsValid(HitActor) &&
-            HitActor->Implements<UBHInteractable>())
-        {
-            bLookingAtInteractable = true;
-        }
+    if (!bHit)
+    {
+        InteractionPromptWidget->SetVisibility(
+            ESlateVisibility::Hidden
+        );
+        return;
+    }
+
+    AActor* HitActor = HitResult.GetActor();
+
+    if (IsValid(HitActor) &&
+        HitActor->GetClass()->ImplementsInterface(
+            UBHInteractable::StaticClass()
+        ))
+    {
         const FText PromptText =
             IBHInteractable::Execute_GetInteractionText(HitActor);
 
         InteractionPromptWidget->SetInteractionText(PromptText);
+        InteractionPromptWidget->SetVisibility(
+            ESlateVisibility::Visible
+        );
     }
-
-    InteractionPromptWidget->SetVisibility(
-        bLookingAtInteractable
-        ? ESlateVisibility::Visible
-        : ESlateVisibility::Collapsed
-    );
-}
+    else
+    {
+        InteractionPromptWidget->SetVisibility(
+            ESlateVisibility::Hidden
+        );
+    }
+} 
 
 void ABHCharacter::Interact()
 {
@@ -395,3 +423,24 @@ void ABHCharacter::Interact()
         2.0f
     );
 } 
+
+void ABHCharacter::AddKeycard(const FName KeycardID)
+{
+    if (!KeycardID.IsNone())
+    {
+        OwnedKeycards.Add(KeycardID);
+    }
+}
+
+bool ABHCharacter::HasKeycard(const FName KeycardID) const
+{
+    return OwnedKeycards.Contains(KeycardID);
+}
+
+void ABHCharacter::SetObjective(const FText& NewObjective)
+{
+    if (IsValid(ObjectiveWidget))
+    {
+        ObjectiveWidget->SetObjectiveText(NewObjective);
+    }
+}

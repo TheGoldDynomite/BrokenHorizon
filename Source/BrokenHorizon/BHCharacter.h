@@ -10,6 +10,7 @@ class UInputAction;
 class UInputMappingContext;
 class UInputComponent; 
 class UBHInteractionPromptWidget;
+class UBHObjectiveWidget;
 
 UCLASS()
 class BROKENHORIZON_API ABHCharacter : public ACharacter
@@ -18,6 +19,16 @@ class BROKENHORIZON_API ABHCharacter : public ACharacter
 
 public:
     ABHCharacter();
+
+
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    void AddKeycard(FName KeycardID);
+
+    UFUNCTION(BlueprintPure, Category = "Inventory")
+    bool HasKeycard(FName KeycardID) const;
+
+    UFUNCTION(BlueprintCallable, Category = "Objective")
+    void SetObjective(const FText& NewObjective);
 
 protected:
     virtual void BeginPlay() override;
@@ -116,6 +127,9 @@ protected:
     bool bIsSprinting = false;
     float TimeSinceSprintStopped = 0.0f;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+    float InteractionDistance = 300.0f;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Input")
     TObjectPtr<UInputAction> InteractAction;
 
@@ -125,5 +139,14 @@ protected:
     UPROPERTY()
     TObjectPtr<UBHInteractionPromptWidget> InteractionPromptWidget;
 
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
+    TSet<FName> OwnedKeycards;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Objective")
+    TSubclassOf<UBHObjectiveWidget> ObjectiveWidgetClass;
+
+    UPROPERTY()
+    TObjectPtr<UBHObjectiveWidget> ObjectiveWidget;
   
 };
