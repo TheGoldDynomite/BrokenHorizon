@@ -1,5 +1,6 @@
 #include "BHCharacter.h"
 
+
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
@@ -14,10 +15,18 @@
 #include "Blueprint/UserWidget.h"
 #include "BHInteractionPromptWidget.h"
 #include "BHObjectiveWidget.h"
+#include "BHObjectiveComponent.h"
+#include "BHObjectiveNotificationWidget.h"
+
 
 ABHCharacter::ABHCharacter()
 {
+
     PrimaryActorTick.bCanEverTick = false;
+
+    ObjectiveComponent = CreateDefaultSubobject<UBHObjectiveComponent>(
+        TEXT("ObjectiveComponent")
+    );
 
     FirstPersonCamera =
         CreateDefaultSubobject<UCameraComponent>(
@@ -58,7 +67,7 @@ void ABHCharacter::BeginPlay()
         if (ObjectiveWidget)
         {
             ObjectiveWidget->AddToViewport();
-            ObjectiveWidget->SetObjectiveText(
+            SetObjective(
                 FText::FromString(TEXT("Find the Red Keycard"))
             );
         }
@@ -74,10 +83,21 @@ void ABHCharacter::BeginPlay()
         if (InteractionPromptWidget)
         {
             InteractionPromptWidget->AddToViewport();
+
             InteractionPromptWidget->SetVisibility(
                 ESlateVisibility::Collapsed
             );
         }
+    }
+
+
+    // Objective Notification Event
+    if (ObjectiveComponent)
+    {
+        ObjectiveComponent->OnObjectiveCompleted.AddDynamic(
+            this,
+            &ABHCharacter::OnObjectiveCompleted
+        );
     }
 
     APlayerController* PlayerController =
@@ -439,8 +459,60 @@ bool ABHCharacter::HasKeycard(const FName KeycardID) const
 
 void ABHCharacter::SetObjective(const FText& NewObjective)
 {
-    if (IsValid(ObjectiveWidget))
+    if (IsValid(ObjectiveComponent))
     {
-        ObjectiveWidget->SetObjectiveText(NewObjective);
+        ObjectiveComponent->SetObjective(NewObjective);
+    }
+
+    if (IsValid(ObjectiveWidget) &&
+        IsValid(ObjectiveComponent))
+    {
+        ObjectiveWidget->SetObjectiveList(
+            ObjectiveComponent->GetCompletedObjectives(),
+            ObjectiveComponent->GetCurrentObjective()
+        );
+    }
+}
+
+void ABHCharacter::OnObjectiveCompleted(
+    FText CompletedObjective
+)
+{
+    if (!ObjectiveNotificationWidget &&
+        ObjectiveNotificationWidgetClass)
+    {
+        ObjectiveNotificationWidget =
+            CreateWidget<UBHObjectiveNotificationWidget>(
+                GetWorld(),
+                ObjectiveNotificationWidgetClass
+            );
+
+        if (ObjectiveNotificationWidget)
+        {
+            ObjectiveNotificationWidget->AddToViewport();
+        }
+    }
+
+
+    if (ObjectiveNotificationWidget)
+    {
+        ObjectiveNotificationWidget->ShowNotification(
+            FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "ObjectiveCompletedNotification",
+                    "OBJECTIVE COMPLETE\n\n\u2713 {0}"
+                ),
+                CompletedObjective
+            )
+        );
+    }
+
+    if (IsValid(ObjectiveWidget) && IsValid(ObjectiveComponent))
+    {
+        ObjectiveWidget->SetObjectiveList(
+            ObjectiveComponent->GetCompletedObjectives(),
+            ObjectiveComponent->GetCurrentObjective()
+        );
     }
 }

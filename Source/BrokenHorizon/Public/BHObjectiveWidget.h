@@ -16,6 +16,12 @@ public:
     UFUNCTION(BlueprintCallable)
     void SetObjectiveText(const FText& NewText);
 
+    UFUNCTION(BlueprintCallable)
+    void SetObjectiveList(
+        const TArray<FText>& Completed,
+        const FText& Current
+    );
+
 protected:
 
     UPROPERTY(meta = (BindWidget))

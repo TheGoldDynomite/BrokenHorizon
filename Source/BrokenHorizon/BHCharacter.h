@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+
 #include "BHCharacter.generated.h"
 
 class UCameraComponent;
@@ -11,6 +12,8 @@ class UInputMappingContext;
 class UInputComponent; 
 class UBHInteractionPromptWidget;
 class UBHObjectiveWidget;
+class UBHObjectiveComponent;
+class UBHObjectiveNotificationWidget;
 
 UCLASS()
 class BROKENHORIZON_API ABHCharacter : public ACharacter
@@ -30,6 +33,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Objective")
     void SetObjective(const FText& NewObjective);
 
+    UFUNCTION()
+    void OnObjectiveCompleted(FText CompletedObjective);
+
 protected:
     virtual void BeginPlay() override;
 
@@ -37,7 +43,7 @@ protected:
         UInputComponent* PlayerInputComponent) override;
 
     void Move(const FInputActionValue& Value);
-    void Look(const FInputActionValue& Value);\
+    void Look(const FInputActionValue& Value);
 
     void StartJump();
     void StopJump();
@@ -148,5 +154,14 @@ protected:
 
     UPROPERTY()
     TObjectPtr<UBHObjectiveWidget> ObjectiveWidget;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Objectives", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UBHObjectiveComponent> ObjectiveComponent;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Objectives")
+    TSubclassOf<UBHObjectiveNotificationWidget> ObjectiveNotificationWidgetClass;
+
+    UPROPERTY()
+    TObjectPtr<UBHObjectiveNotificationWidget> ObjectiveNotificationWidget;
   
 };
