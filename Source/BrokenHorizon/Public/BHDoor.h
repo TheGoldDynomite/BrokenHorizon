@@ -25,7 +25,12 @@ public:
     virtual FText GetInteractionText_Implementation() const override;
 
     virtual void Tick(float DeltaTime) override;
-    
+
+    FName GetPersistenceID() const;
+
+    bool IsUnlocked() const;
+
+    void RestoreUnlockedState(bool bShouldBeUnlocked);
 
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Door|Components")
@@ -48,6 +53,9 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Door")
     FName RequiredKeycard = NAME_None;
+
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Persistence")
+    FName PersistenceID = NAME_None;
 
     FRotator ClosedRotation;
     FRotator OpenRotation;

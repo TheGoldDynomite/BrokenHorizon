@@ -453,9 +453,43 @@ void ABHCharacter::AddKeycard(const FName KeycardID)
     }
 }
 
+bool ABHCharacter::CollectKeycard(
+    FName KeycardID,
+    FName PickupPersistenceID
+)
+{
+    if (KeycardID.IsNone() || PickupPersistenceID.IsNone())
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT(
+                "Cannot collect keycard: both the inventory ID and "
+                "pickup persistence ID are required."
+            )
+        );
+        return false;
+    }
+
+    OwnedKeycards.Add(KeycardID);
+    CollectedKeycardPersistenceIDs.Add(PickupPersistenceID);
+    return true;
+}
+
 bool ABHCharacter::HasKeycard(const FName KeycardID) const
 {
     return OwnedKeycards.Contains(KeycardID);
+}
+
+TArray<FName> ABHCharacter::GetOwnedKeycardIDs() const
+{
+    return OwnedKeycards.Array();
+}
+
+TArray<FName>
+ABHCharacter::GetCollectedKeycardPersistenceIDs() const
+{
+    return CollectedKeycardPersistenceIDs.Array();
 }
 
 bool ABHCharacter::CompleteObjective(FName ObjectiveID)
@@ -466,6 +500,74 @@ bool ABHCharacter::CompleteObjective(FName ObjectiveID)
     }
 
     return ObjectiveComponent->CompleteObjectiveByID(ObjectiveID);
+}
+
+UBHMissionData* ABHCharacter::GetMissionData() const
+{
+    return IsValid(ObjectiveComponent)
+        ? ObjectiveComponent->GetActiveMissionData()
+        : MissionData.Get();
+}
+
+FName ABHCharacter::GetCurrentObjectiveID() const
+{
+    return IsValid(ObjectiveComponent)
+        ? ObjectiveComponent->GetCurrentObjectiveID()
+        : NAME_None;
+}
+
+TArray<FName> ABHCharacter::GetCompletedObjectiveIDs() const
+{
+    return IsValid(ObjectiveComponent)
+        ? ObjectiveComponent->GetCompletedObjectiveIDs()
+        : TArray<FName>();
+}
+
+bool ABHCharacter::RestorePersistentState(
+    UBHMissionData* SavedMissionData,
+    FName SavedCurrentObjectiveID,
+    const TArray<FName>& SavedCompletedObjectiveIDs,
+    const TArray<FName>& SavedOwnedKeycardIDs,
+    const TArray<FName>& SavedCollectedKeycardPersistenceIDs
+)
+{
+    if (!IsValid(ObjectiveComponent))
+    {
+        return false;
+    }
+
+    OwnedKeycards.Reset();
+
+    for (const FName KeycardID : SavedOwnedKeycardIDs)
+    {
+        if (!KeycardID.IsNone())
+        {
+            OwnedKeycards.Add(KeycardID);
+        }
+    }
+
+    CollectedKeycardPersistenceIDs.Reset();
+
+    for (const FName PersistenceID
+        : SavedCollectedKeycardPersistenceIDs)
+    {
+        if (!PersistenceID.IsNone())
+        {
+            CollectedKeycardPersistenceIDs.Add(PersistenceID);
+        }
+    }
+
+    MissionData = SavedMissionData;
+
+    const bool bRestoredObjectives =
+        ObjectiveComponent->RestoreMissionState(
+            SavedMissionData,
+            SavedCurrentObjectiveID,
+            SavedCompletedObjectiveIDs
+        );
+
+    RefreshObjectiveWidget();
+    return bRestoredObjectives;
 }
 
 void ABHCharacter::OnObjectiveCompleted(

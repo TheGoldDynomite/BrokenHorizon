@@ -95,6 +95,94 @@ bool UBHObjectiveComponent::CompleteObjectiveByID(
     return true;
 }
 
+bool UBHObjectiveComponent::RestoreMissionState(
+    UBHMissionData* MissionData,
+    FName SavedCurrentObjectiveID,
+    const TArray<FName>& SavedCompletedObjectiveIDs
+)
+{
+    ActiveMissionData = MissionData;
+    CurrentObjectiveID = NAME_None;
+    CompletedObjectiveIDs.Reset();
+    CurrentObjectiveIndex = INDEX_NONE;
+
+    if (!IsValid(ActiveMissionData))
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT("Cannot restore objective state without mission data.")
+        );
+        return false;
+    }
+
+    TSet<FName> RestoredCompletedIDs;
+
+    for (const FName CompletedID : SavedCompletedObjectiveIDs)
+    {
+        if (!FindObjectiveDefinition(CompletedID))
+        {
+            UE_LOG(
+                LogTemp,
+                Warning,
+                TEXT(
+                    "Skipped saved objective %s because it is not "
+                    "present in mission %s."
+                ),
+                *CompletedID.ToString(),
+                *ActiveMissionData->GetName()
+            );
+            continue;
+        }
+
+        if (RestoredCompletedIDs.Contains(CompletedID))
+        {
+            UE_LOG(
+                LogTemp,
+                Warning,
+                TEXT("Skipped duplicate saved objective %s."),
+                *CompletedID.ToString()
+            );
+            continue;
+        }
+
+        RestoredCompletedIDs.Add(CompletedID);
+        CompletedObjectiveIDs.Add(CompletedID);
+    }
+
+    if (SavedCurrentObjectiveID.IsNone())
+    {
+        return true;
+    }
+
+    const int32 SavedObjectiveIndex =
+        FindObjectiveIndex(SavedCurrentObjectiveID);
+
+    if (SavedObjectiveIndex == INDEX_NONE)
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT(
+                "Cannot restore current objective %s because it is "
+                "not present in mission %s."
+            ),
+            *SavedCurrentObjectiveID.ToString(),
+            *ActiveMissionData->GetName()
+        );
+        return false;
+    }
+
+    CurrentObjectiveIndex = SavedObjectiveIndex;
+    CurrentObjectiveID = SavedCurrentObjectiveID;
+    return true;
+}
+
+UBHMissionData* UBHObjectiveComponent::GetActiveMissionData() const
+{
+    return ActiveMissionData;
+}
+
 FName UBHObjectiveComponent::GetCurrentObjectiveID() const
 {
     return CurrentObjectiveID;
@@ -170,4 +258,21 @@ void UBHObjectiveComponent::SetCurrentObjectiveFromIndex(
     CurrentObjectiveIndex = ObjectiveIndex;
     CurrentObjectiveID =
         ActiveMissionData->Objectives[ObjectiveIndex].ObjectiveID;
+}
+
+int32 UBHObjectiveComponent::FindObjectiveIndex(
+    FName ObjectiveID
+) const
+{
+    if (!IsValid(ActiveMissionData) || ObjectiveID.IsNone())
+    {
+        return INDEX_NONE;
+    }
+
+    return ActiveMissionData->Objectives.IndexOfByPredicate(
+        [ObjectiveID](const FBHObjectiveDefinition& Definition)
+        {
+            return Definition.ObjectiveID == ObjectiveID;
+        }
+    );
 }

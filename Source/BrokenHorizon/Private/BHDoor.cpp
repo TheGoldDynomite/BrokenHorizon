@@ -77,6 +77,16 @@ void ABHDoor::BeginPlay()
     ClosedRotation = DoorRoot->GetRelativeRotation();
     OpenRotation = ClosedRotation + FRotator(0.0f, OpenAngle, 0.0f);
     TargetOpenRotation = OpenRotation;
+
+    if (PersistenceID.IsNone())
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT("Door %s has no persistence ID."),
+            *GetPathName()
+        );
+    }
 }
 
 void ABHDoor::Tick(float DeltaTime)
@@ -94,4 +104,26 @@ void ABHDoor::Tick(float DeltaTime)
     );
 
     DoorRoot->SetRelativeRotation(NewRotation);
+}
+
+FName ABHDoor::GetPersistenceID() const
+{
+    return PersistenceID;
+}
+
+bool ABHDoor::IsUnlocked() const
+{
+    return !bLocked;
+}
+
+void ABHDoor::RestoreUnlockedState(bool bShouldBeUnlocked)
+{
+    bLocked = !bShouldBeUnlocked;
+
+    if (bLocked)
+    {
+        bIsOpen = false;
+        TargetOpenRotation = ClosedRotation;
+        DoorRoot->SetRelativeRotation(ClosedRotation);
+    }
 }

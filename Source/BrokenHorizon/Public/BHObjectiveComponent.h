@@ -29,6 +29,14 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Objectives")
     bool CompleteObjectiveByID(FName ObjectiveID);
 
+    bool RestoreMissionState(
+        UBHMissionData* MissionData,
+        FName SavedCurrentObjectiveID,
+        const TArray<FName>& SavedCompletedObjectiveIDs
+    );
+
+    UBHMissionData* GetActiveMissionData() const;
+
     UFUNCTION(BlueprintPure, Category = "Objectives")
     FName GetCurrentObjectiveID() const;
 
@@ -63,6 +71,8 @@ private:
     ) const;
 
     void SetCurrentObjectiveFromIndex(int32 ObjectiveIndex);
+
+    int32 FindObjectiveIndex(FName ObjectiveID) const;
 
     int32 CurrentObjectiveIndex = INDEX_NONE;
 };

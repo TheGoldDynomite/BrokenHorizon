@@ -20,6 +20,21 @@ ABHKeycard::ABHKeycard()
     KeycardMesh->SetSimulatePhysics(false);
 }
 
+void ABHKeycard::BeginPlay()
+{
+    Super::BeginPlay();
+
+    if (PersistenceID.IsNone())
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT("Keycard %s has no persistence ID."),
+            *GetPathName()
+        );
+    }
+}
+
 void ABHKeycard::Interact_Implementation(AActor* InteractingActor)
 {
     ABHCharacter* Character = Cast<ABHCharacter>(InteractingActor);
@@ -29,7 +44,11 @@ void ABHKeycard::Interact_Implementation(AActor* InteractingActor)
         return;
     }
 
-    Character->AddKeycard(KeycardID);
+    if (!Character->CollectKeycard(KeycardID, PersistenceID))
+    {
+        return;
+    }
+
     Character->CompleteObjective(
         BHObjectiveIds::FindRedKeycard
     );
@@ -40,4 +59,9 @@ void ABHKeycard::Interact_Implementation(AActor* InteractingActor)
 FText ABHKeycard::GetInteractionText_Implementation() const
 {
     return FText::FromString(TEXT("Press [F] to Pick Up Red Keycard"));
+}
+
+FName ABHKeycard::GetPersistenceID() const
+{
+    return PersistenceID;
 }

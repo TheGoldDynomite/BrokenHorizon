@@ -28,11 +28,34 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Inventory")
     void AddKeycard(FName KeycardID);
 
+    bool CollectKeycard(
+        FName KeycardID,
+        FName PickupPersistenceID
+    );
+
     UFUNCTION(BlueprintPure, Category = "Inventory")
     bool HasKeycard(FName KeycardID) const;
 
+    TArray<FName> GetOwnedKeycardIDs() const;
+
+    TArray<FName> GetCollectedKeycardPersistenceIDs() const;
+
     UFUNCTION(BlueprintCallable, Category = "Objectives")
     bool CompleteObjective(FName ObjectiveID);
+
+    UBHMissionData* GetMissionData() const;
+
+    FName GetCurrentObjectiveID() const;
+
+    TArray<FName> GetCompletedObjectiveIDs() const;
+
+    bool RestorePersistentState(
+        UBHMissionData* SavedMissionData,
+        FName SavedCurrentObjectiveID,
+        const TArray<FName>& SavedCompletedObjectiveIDs,
+        const TArray<FName>& SavedOwnedKeycardIDs,
+        const TArray<FName>& SavedCollectedKeycardPersistenceIDs
+    );
 
     UFUNCTION()
     void OnObjectiveCompleted(
@@ -154,6 +177,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
     TSet<FName> OwnedKeycards;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
+    TSet<FName> CollectedKeycardPersistenceIDs;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Objective")
     TSubclassOf<UBHObjectiveWidget> ObjectiveWidgetClass;

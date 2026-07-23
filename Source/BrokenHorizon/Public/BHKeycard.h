@@ -19,9 +19,16 @@ public:
 
     virtual FText GetInteractionText_Implementation() const override;
 
+    FName GetPersistenceID() const;
+
 protected:
+    virtual void BeginPlay() override;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Keycard")
     TObjectPtr<UStaticMeshComponent> KeycardMesh;
+
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Persistence")
+    FName PersistenceID = NAME_None;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Keycard")
     FName KeycardID = TEXT("RedKeycard");
