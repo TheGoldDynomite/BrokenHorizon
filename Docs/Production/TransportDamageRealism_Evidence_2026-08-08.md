@@ -10,6 +10,9 @@ fraction, forward and reverse mobility degrade progressively and mechanical
 strain increases fuel burn. A transport with zero hull still stops through the
 existing immobilization path, while the existing crew-damage, repair,
 replication, and save/load contracts remain intact.
+The native transport label now reports the current mobility percentage so the
+player can understand the handling penalty before the vehicle becomes
+immobilized.
 
 ## Runtime contract
 
@@ -21,6 +24,8 @@ replication, and save/load contracts remain intact.
   penalty.
 - The live movement path applies both curves to forward speed, reverse speed,
   and distance-based fuel consumption.
+- `GetMobilityPercentage` exposes the live mobility state to Blueprint and the
+  native transport label, reporting `0%` for an immobilized vehicle.
 - The calculation functions clamp invalid fractions and multipliers so
   Blueprint-authored tuning cannot create negative mobility or reduced fuel
   burn from damage.
@@ -41,6 +46,9 @@ Results:
 - First Light smoke passed with
   `BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE_COMPLETE result=success`.
 - First Light navigation fallbacks were `8/12`, within the configured limit.
+- The first validation attempt encountered a transient MSVC internal compiler
+  error in untouched `BHAmbientWarDirector.cpp`; the immediate retry passed
+  without any ambient-war source change.
 
 Evidence logs:
 

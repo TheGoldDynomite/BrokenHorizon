@@ -86,6 +86,12 @@ public:
         BlueprintPure,
         Category = "Field Transport|Readiness"
     )
+    float GetMobilityPercentage() const;
+
+    UFUNCTION(
+        BlueprintPure,
+        Category = "Field Transport|Readiness"
+    )
     float GetSpeedKPH() const;
 
     UFUNCTION(

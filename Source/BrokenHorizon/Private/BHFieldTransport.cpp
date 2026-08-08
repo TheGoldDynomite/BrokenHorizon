@@ -511,6 +511,13 @@ float ABHFieldTransport::GetHullPercentage() const
     );
 }
 
+float ABHFieldTransport::GetMobilityPercentage() const
+{
+    return CurrentHull <= KINDA_SMALL_NUMBER
+        ? 0.0f
+        : GetHullMobilityMultiplier();
+}
+
 float ABHFieldTransport::GetSpeedKPH() const
 {
     return FMath::Abs(CurrentSpeed) * 0.036f;
@@ -2107,10 +2114,12 @@ void ABHFieldTransport::UpdateTransportLabel()
     const FString ReadinessText = FString::Printf(
         TEXT(
             "FIELD TRANSPORT\n"
-            "FUEL %.0f%% // HULL %.0f%% // %s"
+            "FUEL %.0f%% // HULL %.0f%% // "
+            "MOBILITY %.0f%% // %s"
         ),
         GetFuelPercentage() * 100.0f,
         GetHullPercentage() * 100.0f,
+        GetMobilityPercentage() * 100.0f,
         *CargoText
     );
     TransportLabel->SetText(FText::FromString(ReadinessText));
