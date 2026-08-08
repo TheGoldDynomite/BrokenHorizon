@@ -1283,10 +1283,24 @@ void ABHWarGameState::BeginPlay()
             {
                 const FBHCarryLoadProfile Fighting =
                     UBHLoadoutWeight::BuildCarryLoadProfile(
-                        EBHWeaponRole::Assault, 15, 30, 0, 0, 0, 0);
+                        EBHWeaponRole::Assault,
+                        15,
+                        30,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0);
                 const FBHCarryLoadProfile Heavy =
                     UBHLoadoutWeight::BuildCarryLoadProfile(
-                        EBHWeaponRole::Support, 60, 240, 2, 2, 2, 3);
+                        EBHWeaponRole::Support,
+                        60,
+                        240,
+                        2,
+                        0,
+                        2,
+                        2,
+                        3);
                 const bool bSuccess =
                     Heavy.TotalKilograms > Fighting.TotalKilograms &&
                     Heavy.StaminaDrainMultiplier >
@@ -2254,12 +2268,7 @@ void ABHWarGameState::RunRenderedUIReviewTest()
                     EBHWarFaction::Friendly,
                     79.0f,
                     1.5f,
-                    12,
-                    1,
-                    1,
-                    1.0f,
-                    1.1f,
-                    true
+                    12
                 );
                 It->SetEnemyResponsePressure(42.0f);
                 It->SetCivilianSupport(68.0f);

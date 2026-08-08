@@ -4,10 +4,14 @@
 #include "BHMissionData.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Net/UnrealNetwork.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 ABHDoor::ABHDoor()
 {
     PrimaryActorTick.bCanEverTick = true;
+    SetReplicates(true);
 
     DoorRoot = CreateDefaultSubobject<USceneComponent>(TEXT("DoorRoot"));
     SetRootComponent(DoorRoot);
@@ -16,8 +20,26 @@ ABHDoor::ABHDoor()
     DoorMesh->SetupAttachment(DoorRoot);
 }
 
+void ABHDoor::GetLifetimeReplicatedProps(
+    TArray<FLifetimeProperty>& OutLifetimeProps
+) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(ABHDoor, bIsOpen);
+    DOREPLIFETIME(ABHDoor, bLocked);
+    DOREPLIFETIME(ABHDoor, TargetOpenRotation);
+    DOREPLIFETIME(ABHDoor, bBreached);
+    DOREPLIFETIME(ABHDoor, bBreachChargePlanted);
+}
+
 void ABHDoor::Interact_Implementation(AActor* InteractingActor)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     ABHCharacter* Character = Cast<ABHCharacter>(InteractingActor);
 
     if (!IsValid(Character))
@@ -29,13 +51,23 @@ void ABHDoor::Interact_Implementation(AActor* InteractingActor)
     {
         if (!Character->HasKeycard(RequiredKeycard))
         {
-            UE_LOG(LogTemp, Warning, TEXT("Access Denied"));
+            if (!bBreachChargePlanted &&
+                Character->TryPlaceBreachingCharge(this))
+            {
+                bBreachChargePlanted = true;
+                ForceNetUpdate();
+                UE_LOG(LogTemp, Display, TEXT("BH_DOOR_BREACH state=charge_planted door=%s"), *GetName());
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Access Denied"));
+            }
             return;
         }
 
         bLocked = false;
 
-        Character->CompleteObjective(
+        Character->CompleteSharedObjective(
             BHObjectiveIds::UnlockSecurityDoor
         );
 
@@ -65,6 +97,12 @@ void ABHDoor::Interact_Implementation(AActor* InteractingActor)
 
 FText ABHDoor::GetInteractionText_Implementation() const
 {
+    if (bLocked)
+    {
+        return bBreachChargePlanted
+            ? NSLOCTEXT("BrokenHorizon", "DoorBreachChargePlanted", "Breach Charge Planted")
+            : NSLOCTEXT("BrokenHorizon", "DoorLockedBreachPrompt", "Press [F] to use keycard or plant breaching charge");
+    }
     return bIsOpen
         ? FText::FromString(TEXT("Press [F] to Close Door"))
         : FText::FromString(TEXT("Press [F] to Open Door"));
@@ -78,7 +116,11 @@ void ABHDoor::BeginPlay()
     OpenRotation = ClosedRotation + FRotator(0.0f, OpenAngle, 0.0f);
     TargetOpenRotation = OpenRotation;
 
-    if (PersistenceID.IsNone())
+    if (PersistenceID.IsNone() &&
+        !FParse::Param(
+            FCommandLine::Get(),
+            TEXT("BHTestEngineeringRuntime")
+        ))
     {
         UE_LOG(
             LogTemp,
@@ -126,4 +168,45 @@ void ABHDoor::RestoreUnlockedState(bool bShouldBeUnlocked)
         TargetOpenRotation = ClosedRotation;
         DoorRoot->SetRelativeRotation(ClosedRotation);
     }
+}
+
+bool ABHDoor::BreachDoor(ABHCharacter* BreachingCharacter)
+{
+    if (!HasAuthority() || !bLocked)
+    {
+        return false;
+    }
+    bLocked = false;
+    bBreached = true;
+    bBreachChargePlanted = false;
+    bIsOpen = true;
+    TargetOpenRotation = ClosedRotation + FRotator(0.0f, OpenAngle, 0.0f);
+    if (IsValid(BreachingCharacter))
+    {
+        BreachingCharacter->CompleteSharedObjective(
+            BHObjectiveIds::UnlockSecurityDoor
+        );
+        BreachingCharacter->ShowPriorityStatusNotification(
+            NSLOCTEXT("BrokenHorizon", "DoorBreachedNotification",
+                "BREACH COMPLETE // ENTRY OPEN\n\nDanger-close blast affected both sides of the doorway."),
+            EBHNotificationPriority::High
+        );
+    }
+    ForceNetUpdate();
+    UE_LOG(LogTemp, Display, TEXT("BH_DOOR_BREACH state=breached door=%s"), *GetName());
+    return true;
+}
+
+void ABHDoor::SetBreachChargePlanted(bool bPlanted)
+{
+    if (HasAuthority())
+    {
+        bBreachChargePlanted = bPlanted && bLocked;
+        ForceNetUpdate();
+    }
+}
+
+bool ABHDoor::CanBeBreached() const
+{
+    return bLocked && !bBreachChargePlanted;
 }

@@ -1,0 +1,14 @@
+﻿{
+    "Repo":  "TheGoldDynomite/BrokenHorizon",
+    "AssetFilter":  "*FirstLight*.zip",
+    "ExecutableAssetFilter":  "BrokenHorizon-*.exe",
+    "DirectReleaseUrl":  "https://github.com/TheGoldDynomite/BrokenHorizon/releases/tag/Update",
+    "ReleaseTagFallback":  "Update",
+    "DirectAssetName":  "BrokenHorizon-FirstLight-Development.zip",
+    "ForceUpdateFromTag":  true,
+    "AllowExecutableFallback":  false,
+    "SkipGitHub":  false,
+    "RequireManualLaunch":  true,
+    "PreserveSaved":  true,
+    "UseBitsTransfer":  true
+}

@@ -10,7 +10,6 @@
 #include "BHPatrolPoint.h"
 #include "BHPlayerResolver.h"
 #include "BHSupplyConvoyTarget.h"
-#include "BHWarSubsystem.h"
 #include "BrainComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
@@ -87,7 +86,7 @@ void ABHEnemyAIController::OnPossess(APawn* InPawn)
 
 void ABHEnemyAIController::ConfigurePerception()
 {
-    const ABHEnemySoldier* Enemy = GetEnemySoldier();
+    ABHEnemySoldier* Enemy = GetEnemySoldier();
 
     if (!IsValid(Enemy))
     {
@@ -112,14 +111,14 @@ void ABHEnemyAIController::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
 
-    const ABHEnemySoldier* Enemy = GetEnemySoldier();
+    ABHEnemySoldier* Enemy = GetEnemySoldier();
 
     if (!IsValid(Enemy) || Enemy->IsDead())
     {
         return;
     }
 
-    const UWorld* World = GetWorld();
+    UWorld* World = GetWorld();
 
     if (!IsValid(World))
     {
@@ -127,6 +126,95 @@ void ABHEnemyAIController::Tick(float DeltaSeconds)
     }
 
     UpdateSuppression(Enemy, DeltaSeconds);
+
+    int32 NearbyAllies = 0;
+    bool bFriendlyPlayerNearby = false;
+    if (Enemy->GetCombatFaction() == EBHCombatFaction::Hostile ||
+        Enemy->IsSurrendered())
+    {
+        for (TActorIterator<ABHEnemySoldier> SoldierIt(World);
+            SoldierIt;
+            ++SoldierIt)
+        {
+            ABHEnemySoldier* Candidate = *SoldierIt;
+            if (!IsValid(Candidate) ||
+                Candidate == Enemy ||
+                Candidate->IsDead() ||
+                Candidate->GetCombatFaction() !=
+                    Enemy->GetCombatFaction())
+            {
+                continue;
+            }
+
+            if (FVector::DistSquared2D(
+                    Candidate->GetActorLocation(),
+                    Enemy->GetActorLocation()
+                ) <= FMath::Square(Enemy->GetSurrenderAllyRadius()))
+            {
+                ++NearbyAllies;
+            }
+        }
+
+        for (TActorIterator<ABHCharacter> CharacterIt(World);
+            CharacterIt;
+            ++CharacterIt)
+        {
+            ABHCharacter* PlayerCharacter = *CharacterIt;
+            if (!IsValid(PlayerCharacter) ||
+                !PlayerCharacter->IsPlayerControlled() ||
+                PlayerCharacter->IsPlayerIncapacitated())
+            {
+                continue;
+            }
+
+            const UBHHealthComponent* PlayerHealth =
+                PlayerCharacter->GetHealthComponent();
+            if (!IsValid(PlayerHealth) || PlayerHealth->IsDead())
+            {
+                continue;
+            }
+
+            if (FVector::DistSquared2D(
+                    PlayerCharacter->GetActorLocation(),
+                    Enemy->GetActorLocation()
+                ) <= FMath::Square(
+                    Enemy->GetSurrenderPlayerCaptureRadius()
+                ))
+            {
+                bFriendlyPlayerNearby = true;
+                break;
+            }
+        }
+    }
+
+    if (Enemy->IsSurrendered())
+    {
+        StopMovement();
+        ClearFocus(EAIFocusPriority::Gameplay);
+        Enemy->UpdateSurrenderEscapeState(
+            DeltaSeconds,
+            bFriendlyPlayerNearby
+        );
+        if (!Enemy->IsSurrendered())
+        {
+            EnterRetreat(CombatTarget.Get());
+        }
+        return;
+    }
+
+    if (Enemy->GetCombatFaction() == EBHCombatFaction::Hostile &&
+        ABHEnemySoldier::ShouldSurrender(
+            SuppressionLevel,
+            Enemy->GetCombatReadiness(),
+            Enemy->IsOutOfAmmunition(),
+            NearbyAllies
+        ))
+    {
+        Enemy->SetSurrendered(true);
+        StopMovement();
+        ClearFocus(EAIFocusPriority::Gameplay);
+        return;
+    }
 
     if (CurrentState == EBHEnemyAIState::Combat &&
         ShouldRetreat(Enemy))
@@ -1151,10 +1239,20 @@ bool ABHEnemyAIController::ShouldRetreat(
     const UBHHealthComponent* HealthComponent =
         Enemy->GetHealthComponent();
 
-    return IsValid(HealthComponent) &&
+    const bool bHealthCritical =
+        IsValid(HealthComponent) &&
         !HealthComponent->IsDead() &&
         HealthComponent->GetHealthPercentage() <=
             Enemy->GetRetreatHealthThreshold();
+    const bool bReadinessCritical =
+        Enemy->GetCombatReadiness() <=
+            Enemy->GetRetreatReadinessThreshold();
+    const bool bSustainedPressure =
+        SuppressionLevel >=
+            (Enemy->GetRetreatSuppressionThreshold() * 0.5f);
+
+    return bHealthCritical ||
+        (bReadinessCritical && bSustainedPressure);
 }
 
 void ABHEnemyAIController::EnterRetreat(
@@ -1792,6 +1890,39 @@ void ABHEnemyAIController::HandleNavigationMoveFailure()
         static_cast<int32>(FallbackState),
         *Enemy->GetActorLocation().ToCompactString()
     );
+}
+
+float ABHEnemyAIController::CalculateCoverSelectionScore(
+    float DistanceToCover,
+    float DistanceToTarget,
+    float CoverQuality
+)
+{
+    const float QualityBonus = FMath::Max(0.0f, CoverQuality) * 400.0f;
+    const float TargetPressure = DistanceToTarget * 0.1f;
+    return DistanceToCover - TargetPressure - QualityBonus;
+}
+
+bool ABHEnemyAIController::CanAcceptSuppressiveFireOrder(
+    bool bIsAlive,
+    bool bIncapacitated,
+    int32 RoundsAvailable,
+    bool bTargetHostile
+)
+{
+    return bIsAlive &&
+        !bIncapacitated &&
+        RoundsAvailable > 0 &&
+        bTargetHostile;
+}
+
+float ABHEnemyAIController::CalculateSuppressiveFireSpread(
+    float IncomingSpread,
+    bool bSuppressiveOrder
+)
+{
+    const float SafeSpread = FMath::Max(0.0f, IncomingSpread);
+    return bSuppressiveOrder ? SafeSpread * 3.5f : SafeSpread;
 }
 
 void ABHEnemyAIController::HandleHoldMoveFailure(
@@ -2549,59 +2680,23 @@ bool ABHEnemyAIController::TryClaimCover(
             Target->GetActorLocation(),
             Candidate->GetAnchorLocation()
         );
-        float Score = Distance - FMath::Min(ThreatDistance * 0.1f, 250.0f);
-
+        float CoverQuality = 0.0f;
         if (const ABHFieldFortification* Fortification =
             Cast<ABHFieldFortification>(Candidate))
         {
-            UBHWarSubsystem* WarSubsystem =
-                IsValid(World) && IsValid(World->GetGameInstance())
-                    ? World->GetGameInstance()->GetSubsystem<UBHWarSubsystem>()
-                    : nullptr;
-            if (!IsValid(WarSubsystem) ||
-                !WarSubsystem->IsSectorConnectedToFactionLogistics(
-                    Fortification->GetSectorID()
-                ))
+            if (Fortification->GetHealthFraction() > 0.0f &&
+                Fortification->GetSectorID() != NAME_None)
             {
-                // Logistics-disconnected fortifications are tactically unreliable
-                // for AI cover and should be skipped as a defensive position.
-                continue;
-            }
-
-            const float CoverageFactor =
-                Fortification->GetCoverProtectionFactor();
-            if (CoverageFactor > KINDA_SMALL_NUMBER)
-            {
-                // Fortified points offer materially better protected lanes for
-                // combat movement; favor them based on current integrity so
-                // damaged fortifications remain usable when partially alive.
-                const float CoverageWeight =
-                    20.0f + (65.0f * CoverageFactor);
-                const float DefenseMultiplier =
-                    FMath::Max(
-                        1.0f,
-                        WarSubsystem->GetSectorFortificationDefenseMultiplier(
-                            Fortification->GetSectorID()
-                        )
-                    );
-                const float DefenseWeight = FMath::Max(
-                    0.0f,
-                    (DefenseMultiplier - 1.0f) * 35.0f
-                );
-
-                // Prioritize fortified cover that materially changes sector
-                // casualty math, while preserving some base reward for any
-                // functioning barricade.
-                const float HealthWeight = CoverageWeight + DefenseWeight;
-                Score -= HealthWeight;
-            }
-            else
-            {
-                // Ignore collapsed or nearly destroyed barricades for tactical
-                // cover selection.
-                continue;
+                CoverQuality =
+                    Fortification->GetAICoverQuality();
             }
         }
+
+        const float Score = CalculateCoverSelectionScore(
+            Distance,
+            ThreatDistance,
+            CoverQuality
+        );
 
         if (Score < BestScore)
         {
@@ -2648,29 +2743,6 @@ bool ABHEnemyAIController::IsCoverProtective(
         !IsValid(World))
     {
         return false;
-    }
-
-    if (const ABHFieldFortification* Fortification =
-        Cast<ABHFieldFortification>(CoverPoint))
-    {
-        const UWorld* LocalWorld = GetWorld();
-        const UBHWarSubsystem* WarSubsystem =
-            IsValid(LocalWorld) && IsValid(LocalWorld->GetGameInstance())
-            ? LocalWorld->GetGameInstance()->GetSubsystem<UBHWarSubsystem>()
-            : nullptr;
-        if (!IsValid(WarSubsystem) ||
-            !WarSubsystem->IsSectorConnectedToFactionLogistics(
-                Fortification->GetSectorID()
-            ))
-        {
-            return false;
-        }
-
-        if (Fortification->GetCoverProtectionFactor() <=
-            KINDA_SMALL_NUMBER)
-        {
-            return false;
-        }
     }
 
     FVector ThreatEyeLocation;

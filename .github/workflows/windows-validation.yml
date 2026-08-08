@@ -1,0 +1,48 @@
+name: Windows validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "Source/**"
+      - "Config/**"
+      - "Scripts/**"
+      - "BrokenHorizon.uproject"
+      - ".github/workflows/windows-validation.yml"
+
+concurrency:
+  group: broken-horizon-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on:
+      - self-hosted
+      - Windows
+      - unreal-5.8
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Build and test
+        shell: cmd
+        run: >
+          Validate-BrokenHorizon.cmd
+          -Build
+          -Tests
+          -Smoke
+          -FirstLight
+          -EngineRoot "${{ vars.UE_5_8_ROOT }}"
+          -LogPrefix "CI-${{ github.run_id }}"
+
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-logs-${{ github.run_id }}
+          path: Saved/Logs/CI-${{ github.run_id }}-*.log
+          if-no-files-found: warn
+          retention-days: 14

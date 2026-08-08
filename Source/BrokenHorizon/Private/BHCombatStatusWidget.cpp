@@ -745,6 +745,17 @@ void UBHCombatStatusWidget::SetSuppression(
     InvalidateLayoutAndVolatility();
 }
 
+void UBHCombatStatusWidget::SetControlledBreathing(bool bHolding)
+{
+    if (bControlledBreathing == bHolding)
+    {
+        return;
+    }
+
+    bControlledBreathing = bHolding;
+    InvalidateLayoutAndVolatility();
+}
+
 void UBHCombatStatusWidget::NotifyGrenadeThreat(
     AActor* SourceActor,
     FVector SourceDirection,
@@ -831,6 +842,14 @@ void UBHCombatStatusWidget::SetFragGrenadeCount(
 )
 {
     FragGrenadeCount = FMath::Max(0, GrenadeCount);
+    InvalidateLayoutAndVolatility();
+}
+
+void UBHCombatStatusWidget::SetSmokeGrenadeCount(
+    int32 GrenadeCount
+)
+{
+    SmokeGrenadeCount = FMath::Max(0, GrenadeCount);
     InvalidateLayoutAndVolatility();
 }
 
@@ -1123,12 +1142,7 @@ void UBHCombatStatusWidget::SetStrategicSituation(
     EBHWarFaction SectorOwner,
     float SectorSupply,
     float SupplyFlowPerTurn,
-    int32 WarTurn,
-    int32 ConstructedFortifications,
-    int32 FortificationCapacity,
-    float FortificationCoverage,
-    float FortificationDefenseMultiplier,
-    bool bConnectedFortifications
+    int32 WarTurn
 )
 {
     bStrategicSituationVisible =
@@ -1142,17 +1156,6 @@ void UBHCombatStatusWidget::SetStrategicSituation(
     );
     StrategicSupplyFlowPerTurn = SupplyFlowPerTurn;
     StrategicWarTurn = FMath::Max(0, WarTurn);
-    StrategicFortificationConstructed = FMath::Max(0, ConstructedFortifications);
-    StrategicFortificationCapacity = FMath::Max(1, FortificationCapacity);
-    StrategicFortificationCoverage = FMath::Max(
-        0.0f,
-        FortificationCoverage
-    );
-    StrategicFortificationDefenseMultiplier = FMath::Max(
-        1.0f,
-        FortificationDefenseMultiplier
-    );
-    bFortificationsConnected = bConnectedFortifications;
     InvalidateLayoutAndVolatility();
 }
 
@@ -2164,8 +2167,6 @@ int32 UBHCombatStatusWidget::NativePaint(
                 "LOCAL AO // %s // T%03d\n"
                 "%s // SUP %.0f // FLOW %+.1f\n"
                 "LOCALS %.0f%% // RESPONSE %s %.0f%%\n"
-                "FORTIFICATIONS %d/%d // COVER %d%% // DEF +%d%%\n"
-                "FORT ROUTE %s\n"
                 "%s"
             ),
             *StrategicSectorDisplayName.ToString(),
@@ -2176,31 +2177,6 @@ int32 UBHCombatStatusWidget::NativePaint(
             StrategicCivilianSupport,
             ResponseLabel,
             StrategicEnemyResponsePressure,
-            StrategicFortificationConstructed,
-            StrategicFortificationCapacity,
-            FMath::Clamp(
-                FMath::RoundToInt(
-                    FMath::Min(
-                        100.0f,
-                        (StrategicFortificationCoverage /
-                            FMath::Max(
-                                1.0f,
-                                static_cast<float>(
-                                    StrategicFortificationCapacity
-                                )
-                            )) * 100.0f
-                    )
-                ),
-                0,
-                100
-            ),
-            FMath::Max(
-                0,
-                FMath::RoundToInt(
-                    (StrategicFortificationDefenseMultiplier - 1.0f) * 100.0f
-                )
-            ),
-            bFortificationsConnected ? TEXT("ONLINE") : TEXT("OFFLINE"),
             *ReconLabel
         );
 
@@ -2647,6 +2623,10 @@ int32 UBHCombatStatusWidget::NativePaint(
             FName(TEXT("Grenade")),
             TEXT("G")
         );
+        const FString SmokeGrenadePrompt = GetBindingPrompt(
+            FName(TEXT("SmokeGrenade")),
+            TEXT("R")
+        );
         const FString EngineeringPrompt = GetBindingPrompt(
             FName(TEXT("Engineering")),
             TEXT("V")
@@ -2655,7 +2635,8 @@ int32 UBHCombatStatusWidget::NativePaint(
             TEXT(
                 "ARMOR  H:%d%%  V:%d%%\n"
                 "DRESSINGS: %d  [%s]  MEDKITS: %d [%s]\n"
-                "FRAGS: %d  [%s]  CHARGES: %d [%s]  ARMED: %d\n"
+                "FRAGS: %d  [%s]  SMOKES: %d  [%s]  CHARGES: %d [%s]  ARMED: %d\n"
+                "BREATH: %s\n"
                 "LOAD: %.1f KG  %s  SPEED:%d%%  ENDURANCE:%d%%"
             ),
             FMath::RoundToInt(
@@ -2670,9 +2651,12 @@ int32 UBHCombatStatusWidget::NativePaint(
             *MedkitPrompt,
             FragGrenadeCount,
             *GrenadePrompt,
+            SmokeGrenadeCount,
+            *SmokeGrenadePrompt,
             EngineeringChargeCount,
             *EngineeringPrompt,
             ActiveEngineeringChargeCount,
+            bControlledBreathing ? TEXT("HELD") : TEXT("READY"),
             CarryLoadKilograms,
             CarryLoadState == EBHCarryLoadState::Overloaded
                 ? TEXT("OVERLOADED")

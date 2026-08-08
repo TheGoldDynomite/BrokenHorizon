@@ -1,4 +1,6 @@
 #include "BHCharacter.h"
+#include "BHBattlefieldConditions.h"
+#include "BHLoadoutWeight.h"
 
 
 #include "Animation/AnimSequenceBase.h"
@@ -6,16 +8,19 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/SpotLightComponent.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "InputCoreTypes.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/World.h"
 #include "BHInteractable.h"
+#include "BHDoor.h"
 #include "Blueprint/UserWidget.h"
 #include "BHInteractionPromptWidget.h"
 #include "BHObjectiveWidget.h"
@@ -28,6 +33,7 @@
 #include "BHDefenseMissionDirector.h"
 #include "BHAmbientWarDirector.h"
 #include "BHOpenWorldOperationDirector.h"
+#include "BHRaidSabotageTarget.h"
 #include "BHEnemyAIController.h"
 #include "BHEnemySoldier.h"
 #include "BHWarOperationRules.h"
@@ -37,6 +43,7 @@
 #include "BHSectorAnchor.h"
 #include "BHSupplyConvoyTarget.h"
 #include "BHSaveSubsystem.h"
+#include "BHPlaytestTelemetrySubsystem.h"
 #include "BHSessionSubsystem.h"
 #include "BHWeaponComponent.h"
 #include "BHAmmoHUDWidget.h"
@@ -48,16 +55,29 @@
 #include "BHWarSubsystem.h"
 #include "BHGameShellSettings.h"
 #include "BHUserSettingsSubsystem.h"
+#include "BHSubtitleWidget.h"
 #include "BHCombatStatusWidget.h"
 #include "BHFragGrenade.h"
+#include "BHSmokeGrenade.h"
+#include "BHEngineeringCharge.h"
 #include "Engine/GameInstance.h"
 #include "EngineUtils.h"
+#include "GameFramework/DamageType.h"
+#include "HAL/PlatformMisc.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "NavigationInvokerComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Perception/AISense_Hearing.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
+#include "Sound/SoundBase.h"
 
 namespace
 {
+bool bBHPlayerCasualtyRuntimeProbeScheduled = false;
+bool bBHEngineeringRuntimeProbeScheduled = false;
+
 enum class EBHSectorSupplyReadiness : uint8
 {
     Starved,
@@ -120,6 +140,56 @@ FText GetSectorSupplyReadinessText(
             );
     }
 }
+
+FName ResolveMappingBindingID(
+    const UInputAction* Action,
+    const FKey& DefaultKey
+)
+{
+    if (!IsValid(Action))
+    {
+        return NAME_None;
+    }
+
+    const FString ActionName = Action->GetName();
+    if (ActionName.Contains(TEXT("Move")))
+    {
+        if (DefaultKey == EKeys::W) return TEXT("MoveForward");
+        if (DefaultKey == EKeys::S) return TEXT("MoveBackward");
+        if (DefaultKey == EKeys::A) return TEXT("MoveLeft");
+        if (DefaultKey == EKeys::D) return TEXT("MoveRight");
+    }
+    if (ActionName.Contains(TEXT("Look")))
+    {
+        if (DefaultKey == EKeys::MouseX) return TEXT("LookHorizontal");
+        if (DefaultKey == EKeys::MouseY) return TEXT("LookVertical");
+    }
+
+    const TPair<const TCHAR*, const TCHAR*> ActionBindings[] = {
+        {TEXT("Jump"), TEXT("Jump")},
+        {TEXT("Sprint"), TEXT("Sprint")},
+        {TEXT("Crouch"), TEXT("Crouch")},
+        {TEXT("Interact"), TEXT("Interact")},
+        {TEXT("Fire"), TEXT("Fire")},
+        {TEXT("Aim"), TEXT("Aim")},
+        {TEXT("Reload"), TEXT("Reload")},
+        {TEXT("Pause"), TEXT("Pause")},
+        {TEXT("LeanLeft"), TEXT("LeanLeft")},
+        {TEXT("LeanRight"), TEXT("LeanRight")},
+        {TEXT("Prone"), TEXT("Prone")},
+        {TEXT("Smoke"), TEXT("SmokeGrenade")},
+        {TEXT("FieldDressing"), TEXT("FieldDressing")},
+        {TEXT("Medkit"), TEXT("Medkit")}
+    };
+    for (const TPair<const TCHAR*, const TCHAR*>& Entry : ActionBindings)
+    {
+        if (ActionName.Contains(Entry.Key))
+        {
+            return FName(Entry.Value);
+        }
+    }
+    return NAME_None;
+}
 }
 
 
@@ -179,6 +249,21 @@ ABHCharacter::ABHCharacter()
     FirstPersonCamera->bUsePawnControlRotation = true;
     FirstPersonCamera->SetFieldOfView(90.0f);
 
+    TacticalFlashlight = CreateDefaultSubobject<USpotLightComponent>(
+        TEXT("TacticalFlashlight")
+    );
+    TacticalFlashlight->SetupAttachment(FirstPersonCamera);
+    TacticalFlashlight->SetRelativeLocation(
+        FVector(24.0f, 0.0f, -8.0f)
+    );
+    TacticalFlashlight->SetIntensity(4500.0f);
+    TacticalFlashlight->SetAttenuationRadius(2200.0f);
+    TacticalFlashlight->SetInnerConeAngle(12.0f);
+    TacticalFlashlight->SetOuterConeAngle(24.0f);
+    TacticalFlashlight->SetLightColor(FLinearColor(1.0f, 0.95f, 0.82f));
+    TacticalFlashlight->SetCastShadows(true);
+    TacticalFlashlight->SetVisibility(false);
+
     FirstPersonArms = CreateDefaultSubobject<USkeletalMeshComponent>(
         TEXT("FirstPersonArms")
     );
@@ -201,6 +286,8 @@ ABHCharacter::ABHCharacter()
 
     CurrentStamina = MaxStamina;
     FragGrenadeClass = ABHFragGrenade::StaticClass();
+    SmokeGrenadeClass = ABHSmokeGrenade::StaticClass();
+    EngineeringChargeClass = ABHEngineeringCharge::StaticClass();
     MissionCompleteMessage = NSLOCTEXT(
         "BrokenHorizon",
         "MissionCompleteMessage",
@@ -233,6 +320,12 @@ void ABHCharacter::GetLifetimeReplicatedProps(
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter,
+        CurrentStamina,
+        COND_OwnerOnly
+    );
+
     DOREPLIFETIME(
         ABHCharacter,
         AssignedWarSectorID
@@ -249,11 +342,59 @@ void ABHCharacter::GetLifetimeReplicatedProps(
         ABHCharacter,
         bRuntimeWarOperation
     );
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter,
+        FieldSquadMembers,
+        COND_OwnerOnly
+    );
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter,
+        FieldSquadContextAction,
+        COND_OwnerOnly
+    );
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter,
+        FieldSquadContextTargetLabel,
+        COND_OwnerOnly
+    );
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter,
+        bFieldSquadContextActionReachedTarget,
+        COND_OwnerOnly
+    );
+    DOREPLIFETIME(ABHCharacter, bPlayerIncapacitated);
+    DOREPLIFETIME(ABHCharacter, bPlayerCasualtyStabilized);
+    DOREPLIFETIME(ABHCharacter, PlayerBleedOutDeadline);
+    DOREPLIFETIME(ABHCharacter, DraggedCasualty);
+    DOREPLIFETIME(ABHCharacter, bHoldingControlledBreath);
+    DOREPLIFETIME(ABHCharacter, bWeaponBraced);
+    DOREPLIFETIME(ABHCharacter, WeaponBraceSupportQuality);
+    DOREPLIFETIME(ABHCharacter, bTacticalFlashlightOn);
+    DOREPLIFETIME(ABHCharacter, TacticalFlashlightBattery);
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter, FragGrenadeCount, COND_OwnerOnly
+    );
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter, SmokeGrenadeCount, COND_OwnerOnly
+    );
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter, EngineeringChargeCount, COND_OwnerOnly
+    );
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter, ActiveEngineeringChargeCount, COND_OwnerOnly
+    );
 }
 
 void ABHCharacter::BeginPlay()
 {
     Super::BeginPlay();
+
+    TacticalFlashlightBattery = FMath::Clamp(
+        TacticalFlashlightBattery,
+        0.0f,
+        FMath::Max(1.0f, TacticalFlashlightMaxBattery)
+    );
+    UpdateTacticalFlashlightVisual();
 
     if (HasAuthority() && IsValid(GetWorld()))
     {
@@ -313,9 +454,12 @@ void ABHCharacter::BeginPlay()
     if (APlayerController* PlayerController =
         ResolveOwningPlayerController();
         IsValid(PlayerController) &&
-        PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() != nullptr)
     {
-        UGameplayStatics::SetGamePaused(this, false);
+        if (ShouldPauseWorldForMenu(GetNetMode()))
+        {
+            UGameplayStatics::SetGamePaused(this, false);
+        }
         PlayerController->SetIgnoreMoveInput(false);
         PlayerController->SetIgnoreLookInput(false);
         PlayerController->SetInputMode(FInputModeGameOnly());
@@ -328,6 +472,10 @@ void ABHCharacter::BeginPlay()
             GameInstance->GetSubsystem<UBHUserSettingsSubsystem>())
         {
             SettingsSubsystem->ApplyPersistedSettings();
+            SettingsSubsystem->OnInputBindingsChanged.AddUniqueDynamic(
+                this,
+                &ABHCharacter::HandleInputBindingsChanged
+            );
         }
     }
 
@@ -350,9 +498,24 @@ void ABHCharacter::BeginPlay()
     APlayerController* PlayerController =
         ResolveOwningPlayerController();
 
+    if (IsValid(PlayerController) && PlayerController->GetLocalPlayer() != nullptr)
+    {
+        const TSubclassOf<UBHSubtitleWidget> WidgetClass = SubtitleWidgetClass
+            ? SubtitleWidgetClass
+            : TSubclassOf<UBHSubtitleWidget>(UBHSubtitleWidget::StaticClass());
+        SubtitleWidget = CreateWidget<UBHSubtitleWidget>(
+            PlayerController,
+            WidgetClass
+        );
+        if (IsValid(SubtitleWidget))
+        {
+            SubtitleWidget->AddToViewport(40);
+        }
+    }
+
     if (ObjectiveWidgetClass &&
         IsValid(PlayerController) &&
-        PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() != nullptr)
     {
         ObjectiveWidget = CreateWidget<UBHObjectiveWidget>(
             PlayerController,
@@ -361,13 +524,22 @@ void ABHCharacter::BeginPlay()
 
         if (ObjectiveWidget)
         {
+            ObjectiveWidget->SetAnchorsInViewport(FAnchors(0.0f, 0.0f));
+            ObjectiveWidget->SetAlignmentInViewport(FVector2D::ZeroVector);
+            ObjectiveWidget->SetPositionInViewport(
+                FVector2D(36.0f, 36.0f),
+                false
+            );
+            ObjectiveWidget->SetDesiredSizeInViewport(
+                FVector2D(460.0f, 190.0f)
+            );
             ObjectiveWidget->AddToViewport();
         }
     }
 
     if (InteractionPromptClass &&
         IsValid(PlayerController) &&
-        PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() != nullptr)
     {
         InteractionPromptWidget = CreateWidget<UBHInteractionPromptWidget>(
             PlayerController,
@@ -391,11 +563,19 @@ void ABHCharacter::BeginPlay()
             this,
             &ABHCharacter::HandleAmmoChanged
         );
+        WeaponComponent->OnWeaponRoleChanged.AddDynamic(
+            this,
+            &ABHCharacter::HandleWeaponRoleChanged
+        );
+        WeaponComponent->OnWeaponHeatChanged.AddDynamic(
+            this,
+            &ABHCharacter::HandleWeaponHeatChanged
+        );
     }
 
     if (AmmoHUDWidgetClass &&
         IsValid(PlayerController) &&
-        PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() != nullptr)
     {
         AmmoHUDWidget = CreateWidget<UBHAmmoHUDWidget>(
             PlayerController,
@@ -413,11 +593,22 @@ void ABHCharacter::BeginPlay()
                     ? WeaponComponent->GetReserveAmmo()
                     : 0
             );
+            HandleWeaponRoleChanged(
+                WeaponComponent
+                    ? WeaponComponent->GetWeaponRole()
+                    : EBHWeaponRole::Assault
+            );
+            HandleWeaponHeatChanged(
+                WeaponComponent
+                    ? WeaponComponent->GetWeaponHeatNormalized() : 0.0f,
+                WeaponComponent
+                    ? WeaponComponent->IsWeaponOverheated() : false
+            );
         }
     }
 
     if (IsValid(PlayerController) &&
-        PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() != nullptr)
     {
         HitMarkerWidget = CreateWidget<UBHHitMarkerWidget>(
             PlayerController,
@@ -441,7 +632,7 @@ void ABHCharacter::BeginPlay()
 
     if (CombatStatusWidgetClass &&
         IsValid(PlayerController) &&
-        PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() != nullptr)
     {
         CombatStatusWidget =
             CreateWidget<UBHCombatStatusWidget>(
@@ -465,6 +656,7 @@ void ABHCharacter::BeginPlay()
                 MaxStamina
             );
             RefreshFragGrenadeHUD();
+            RefreshEngineeringHUD();
         }
     }
 
@@ -513,6 +705,9 @@ void ABHCharacter::BeginPlay()
         ObjectiveComponent->StartMission(MissionData);
         ConfigureStrategicMissionPresentation();
         RefreshObjectiveWidget();
+        QueueObjectiveActivationRadio(
+            ObjectiveComponent->GetCurrentObjectiveID()
+        );
     }
 
     if (UGameInstance* GameInstance = GetGameInstance())
@@ -528,29 +723,419 @@ void ABHCharacter::BeginPlay()
         }
     }
 
-    if (!PlayerController || !PlayerMappingContext)
+    EnsureRuntimeInputActions();
+    RefreshPlayerInputMappings();
+
+#if !UE_BUILD_SHIPPING
+    if (HasAuthority() && IsPlayerControlled() &&
+        !bBHPlayerCasualtyRuntimeProbeScheduled &&
+        FParse::Param(
+            FCommandLine::Get(),
+            TEXT("BHTestPlayerCasualtyRuntime")
+        ))
+    {
+        bBHPlayerCasualtyRuntimeProbeScheduled = true;
+        FTimerHandle ProbeTimer;
+        FTimerDelegate ProbeDelegate = FTimerDelegate::CreateWeakLambda(
+            this,
+            [this]()
+            {
+                const int32 InitialDressings = IsValid(InjuryComponent)
+                    ? InjuryComponent->GetFieldDressingCount() : 0;
+                const int32 InitialMedkits = IsValid(InjuryComponent)
+                    ? InjuryComponent->GetMedkitCount() : 0;
+                if (IsValid(HealthComponent))
+                {
+                    HealthComponent->ApplyDamage(
+                        HealthComponent->GetCurrentHealth() + 10.0f,
+                        this
+                    );
+                }
+                const bool bEnteredCasualty = bPlayerIncapacitated &&
+                    !bPlayerCasualtyStabilized;
+                FActorSpawnParameters SpawnParameters;
+                SpawnParameters.SpawnCollisionHandlingOverride =
+                    ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+                ABHCharacter* Reviver = GetWorld()->SpawnActor<ABHCharacter>(
+                    ABHCharacter::StaticClass(),
+                    GetActorLocation() + FVector(100.0f, 0.0f, 0.0f),
+                    GetActorRotation(),
+                    SpawnParameters
+                );
+                if (IsValid(Reviver))
+                {
+                    Reviver->TryTreatPlayerCasualty(this);
+                    Reviver->TryTreatPlayerCasualty(this);
+                }
+                const bool bSuccess = bEnteredCasualty &&
+                    !bPlayerIncapacitated &&
+                    IsValid(HealthComponent) &&
+                    FMath::IsNearlyEqual(
+                        HealthComponent->GetCurrentHealth(),
+                        PlayerReviveHealth
+                    ) &&
+                    IsValid(Reviver) &&
+                    IsValid(Reviver->InjuryComponent) &&
+                    Reviver->InjuryComponent->GetFieldDressingCount() ==
+                        InitialDressings - 1 &&
+                    Reviver->InjuryComponent->GetMedkitCount() ==
+                        InitialMedkits - 1;
+                UE_LOG(
+                    LogTemp,
+                    Display,
+                    TEXT("BH_PLAYER_CASUALTY_RUNTIME result=%s entered=%d revived=%d health=%.1f dressing_spent=%d medkit_spent=%d"),
+                    bSuccess ? TEXT("success") : TEXT("failure"),
+                    bEnteredCasualty ? 1 : 0,
+                    bPlayerIncapacitated ? 0 : 1,
+                    IsValid(HealthComponent)
+                        ? HealthComponent->GetCurrentHealth() : 0.0f,
+                    IsValid(Reviver) && IsValid(Reviver->InjuryComponent)
+                        ? InitialDressings - Reviver->InjuryComponent
+                            ->GetFieldDressingCount() : 0,
+                    IsValid(Reviver) && IsValid(Reviver->InjuryComponent)
+                        ? InitialMedkits - Reviver->InjuryComponent
+                            ->GetMedkitCount() : 0
+                );
+                if (IsValid(Reviver))
+                {
+                    Reviver->Destroy();
+                }
+                FPlatformMisc::RequestExit(false);
+            }
+        );
+        GetWorldTimerManager().SetTimer(
+            ProbeTimer,
+            ProbeDelegate,
+            1.0f,
+            false
+        );
+    }
+
+    if (HasAuthority() && IsPlayerControlled() &&
+        !bBHEngineeringRuntimeProbeScheduled &&
+        FParse::Param(FCommandLine::Get(), TEXT("BHTestEngineeringRuntime")))
+    {
+        bBHEngineeringRuntimeProbeScheduled = true;
+        FTimerHandle EngineeringProbeTimer;
+        FTimerDelegate EngineeringProbeDelegate =
+            FTimerDelegate::CreateWeakLambda(this, [this]()
+            {
+                FActorSpawnParameters SpawnParameters;
+                SpawnParameters.SpawnCollisionHandlingOverride =
+                    ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+                ABHDoor* TestDoor = GetWorld()->SpawnActor<ABHDoor>(
+                    ABHDoor::StaticClass(),
+                    GetActorLocation() + GetActorForwardVector() * 100.0f,
+                    GetActorRotation(),
+                    SpawnParameters
+                );
+                if (IsValid(TestDoor))
+                {
+                    TestDoor->RestoreUnlockedState(false);
+                }
+                const int32 StartingCharges = EngineeringChargeCount;
+                const bool bPlaced = IsValid(TestDoor) &&
+                    TryPlaceBreachingCharge(TestDoor);
+                FTimerHandle DetonationTimer;
+                FTimerDelegate DetonationDelegate =
+                    FTimerDelegate::CreateWeakLambda(
+                        this,
+                        [this, TestDoor, StartingCharges, bPlaced]()
+                        {
+                            DetonateEngineeringCharges();
+                            const bool bSuccess = bPlaced &&
+                                IsValid(TestDoor) && TestDoor->IsUnlocked() &&
+                                EngineeringChargeCount == StartingCharges - 1 &&
+                                ActiveEngineeringChargeCount == 0;
+                            UE_LOG(LogTemp, Display,
+                                TEXT("BH_ENGINEERING_RUNTIME result=%s placed=%d breached=%d carried=%d active=%d"),
+                                bSuccess ? TEXT("success") : TEXT("failure"),
+                                bPlaced ? 1 : 0,
+                                IsValid(TestDoor) && TestDoor->IsUnlocked() ? 1 : 0,
+                                EngineeringChargeCount,
+                                ActiveEngineeringChargeCount);
+                            if (IsValid(TestDoor))
+                            {
+                                TestDoor->Destroy();
+                            }
+                            FPlatformMisc::RequestExit(false);
+                        }
+                    );
+                GetWorldTimerManager().SetTimer(
+                    DetonationTimer,
+                    DetonationDelegate,
+                    2.4f,
+                    false
+                );
+            });
+        GetWorldTimerManager().SetTimer(
+            EngineeringProbeTimer,
+            EngineeringProbeDelegate,
+            1.0f,
+            false
+        );
+    }
+#endif
+}
+
+void ABHCharacter::ShowSubtitle(
+    const FText& Speaker,
+    const FText& Line,
+    float DurationSeconds,
+    float DirectionAngleDegrees,
+    bool bHasDirection
+)
+{
+    if (IsValid(SubtitleWidget))
+    {
+        SubtitleWidget->ShowSubtitle(
+            Speaker,
+            Line,
+            DurationSeconds,
+            DirectionAngleDegrees,
+            bHasDirection
+        );
+    }
+}
+
+const FBHObjectiveDefinition* ABHCharacter::FindAuthoredObjectiveDefinition(
+    FName ObjectiveID
+) const
+{
+    if (!IsValid(MissionData) || ObjectiveID.IsNone())
+    {
+        return nullptr;
+    }
+    return MissionData->Objectives.FindByPredicate(
+        [ObjectiveID](const FBHObjectiveDefinition& Definition)
+        {
+            return Definition.ObjectiveID == ObjectiveID;
+        }
+    );
+}
+
+void ABHCharacter::QueueObjectiveActivationRadio(FName ObjectiveID)
+{
+    const FBHObjectiveDefinition* Definition =
+        FindAuthoredObjectiveDefinition(ObjectiveID);
+    if (!Definition || Definition->ActivationRadioLine.IsEmpty()) return;
+    ShowSubtitle(
+        Definition->RadioSpeaker,
+        Definition->ActivationRadioLine,
+        Definition->RadioSubtitleDuration,
+        Definition->RadioDirectionDegrees,
+        Definition->bRadioHasDirection
+    );
+}
+
+void ABHCharacter::QueueObjectiveCompletionRadio(FName ObjectiveID)
+{
+    const FBHObjectiveDefinition* Definition =
+        FindAuthoredObjectiveDefinition(ObjectiveID);
+    if (!Definition || Definition->CompletionRadioLine.IsEmpty()) return;
+    ShowSubtitle(
+        Definition->RadioSpeaker,
+        Definition->CompletionRadioLine,
+        Definition->RadioSubtitleDuration,
+        Definition->RadioDirectionDegrees,
+        Definition->bRadioHasDirection
+    );
+}
+
+void ABHCharacter::EnsureRuntimeInputActions()
+{
+    auto EnsureAction = [this](
+        TObjectPtr<UInputAction>& Action,
+        const FName Name
+    )
+    {
+        if (!IsValid(Action))
+        {
+            Action = NewObject<UInputAction>(this, Name);
+            Action->ValueType = EInputActionValueType::Boolean;
+        }
+    };
+
+    EnsureAction(WarMapInputAction, TEXT("IA_Runtime_WarMap"));
+    // Some legacy gameplay mapping contexts predate the pause action. Always
+    // provide a native runtime action so packaged maps cannot lose Escape/Menu
+    // after taking permanent mouse capture.
+    EnsureAction(PauseAction, TEXT("IA_Runtime_Pause"));
+    EnsureAction(GrenadeInputAction, TEXT("IA_Runtime_Grenade"));
+    EnsureAction(SmokeGrenadeInputAction, TEXT("IA_Runtime_SmokeGrenade"));
+    EnsureAction(
+        TacticalFlashlightInputAction,
+        TEXT("IA_Runtime_TacticalFlashlight")
+    );
+    EnsureAction(
+        WeaponBashInputAction,
+        TEXT("IA_Runtime_WeaponBash")
+    );
+    EnsureAction(
+        FieldObservationInputAction,
+        TEXT("IA_Runtime_FieldObservation")
+    );
+    EnsureAction(
+        ControlledBreathingInputAction,
+        TEXT("IA_Runtime_ControlledBreathing")
+    );
+    EnsureAction(EngineeringInputAction, TEXT("IA_Runtime_Engineering"));
+    EnsureAction(SquadOrderInputAction, TEXT("IA_Runtime_SquadOrder"));
+    EnsureAction(ContextInputAction, TEXT("IA_Runtime_ContextAction"));
+    EnsureAction(SquadPingInputAction, TEXT("IA_Runtime_SquadPing"));
+    EnsureAction(FireModeInputAction, TEXT("IA_Runtime_FireMode"));
+    EnsureAction(LeanLeftAction, TEXT("IA_Runtime_LeanLeft"));
+    EnsureAction(LeanRightAction, TEXT("IA_Runtime_LeanRight"));
+    EnsureAction(ProneAction, TEXT("IA_Runtime_Prone"));
+    EnsureAction(FieldDressingAction, TEXT("IA_Runtime_FieldDressing"));
+    EnsureAction(MedkitAction, TEXT("IA_Runtime_Medkit"));
+}
+
+void ABHCharacter::RefreshPlayerInputMappings()
+{
+    APlayerController* PlayerController = ResolveOwningPlayerController();
+    ULocalPlayer* LocalPlayer = IsValid(PlayerController)
+        ? PlayerController->GetLocalPlayer()
+        : nullptr;
+    UEnhancedInputLocalPlayerSubsystem* InputSubsystem = IsValid(LocalPlayer)
+        ? LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>()
+        : nullptr;
+    if (!IsValid(InputSubsystem) || !IsValid(PlayerMappingContext))
     {
         return;
     }
 
-    ULocalPlayer* LocalPlayer =
-        PlayerController->GetLocalPlayer();
+    InputSubsystem->RemoveMappingContext(PlayerMappingContext);
+    if (IsValid(RuntimePlayerMappingContext))
+    {
+        InputSubsystem->RemoveMappingContext(RuntimePlayerMappingContext);
+    }
 
-    if (!LocalPlayer)
+    RuntimePlayerMappingContext = DuplicateObject<UInputMappingContext>(
+        PlayerMappingContext,
+        this,
+        TEXT("IMC_BHRuntimePlayer")
+    );
+    if (!IsValid(RuntimePlayerMappingContext))
     {
         return;
     }
 
-    UEnhancedInputLocalPlayerSubsystem* InputSubsystem =
-        LocalPlayer->GetSubsystem<
-        UEnhancedInputLocalPlayerSubsystem>();
-
-    if (InputSubsystem)
+    const UBHUserSettingsSubsystem* SettingsSubsystem =
+        GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UBHUserSettingsSubsystem>()
+        : nullptr;
+    const TArray<FEnhancedActionKeyMapping> SourceMappings =
+        PlayerMappingContext->GetMappings();
+    for (const FEnhancedActionKeyMapping& SourceMapping : SourceMappings)
     {
-        InputSubsystem->AddMappingContext(
-            PlayerMappingContext,
-            0);
+        const FName BindingID = ResolveMappingBindingID(
+            SourceMapping.Action,
+            SourceMapping.Key
+        );
+        if (BindingID.IsNone() || !IsValid(SettingsSubsystem))
+        {
+            continue;
+        }
+
+        const FKey RemappedKey = SettingsSubsystem->GetInputBinding(
+            BindingID,
+            SourceMapping.Key.IsGamepadKey()
+        );
+        if (!RemappedKey.IsValid() || RemappedKey == SourceMapping.Key)
+        {
+            continue;
+        }
+
+        RuntimePlayerMappingContext->UnmapKey(
+            SourceMapping.Action,
+            SourceMapping.Key
+        );
+        FEnhancedActionKeyMapping& Remapped =
+            RuntimePlayerMappingContext->MapKey(
+                SourceMapping.Action,
+                RemappedKey
+            );
+        Remapped.Modifiers = SourceMapping.Modifiers;
+        Remapped.Triggers = SourceMapping.Triggers;
     }
+
+    auto AddBinding = [this, SettingsSubsystem](
+        UInputAction* Action,
+        const FName BindingID,
+        const bool bGamepad
+    )
+    {
+        if (!IsValid(Action) || !IsValid(SettingsSubsystem))
+        {
+            return;
+        }
+        for (const FEnhancedActionKeyMapping& Existing :
+            RuntimePlayerMappingContext->GetMappings())
+        {
+            if (Existing.Action == Action &&
+                Existing.Key.IsGamepadKey() == bGamepad)
+            {
+                return;
+            }
+        }
+        const FKey Key = SettingsSubsystem->GetInputBinding(
+            BindingID,
+            bGamepad
+        );
+        if (Key.IsValid())
+        {
+            RuntimePlayerMappingContext->MapKey(Action, Key);
+        }
+    };
+
+    AddBinding(MoveAction, TEXT("MoveStick"), true);
+    AddBinding(LookAction, TEXT("LookStick"), true);
+    const TPair<UInputAction*, FName> MappedActions[] = {
+        {JumpAction, TEXT("Jump")},
+        {SprintAction, TEXT("Sprint")},
+        {CrouchAction, TEXT("Crouch")},
+        {InteractAction, TEXT("Interact")},
+        {FireAction, TEXT("Fire")},
+        {AimAction, TEXT("Aim")},
+        {ReloadAction, TEXT("Reload")},
+        {PauseAction, TEXT("Pause")},
+        {WarMapInputAction, TEXT("WarMap")},
+        {GrenadeInputAction, TEXT("Grenade")},
+        {SmokeGrenadeInputAction, TEXT("SmokeGrenade")},
+        {TacticalFlashlightInputAction, TEXT("Flashlight")},
+        {WeaponBashInputAction, TEXT("WeaponBash")},
+        {FieldObservationInputAction, TEXT("FieldObservation")},
+        {ControlledBreathingInputAction, TEXT("ControlledBreathing")},
+        {EngineeringInputAction, TEXT("Engineering")},
+        {SquadOrderInputAction, TEXT("SquadOrder")},
+        {ContextInputAction, TEXT("ContextAction")},
+        {SquadPingInputAction, TEXT("SquadPing")},
+        {FireModeInputAction, TEXT("FireMode")},
+        {FieldDressingAction, TEXT("FieldDressing")},
+        {MedkitAction, TEXT("Medkit")},
+        {LeanLeftAction, TEXT("LeanLeft")},
+        {LeanRightAction, TEXT("LeanRight")},
+        {ProneAction, TEXT("Prone")}
+    };
+    for (const TPair<UInputAction*, FName>& Entry : MappedActions)
+    {
+        AddBinding(Entry.Key, Entry.Value, false);
+        AddBinding(Entry.Key, Entry.Value, true);
+    }
+
+    InputSubsystem->AddMappingContext(RuntimePlayerMappingContext, 0);
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_INPUT_BINDINGS_APPLIED mappings=%d"),
+        RuntimePlayerMappingContext->GetMappings().Num()
+    );
+}
+
+void ABHCharacter::HandleInputBindingsChanged()
+{
+    RefreshPlayerInputMappings();
 }
 
 void ABHCharacter::SetupPlayerInputComponent(
@@ -558,26 +1143,8 @@ void ABHCharacter::SetupPlayerInputComponent(
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-    PlayerInputComponent->BindKey(
-        EKeys::M,
-        IE_Pressed,
-        this,
-        &ABHCharacter::ToggleWarMap
-    );
-
-    PlayerInputComponent->BindKey(
-        EKeys::G,
-        IE_Pressed,
-        this,
-        &ABHCharacter::ThrowFragGrenade
-    );
-
-    PlayerInputComponent->BindKey(
-        EKeys::C,
-        IE_Pressed,
-        this,
-        &ABHCharacter::ToggleFriendlySquadOrder
-    );
+    EnsureRuntimeInputActions();
+    RefreshPlayerInputMappings();
 
     UEnhancedInputComponent* EnhancedInputComponent =
         Cast<UEnhancedInputComponent>(PlayerInputComponent);
@@ -586,6 +1153,103 @@ void ABHCharacter::SetupPlayerInputComponent(
     {
         return;
     }
+
+    EnhancedInputComponent->BindAction(
+        WarMapInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::ToggleWarMap
+    );
+    EnhancedInputComponent->BindAction(
+        GrenadeInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::BeginFragGrenadeCook
+    );
+    EnhancedInputComponent->BindAction(
+        GrenadeInputAction,
+        ETriggerEvent::Completed,
+        this,
+        &ABHCharacter::ReleaseFragGrenade
+    );
+    EnhancedInputComponent->BindAction(
+        GrenadeInputAction,
+        ETriggerEvent::Canceled,
+        this,
+        &ABHCharacter::ReleaseFragGrenade
+    );
+    EnhancedInputComponent->BindAction(
+        SmokeGrenadeInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::ThrowSmokeGrenade
+    );
+    EnhancedInputComponent->BindAction(
+        TacticalFlashlightInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::ToggleTacticalFlashlight
+    );
+    EnhancedInputComponent->BindAction(
+        WeaponBashInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::PerformWeaponBash
+    );
+    EnhancedInputComponent->BindAction(
+        FieldObservationInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::PerformFieldObservation
+    );
+    EnhancedInputComponent->BindAction(
+        ControlledBreathingInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::BeginControlledBreathing
+    );
+    EnhancedInputComponent->BindAction(
+        ControlledBreathingInputAction,
+        ETriggerEvent::Completed,
+        this,
+        &ABHCharacter::EndControlledBreathing
+    );
+    EnhancedInputComponent->BindAction(
+        ControlledBreathingInputAction,
+        ETriggerEvent::Canceled,
+        this,
+        &ABHCharacter::EndControlledBreathing
+    );
+    EnhancedInputComponent->BindAction(
+        EngineeringInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::UseEngineeringTool
+    );
+    EnhancedInputComponent->BindAction(
+        SquadOrderInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::ToggleFriendlySquadOrder
+    );
+    EnhancedInputComponent->BindAction(
+        ContextInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::IssueFieldSquadContextAction
+    );
+    EnhancedInputComponent->BindAction(
+        SquadPingInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::IssueSquadPing
+    );
+    EnhancedInputComponent->BindAction(
+        FireModeInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::ToggleFireMode
+    );
 
     if (MoveAction)
     {
@@ -632,13 +1296,18 @@ void ABHCharacter::SetupPlayerInputComponent(
             SprintAction,
             ETriggerEvent::Started,
             this,
-            &ABHCharacter::StartSprint);
+            &ABHCharacter::HandleSprintPressed);
 
         EnhancedInputComponent->BindAction(
             SprintAction,
             ETriggerEvent::Completed,
             this,
-            &ABHCharacter::StopSprint);
+            &ABHCharacter::HandleSprintReleased);
+        EnhancedInputComponent->BindAction(
+            SprintAction,
+            ETriggerEvent::Canceled,
+            this,
+            &ABHCharacter::HandleSprintReleased);
     }
 
     if (CrouchAction)
@@ -647,13 +1316,18 @@ void ABHCharacter::SetupPlayerInputComponent(
             CrouchAction,
             ETriggerEvent::Started,
             this,
-            &ABHCharacter::StartCrouch);
+            &ABHCharacter::HandleCrouchPressed);
 
         EnhancedInputComponent->BindAction(
             CrouchAction,
             ETriggerEvent::Completed,
             this,
-            &ABHCharacter::StopCrouch);
+            &ABHCharacter::HandleCrouchReleased);
+        EnhancedInputComponent->BindAction(
+            CrouchAction,
+            ETriggerEvent::Canceled,
+            this,
+            &ABHCharacter::HandleCrouchReleased);
     }
 
     if (LeanLeftAction)
@@ -662,19 +1336,19 @@ void ABHCharacter::SetupPlayerInputComponent(
             LeanLeftAction,
             ETriggerEvent::Started,
             this,
-            &ABHCharacter::StartLeanLeft
+            &ABHCharacter::HandleLeanLeftPressed
         );
         EnhancedInputComponent->BindAction(
             LeanLeftAction,
             ETriggerEvent::Completed,
             this,
-            &ABHCharacter::StopLeanLeft
+            &ABHCharacter::HandleLeanLeftReleased
         );
         EnhancedInputComponent->BindAction(
             LeanLeftAction,
             ETriggerEvent::Canceled,
             this,
-            &ABHCharacter::StopLeanLeft
+            &ABHCharacter::HandleLeanLeftReleased
         );
     }
     else
@@ -699,19 +1373,19 @@ void ABHCharacter::SetupPlayerInputComponent(
             LeanRightAction,
             ETriggerEvent::Started,
             this,
-            &ABHCharacter::StartLeanRight
+            &ABHCharacter::HandleLeanRightPressed
         );
         EnhancedInputComponent->BindAction(
             LeanRightAction,
             ETriggerEvent::Completed,
             this,
-            &ABHCharacter::StopLeanRight
+            &ABHCharacter::HandleLeanRightReleased
         );
         EnhancedInputComponent->BindAction(
             LeanRightAction,
             ETriggerEvent::Canceled,
             this,
-            &ABHCharacter::StopLeanRight
+            &ABHCharacter::HandleLeanRightReleased
         );
     }
     else
@@ -736,7 +1410,19 @@ void ABHCharacter::SetupPlayerInputComponent(
             ProneAction,
             ETriggerEvent::Started,
             this,
-            &ABHCharacter::ToggleProne
+            &ABHCharacter::HandlePronePressed
+        );
+        EnhancedInputComponent->BindAction(
+            ProneAction,
+            ETriggerEvent::Completed,
+            this,
+            &ABHCharacter::HandleProneReleased
+        );
+        EnhancedInputComponent->BindAction(
+            ProneAction,
+            ETriggerEvent::Canceled,
+            this,
+            &ABHCharacter::HandleProneReleased
         );
     }
     else
@@ -755,7 +1441,17 @@ void ABHCharacter::SetupPlayerInputComponent(
             InteractAction,
             ETriggerEvent::Started,
             this,
-            &ABHCharacter::Interact);
+            &ABHCharacter::HandleInteractPressed);
+        EnhancedInputComponent->BindAction(
+            InteractAction,
+            ETriggerEvent::Completed,
+            this,
+            &ABHCharacter::HandleInteractReleased);
+        EnhancedInputComponent->BindAction(
+            InteractAction,
+            ETriggerEvent::Canceled,
+            this,
+            &ABHCharacter::CancelInteractionInput);
     }
 
     if (FireAction)
@@ -786,19 +1482,19 @@ void ABHCharacter::SetupPlayerInputComponent(
             AimAction,
             ETriggerEvent::Started,
             this,
-            &ABHCharacter::StartAim
+            &ABHCharacter::HandleAimPressed
         );
         EnhancedInputComponent->BindAction(
             AimAction,
             ETriggerEvent::Completed,
             this,
-            &ABHCharacter::StopAim
+            &ABHCharacter::HandleAimReleased
         );
         EnhancedInputComponent->BindAction(
             AimAction,
             ETriggerEvent::Canceled,
             this,
-            &ABHCharacter::StopAim
+            &ABHCharacter::HandleAimReleased
         );
     }
 
@@ -811,13 +1507,6 @@ void ABHCharacter::SetupPlayerInputComponent(
             &ABHCharacter::Reload
         );
     }
-
-    PlayerInputComponent->BindKey(
-        EKeys::B,
-        IE_Pressed,
-        this,
-        &ABHCharacter::ToggleFireMode
-    );
 
     if (PauseAction)
     {
@@ -868,7 +1557,6 @@ void ABHCharacter::SetupPlayerInputComponent(
     }
 }
 
-
 void ABHCharacter::Move(const FInputActionValue& Value)
 {
     const FVector2D MovementInput =
@@ -876,6 +1564,17 @@ void ABHCharacter::Move(const FInputActionValue& Value)
 
     if (!Controller || bIsTraversing)
     {
+        return;
+    }
+
+    if (IsValid(InjuryComponent) &&
+        InjuryComponent->IsMedkitTreatmentActive())
+    {
+        if (UCharacterMovementComponent* MovementComponent =
+                GetCharacterMovement())
+        {
+            MovementComponent->StopMovementImmediately();
+        }
         return;
     }
 
@@ -909,20 +1608,38 @@ void ABHCharacter::Look(const FInputActionValue& Value)
     const FVector2D LookInput =
         Value.Get<FVector2D>();
 
-    float MouseSensitivity = 1.0f;
+    float HorizontalSensitivity = 1.0f;
+    float VerticalSensitivity = 1.0f;
+    float ADSSensitivityMultiplier = 1.0f;
+    bool bInvertVerticalLook = false;
 
     if (UGameInstance* GameInstance = GetGameInstance())
     {
         if (const UBHUserSettingsSubsystem* SettingsSubsystem =
             GameInstance->GetSubsystem<UBHUserSettingsSubsystem>())
         {
-            MouseSensitivity =
-                SettingsSubsystem->GetMouseSensitivity();
+            HorizontalSensitivity = SettingsSubsystem->
+                GetHorizontalLookSensitivity();
+            VerticalSensitivity = SettingsSubsystem->
+                GetVerticalLookSensitivity();
+            ADSSensitivityMultiplier = SettingsSubsystem->
+                GetADSSensitivityMultiplier();
+            bInvertVerticalLook = SettingsSubsystem->
+                IsVerticalLookInverted();
         }
     }
 
-    AddControllerYawInput(LookInput.X * MouseSensitivity);
-    AddControllerPitchInput(LookInput.Y * MouseSensitivity);
+    const FVector2D AdjustedLookInput =
+        UBHUserSettingsSubsystem::CalculateLookInput(
+            LookInput,
+            HorizontalSensitivity,
+            VerticalSensitivity,
+            ADSSensitivityMultiplier,
+            IsValid(WeaponComponent) && WeaponComponent->IsAiming(),
+            bInvertVerticalLook
+        );
+    AddControllerYawInput(AdjustedLookInput.X);
+    AddControllerPitchInput(AdjustedLookInput.Y);
 }
 
 void ABHCharacter::StartJump()
@@ -1339,7 +2056,8 @@ bool ABHCharacter::IsTraversalPathClear(
 
 bool ABHCharacter::SpendStamina(float Amount)
 {
-    const float ClampedAmount = FMath::Max(0.0f, Amount);
+    const float ClampedAmount = FMath::Max(0.0f, Amount) *
+        GetCarryLoadProfile().TraversalCostMultiplier;
 
     if (CurrentStamina + KINDA_SMALL_NUMBER < ClampedAmount)
     {
@@ -1480,6 +2198,60 @@ void ABHCharacter::FinishTraversal(bool bCompleted)
     }
 }
 
+const UBHUserSettingsSubsystem* ABHCharacter::GetUserSettings() const
+{
+    return GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UBHUserSettingsSubsystem>()
+        : nullptr;
+}
+
+bool ABHCharacter::ResolveToggleHoldState(
+    bool bCurrentState,
+    bool bToggleMode,
+    bool bPressed
+)
+{
+    if (bPressed)
+    {
+        return bToggleMode ? !bCurrentState : true;
+    }
+    return bToggleMode ? bCurrentState : false;
+}
+
+bool ABHCharacter::ShouldCommitHeldInteraction(
+    float HeldDuration,
+    float RequiredDuration
+)
+{
+    return HeldDuration >= FMath::Max(0.1f, RequiredDuration);
+}
+
+void ABHCharacter::HandleSprintPressed()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    const bool bToggle = IsValid(Settings) &&
+        Settings->IsToggleSprintEnabled();
+    if (ResolveToggleHoldState(bIsSprinting, bToggle, true))
+    {
+        StartSprint();
+    }
+    else
+    {
+        StopSprint();
+    }
+}
+
+void ABHCharacter::HandleSprintReleased()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    const bool bToggle = IsValid(Settings) &&
+        Settings->IsToggleSprintEnabled();
+    if (!ResolveToggleHoldState(bIsSprinting, bToggle, false))
+    {
+        StopSprint();
+    }
+}
+
 void ABHCharacter::StartSprint()
 {
     if (CurrentStamina <= 0.0f ||
@@ -1511,6 +2283,32 @@ void ABHCharacter::StopSprint()
 }
 
 
+void ABHCharacter::HandleCrouchPressed()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    const bool bToggle = IsValid(Settings) &&
+        Settings->IsToggleCrouchEnabled();
+    if (ResolveToggleHoldState(bIsCrouched, bToggle, true))
+    {
+        StartCrouch();
+    }
+    else
+    {
+        StopCrouch();
+    }
+}
+
+void ABHCharacter::HandleCrouchReleased()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    const bool bToggle = IsValid(Settings) &&
+        Settings->IsToggleCrouchEnabled();
+    if (!ResolveToggleHoldState(bIsCrouched, bToggle, false))
+    {
+        StopCrouch();
+    }
+}
+
 void ABHCharacter::StartCrouch()
 {
     if (bIsTraversing || bIsProne)
@@ -1540,6 +2338,30 @@ void ABHCharacter::ToggleProne()
     else
     {
         EnterProne();
+    }
+}
+
+void ABHCharacter::HandlePronePressed()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    const bool bToggle = !IsValid(Settings) ||
+        Settings->IsToggleProneEnabled();
+    if (bToggle)
+    {
+        ToggleProne();
+    }
+    else
+    {
+        EnterProne();
+    }
+}
+
+void ABHCharacter::HandleProneReleased()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    if (IsValid(Settings) && !Settings->IsToggleProneEnabled())
+    {
+        TryExitProne();
     }
 }
 
@@ -1774,7 +2596,61 @@ void ABHCharacter::ApplyMovementSpeed()
         : (bIsSprinting ? SprintSpeed : WalkSpeed);
 
     MovementComponent->MaxWalkSpeed =
-        BaseSpeed * InjurySpeedMultiplier;
+        BaseSpeed *
+        InjurySpeedMultiplier *
+        UBHBattlefieldConditions::GetCurrentProfile(this).
+            InfantrySpeedMultiplier *
+        GetCarryLoadProfile().MovementSpeedMultiplier;
+}
+
+void ABHCharacter::HandleLeanLeftPressed()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    const bool bToggle = IsValid(Settings) &&
+        Settings->IsToggleLeanEnabled();
+    if (ResolveToggleHoldState(bLeanLeftHeld, bToggle, true))
+    {
+        StopLeanRight();
+        StartLeanLeft();
+    }
+    else
+    {
+        StopLeanLeft();
+    }
+}
+
+void ABHCharacter::HandleLeanLeftReleased()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    if (!IsValid(Settings) || !Settings->IsToggleLeanEnabled())
+    {
+        StopLeanLeft();
+    }
+}
+
+void ABHCharacter::HandleLeanRightPressed()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    const bool bToggle = IsValid(Settings) &&
+        Settings->IsToggleLeanEnabled();
+    if (ResolveToggleHoldState(bLeanRightHeld, bToggle, true))
+    {
+        StopLeanLeft();
+        StartLeanRight();
+    }
+    else
+    {
+        StopLeanRight();
+    }
+}
+
+void ABHCharacter::HandleLeanRightReleased()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    if (!IsValid(Settings) || !Settings->IsToggleLeanEnabled())
+    {
+        StopLeanRight();
+    }
 }
 
 void ABHCharacter::StartLeanLeft()
@@ -1939,6 +2815,7 @@ void ABHCharacter::UpdateLean(float DeltaTime)
     CameraLocation.Y += CurrentLeanAmount * MaximumLeanDistance;
     CameraLocation.Z -= CurrentProneAlpha * ProneCameraDrop;
     CameraLocation.Z += ProneCameraTransitionCompensationZ;
+    CameraLocation.Z += CurrentHeadBobOffsetZ;
 
     FRotator CameraRotation = LeanCameraBaseRelativeRotation;
     CameraRotation.Roll += CurrentLeanAmount * MaximumLeanRoll;
@@ -1970,6 +2847,86 @@ void ABHCharacter::StopFire()
     if (IsValid(WeaponComponent))
     {
         WeaponComponent->StopFiring();
+    }
+}
+
+void ABHCharacter::HandleAimPressed()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    const bool bToggle = IsValid(Settings) &&
+        Settings->IsToggleAimEnabled();
+    const bool bAiming = IsValid(WeaponComponent) &&
+        WeaponComponent->IsAiming();
+    if (ResolveToggleHoldState(bAiming, bToggle, true))
+    {
+        StartAim();
+    }
+    else
+    {
+        StopAim();
+    }
+}
+
+void ABHCharacter::UpdateHeadBob(float DeltaTime)
+{
+    float ComfortScale = 1.0f;
+    if (const UGameInstance* GameInstance = GetGameInstance())
+    {
+        if (const UBHUserSettingsSubsystem* SettingsSubsystem =
+            GameInstance->GetSubsystem<UBHUserSettingsSubsystem>())
+        {
+            ComfortScale = SettingsSubsystem->GetHeadBobScale();
+        }
+    }
+
+    const UCharacterMovementComponent* Movement = GetCharacterMovement();
+    const bool bShouldBob = IsLocallyControlled() && IsValid(Movement) &&
+        Movement->IsMovingOnGround() && !bIsProne && !bIsTraversing &&
+        GetVelocity().SizeSquared2D() > FMath::Square(10.0f) &&
+        ComfortScale > KINDA_SMALL_NUMBER;
+    if (bShouldBob)
+    {
+        const float SpeedAlpha = FMath::Clamp(
+            GetVelocity().Size2D() / FMath::Max(1.0f, SprintSpeed),
+            0.25f,
+            1.0f
+        );
+        HeadBobPhase = FMath::Fmod(
+            HeadBobPhase + DeltaTime * FMath::Max(0.0f, HeadBobFrequency) *
+                (0.75f + SpeedAlpha * 0.5f),
+            2.0f * PI
+        );
+        const float TargetOffset = FMath::Sin(HeadBobPhase) *
+            FMath::Max(0.0f, HeadBobAmplitude) * SpeedAlpha *
+            FMath::Clamp(ComfortScale, 0.0f, 1.0f);
+        CurrentHeadBobOffsetZ = FMath::FInterpTo(
+            CurrentHeadBobOffsetZ,
+            TargetOffset,
+            DeltaTime,
+            14.0f
+        );
+    }
+    else
+    {
+        CurrentHeadBobOffsetZ = FMath::FInterpTo(
+            CurrentHeadBobOffsetZ,
+            0.0f,
+            DeltaTime,
+            12.0f
+        );
+    }
+}
+
+void ABHCharacter::HandleAimReleased()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    const bool bToggle = IsValid(Settings) &&
+        Settings->IsToggleAimEnabled();
+    const bool bAiming = IsValid(WeaponComponent) &&
+        WeaponComponent->IsAiming();
+    if (!ResolveToggleHoldState(bAiming, bToggle, false))
+    {
+        StopAim();
     }
 }
 
@@ -2009,7 +2966,54 @@ void ABHCharacter::Reload()
         return;
     }
 
-    WeaponComponent->StartReload();
+    const float CurrentTime = IsValid(GetWorld())
+        ? GetWorld()->GetTimeSeconds() : 0.0f;
+    const bool bEmergencyDoubleTap =
+        CurrentTime - LastReloadInputTime <=
+            FMath::Max(0.15f, EmergencyReloadDoubleTapWindow);
+    LastReloadInputTime = CurrentTime;
+
+    if (bEmergencyDoubleTap)
+    {
+        const int32 DiscardedRounds = WeaponComponent->GetMagazineAmmo();
+        if (WeaponComponent->StartEmergencyReload())
+        {
+            ShowStatusNotification(FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "EmergencyReloadStatus",
+                    "EMERGENCY RELOAD // {0} ROUNDS DROPPED\n\n"
+                    "Faster weapon recovery."
+                ),
+                FText::AsNumber(DiscardedRounds)
+            ));
+        }
+        return;
+    }
+
+    const int32 RetainedRounds = WeaponComponent->GetMagazineAmmo();
+    const bool bEmptyWeapon = RetainedRounds <= 0;
+    if (WeaponComponent->StartReload())
+    {
+        ShowStatusNotification(
+            bEmptyWeapon
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "EmptyEmergencyReloadStatus",
+                    "EMPTY RELOAD // EMERGENCY PROCEDURE\n\n"
+                    "No ammunition discarded."
+                )
+                : FText::Format(
+                    NSLOCTEXT(
+                        "BrokenHorizon",
+                        "TacticalReloadStatus",
+                        "TACTICAL RELOAD // {0} ROUNDS RETAINED\n\n"
+                        "Double-tap reload to drop the magazine and reload faster."
+                    ),
+                    FText::AsNumber(RetainedRounds)
+                )
+        );
+    }
 }
 
 void ABHCharacter::ToggleFireMode()
@@ -2025,6 +3029,22 @@ void ABHCharacter::ToggleFireMode()
 
     const EBHFireMode NewFireMode =
         WeaponComponent->ToggleFireMode();
+    if (IsValid(AmmoHUDWidget))
+    {
+        AmmoHUDWidget->SetFireMode(
+            NewFireMode == EBHFireMode::Automatic
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "WeaponFireModeAutomaticShort",
+                    "AUTO"
+                )
+                : NSLOCTEXT(
+                    "BrokenHorizon",
+                    "WeaponFireModeSemiAutomaticShort",
+                    "SEMI"
+                )
+        );
+    }
     ShowStatusNotification(
         NewFireMode == EBHFireMode::Automatic
         ? NSLOCTEXT(
@@ -2040,7 +3060,67 @@ void ABHCharacter::ToggleFireMode()
     );
 }
 
+void ABHCharacter::BeginFragGrenadeCook()
+{
+    if (bIsHandlingDeath ||
+        bIsHandlingMissionComplete ||
+        bPauseMenuOpen ||
+        bWarMapOpen ||
+        bIsTraversing ||
+        bWaitingForInitialWorldStreaming ||
+        bFragGrenadeCooking ||
+        FragGrenadeCount <= 0 ||
+        !FragGrenadeClass ||
+        !IsValid(FirstPersonCamera) ||
+        !IsValid(GetWorld()) ||
+        (IsValid(InjuryComponent) &&
+            InjuryComponent->IsMedkitTreatmentActive()))
+    {
+        return;
+    }
+
+    if (IsValid(WeaponComponent))
+    {
+        WeaponComponent->StopAllActions();
+    }
+
+    StopSprint();
+    bFragGrenadeCooking = true;
+    FragGrenadeCookStartedTime = GetWorld()->GetTimeSeconds();
+}
+
+void ABHCharacter::ReleaseFragGrenade()
+{
+    if (!bFragGrenadeCooking)
+    {
+        return;
+    }
+
+    const float CookDuration = FMath::Clamp(
+        GetWorld()->GetTimeSeconds() - FragGrenadeCookStartedTime,
+        0.0f,
+        FMath::Max(0.0f, MaxFragGrenadeCookDuration)
+    );
+    bFragGrenadeCooking = false;
+    ThrowFragGrenade(CookDuration);
+}
+
+void ABHCharacter::BeginControlledBreathing()
+{
+    SetControlledBreathingRequested(true);
+}
+
+void ABHCharacter::EndControlledBreathing()
+{
+    SetControlledBreathingRequested(false);
+}
+
 void ABHCharacter::ThrowFragGrenade()
+{
+    ThrowFragGrenade(0.0f);
+}
+
+void ABHCharacter::ThrowFragGrenade(float CookDuration)
 {
     if (bIsHandlingDeath ||
         bIsHandlingMissionComplete ||
@@ -2116,6 +3196,320 @@ void ABHCharacter::ThrowFragGrenade()
     );
 }
 
+void ABHCharacter::ThrowSmokeGrenade()
+{
+    if (bIsHandlingDeath ||
+        bIsHandlingMissionComplete ||
+        bPauseMenuOpen ||
+        bWarMapOpen ||
+        bIsTraversing ||
+        bWaitingForInitialWorldStreaming ||
+        SmokeGrenadeCount <= 0 ||
+        !SmokeGrenadeClass ||
+        !IsValid(FirstPersonCamera) ||
+        !IsValid(GetWorld()) ||
+        (IsValid(InjuryComponent) &&
+            InjuryComponent->IsMedkitTreatmentActive()))
+    {
+        return;
+    }
+
+    if (IsValid(WeaponComponent))
+    {
+        WeaponComponent->StopAllActions();
+    }
+
+    StopSprint();
+
+    const FVector Forward = FirstPersonCamera->GetForwardVector();
+    const FVector Right = FirstPersonCamera->GetRightVector();
+    const FVector SpawnLocation =
+        FirstPersonCamera->GetComponentLocation() +
+        Forward * 70.0f +
+        Right * 20.0f -
+        FVector::UpVector * 10.0f;
+
+    FActorSpawnParameters SpawnParameters;
+    SpawnParameters.Owner = this;
+    SpawnParameters.Instigator = this;
+    SpawnParameters.SpawnCollisionHandlingOverride =
+        ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+    ABHSmokeGrenade* Grenade =
+        GetWorld()->SpawnActor<ABHSmokeGrenade>(
+            SmokeGrenadeClass,
+            SpawnLocation,
+            FirstPersonCamera->GetComponentRotation(),
+            SpawnParameters
+        );
+
+    if (!IsValid(Grenade))
+    {
+        return;
+    }
+
+    SmokeGrenadeCount = FMath::Max(0, SmokeGrenadeCount - 1);
+    Grenade->Throw(
+        Forward * FMath::Max(0.0f, FragGrenadeThrowSpeed) +
+        FVector::UpVector * 200.0f +
+        GetVelocity(),
+        0.0f
+    );
+    RefreshSmokeGrenadeHUD();
+    UpdateCarryLoadHUD();
+
+    if (UBHSaveSubsystem* SaveSubsystem =
+        GetGameInstance()
+            ? GetGameInstance()->GetSubsystem<UBHSaveSubsystem>()
+            : nullptr)
+    {
+        SaveSubsystem->SavePlayerResources();
+    }
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_SMOKE_THROWN remaining=%d"),
+        SmokeGrenadeCount
+    );
+}
+
+bool ABHCharacter::IsTacticalFlashlightOn() const
+{
+    return bTacticalFlashlightOn &&
+        TacticalFlashlightBattery > KINDA_SMALL_NUMBER;
+}
+
+float ABHCharacter::GetTacticalFlashlightBattery() const
+{
+    return FMath::Clamp(
+        TacticalFlashlightBattery,
+        0.0f,
+        FMath::Max(1.0f, TacticalFlashlightMaxBattery)
+    );
+}
+
+void ABHCharacter::ToggleTacticalFlashlight()
+{
+    SetTacticalFlashlightOn(!IsTacticalFlashlightOn());
+}
+
+void ABHCharacter::SetTacticalFlashlightOn(bool bEnabled)
+{
+    if (!HasAuthority())
+    {
+        ServerSetTacticalFlashlightOn(bEnabled);
+        return;
+    }
+
+    const bool bNewState = bEnabled &&
+        TacticalFlashlightBattery > KINDA_SMALL_NUMBER;
+    if (bTacticalFlashlightOn == bNewState)
+    {
+        UpdateTacticalFlashlightVisual();
+        return;
+    }
+
+    bTacticalFlashlightOn = bNewState;
+    UpdateTacticalFlashlightVisual();
+    ForceNetUpdate();
+}
+
+void ABHCharacter::ServerSetTacticalFlashlightOn_Implementation(
+    bool bEnabled
+)
+{
+    SetTacticalFlashlightOn(bEnabled);
+}
+
+void ABHCharacter::ServerPerformWeaponBash_Implementation()
+{
+    PerformWeaponBash();
+}
+
+void ABHCharacter::RestoreTacticalFlashlightState(
+    float SavedBattery,
+    bool bSavedOn
+)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    TacticalFlashlightBattery = FMath::Clamp(
+        SavedBattery,
+        0.0f,
+        FMath::Max(1.0f, TacticalFlashlightMaxBattery)
+    );
+    bTacticalFlashlightOn = bSavedOn &&
+        TacticalFlashlightBattery > KINDA_SMALL_NUMBER;
+    UpdateTacticalFlashlightVisual();
+    ForceNetUpdate();
+}
+
+void ABHCharacter::OnRep_TacticalFlashlight()
+{
+    UpdateTacticalFlashlightVisual();
+}
+
+void ABHCharacter::UpdateTacticalFlashlightVisual()
+{
+    if (IsValid(TacticalFlashlight))
+    {
+        TacticalFlashlight->SetVisibility(IsTacticalFlashlightOn(), true);
+    }
+}
+
+void ABHCharacter::PerformWeaponBash()
+{
+    if (!HasAuthority())
+    {
+        ServerPerformWeaponBash();
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    const float CurrentTime = IsValid(World)
+        ? World->GetTimeSeconds()
+        : 0.0f;
+    if (!CanPerformWeaponBash(
+            bIsSprinting,
+            bIsTraversing,
+            bIsHandlingDeath,
+            IsValid(DraggedCasualty),
+            CurrentStamina,
+            WeaponBashStaminaCost,
+            CurrentTime,
+            LastWeaponBashAllowedTime
+        ) ||
+        !IsValid(World) ||
+        !IsValid(FirstPersonCamera) ||
+        !SpendStamina(WeaponBashStaminaCost))
+    {
+        return;
+    }
+
+    LastWeaponBashAllowedTime = CurrentTime +
+        FMath::Max(0.05f, WeaponBashCooldown);
+    if (IsValid(WeaponComponent))
+    {
+        WeaponComponent->StopAllActions();
+    }
+
+    const FVector Start = FirstPersonCamera->GetComponentLocation();
+    const FVector End = Start +
+        FirstPersonCamera->GetForwardVector() *
+        FMath::Max(0.0f, WeaponBashRange);
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponBash), false);
+    QueryParams.AddIgnoredActor(this);
+
+    FHitResult Hit;
+    const bool bHit = World->LineTraceSingleByChannel(
+        Hit,
+        Start,
+        End,
+        ECC_Visibility,
+        QueryParams
+    );
+    const bool bDamagedTarget = bHit && IsValid(Hit.GetActor()) &&
+        UGameplayStatics::ApplyPointDamage(
+            Hit.GetActor(),
+            FMath::Max(0.0f, WeaponBashDamage),
+            FirstPersonCamera->GetForwardVector(),
+            Hit,
+            GetController(),
+            this,
+            UDamageType::StaticClass()
+        ) > 0.0f;
+    const FText Feedback = bDamagedTarget
+        ? NSLOCTEXT(
+            "BrokenHorizon",
+            "WeaponBashContact",
+            "WEAPON BASH // CONTACT"
+        )
+        : NSLOCTEXT(
+            "BrokenHorizon",
+            "WeaponBashMiss",
+            "WEAPON BASH // MISS"
+        );
+    if (IsLocallyControlled())
+    {
+        ShowStatusNotification(Feedback);
+    }
+    else
+    {
+        ClientShowStatusNotification(Feedback);
+    }
+}
+
+void ABHCharacter::PerformFieldObservation()
+{
+    UWorld* World = GetWorld();
+    UBHWeaponComponent* ActiveWeapon = GetWeaponComponent();
+    const float CurrentTime = IsValid(World)
+        ? World->GetTimeSeconds()
+        : 0.0f;
+    if (!IsValid(World) ||
+        !IsValid(FirstPersonCamera) ||
+        !CanPerformFieldObservation(
+            bIsSprinting,
+            bIsTraversing,
+            IsValid(ActiveWeapon) && ActiveWeapon->IsAiming(),
+            bIsHandlingDeath,
+            false,
+            GetVelocity().Size2D(),
+            FieldObservationMaximumStableSpeed,
+            CurrentTime,
+            LastFieldObservationAllowedTime
+        ))
+    {
+        return;
+    }
+
+    LastFieldObservationAllowedTime = CurrentTime +
+        FMath::Max(0.1f, FieldObservationCooldown);
+    const FVector Start = FirstPersonCamera->GetComponentLocation();
+    const FVector End = Start +
+        FirstPersonCamera->GetForwardVector() *
+        FMath::Max(0.0f, FieldObservationRange);
+    FCollisionQueryParams QueryParams(
+        SCENE_QUERY_STAT(FieldObservation),
+        false
+    );
+    QueryParams.AddIgnoredActor(this);
+
+    FHitResult Hit;
+    const bool bHit = World->LineTraceSingleByChannel(
+        Hit,
+        Start,
+        End,
+        ECC_Visibility,
+        QueryParams
+    );
+    const bool bEnemyContact = bHit &&
+        IsValid(Cast<ABHEnemySoldier>(Hit.GetActor()));
+    ShowStatusNotification(
+        bEnemyContact
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldObservationEnemyContact",
+                "OBSERVATION // ENEMY CONTACT"
+            )
+            : bHit
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "FieldObservationUnknownContact",
+                    "OBSERVATION // UNKNOWN CONTACT"
+                )
+                : NSLOCTEXT(
+                    "BrokenHorizon",
+                    "FieldObservationClear",
+                    "OBSERVATION // SECTOR CLEAR"
+                )
+    );
+}
+
 void ABHCharacter::UseFieldDressing()
 {
     if (bIsHandlingDeath ||
@@ -2123,6 +3517,12 @@ void ABHCharacter::UseFieldDressing()
         bIsTraversing ||
         !IsValid(InjuryComponent))
     {
+        return;
+    }
+
+    if (!HasAuthority())
+    {
+        ServerUseFieldDressing();
         return;
     }
 
@@ -2145,8 +3545,18 @@ void ABHCharacter::UseMedkit()
     if (bIsHandlingDeath ||
         bIsHandlingMissionComplete ||
         bIsTraversing ||
-        !IsValid(InjuryComponent) ||
-        !InjuryComponent->StartMedkitTreatment())
+        !IsValid(InjuryComponent))
+    {
+        return;
+    }
+
+    if (!HasAuthority())
+    {
+        ServerUseMedkit();
+        return;
+    }
+
+    if (!InjuryComponent->StartMedkitTreatment())
     {
         return;
     }
@@ -2157,22 +3567,234 @@ void ABHCharacter::UseMedkit()
     }
 
     StopSprint();
+
+    if (UCharacterMovementComponent* MovementComponent =
+            GetCharacterMovement())
+    {
+        MovementComponent->StopMovementImmediately();
+    }
 }
 
+
+void ABHCharacter::UpdateWeaponBraceState()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    bool bNewWeaponBraced = false;
+    float NewSupportQuality = 0.0f;
+    UWorld* World = GetWorld();
+    if (IsValid(World) &&
+        IsValid(FirstPersonCamera) &&
+        IsValid(WeaponComponent) &&
+        WeaponComponent->IsAiming())
+    {
+        const FVector Start = FirstPersonCamera->GetComponentLocation();
+        const FVector Forward = FirstPersonCamera->GetForwardVector();
+        const FVector End = Start + Forward *
+            FMath::Max(1.0f, WeaponBraceMaximumSupportDistance);
+        FCollisionQueryParams QueryParams(
+            SCENE_QUERY_STAT(BHWeaponBraceSupport),
+            false,
+            this
+        );
+        QueryParams.AddIgnoredActor(this);
+
+        FHitResult Hit;
+        if (World->LineTraceSingleByChannel(
+                Hit,
+                Start,
+                End,
+                ECC_Visibility,
+                QueryParams
+            ))
+        {
+            const float DistanceToSupport = FVector::Distance(
+                Start,
+                Hit.ImpactPoint
+            );
+            const float SupportAlignment = FMath::Clamp(
+                FVector::DotProduct(Forward, -Hit.ImpactNormal),
+                0.0f,
+                1.0f
+            );
+            const bool bSupportUsable = IsValid(Hit.GetActor()) &&
+                !Hit.GetActor()->IsA<APawn>();
+            bNewWeaponBraced = CanBraceWeapon(
+                true,
+                bIsSprinting,
+                bIsTraversing,
+                GetVelocity().Size2D(),
+                WeaponBraceMaximumStableSpeed,
+                DistanceToSupport,
+                WeaponBraceMaximumSupportDistance,
+                SupportAlignment,
+                WeaponBraceMinimumAlignment,
+                bSupportUsable,
+                bSupportUsable ? 1.0f : 0.0f
+            );
+            if (bNewWeaponBraced)
+            {
+                const float DistanceQuality = 1.0f - FMath::Clamp(
+                    DistanceToSupport /
+                        FMath::Max(1.0f, WeaponBraceMaximumSupportDistance),
+                    0.0f,
+                    1.0f
+                );
+                NewSupportQuality = FMath::Clamp(
+                    DistanceQuality * SupportAlignment,
+                    0.0f,
+                    1.0f
+                );
+            }
+        }
+    }
+
+    if (bWeaponBraced != bNewWeaponBraced ||
+        FMath::Abs(WeaponBraceSupportQuality - NewSupportQuality) > 0.02f)
+    {
+        bWeaponBraced = bNewWeaponBraced;
+        WeaponBraceSupportQuality = NewSupportQuality;
+        if (IsValid(AmmoHUDWidget))
+        {
+            AmmoHUDWidget->SetWeaponBraced(bWeaponBraced);
+        }
+        ForceNetUpdate();
+    }
+}
+
+void ABHCharacter::OnRep_WeaponBrace()
+{
+    if (IsValid(AmmoHUDWidget))
+    {
+        AmmoHUDWidget->SetWeaponBraced(bWeaponBraced);
+    }
+}
 
 void ABHCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
+    if (HasAuthority() && bTacticalFlashlightOn)
+    {
+        TacticalFlashlightBattery = FMath::Clamp(
+            TacticalFlashlightBattery -
+                FMath::Max(0.0f, TacticalFlashlightBatteryDrainPerSecond) *
+                FMath::Max(0.0f, DeltaTime),
+            0.0f,
+            FMath::Max(1.0f, TacticalFlashlightMaxBattery)
+        );
+
+        if (TacticalFlashlightBattery <= KINDA_SMALL_NUMBER)
+        {
+            bTacticalFlashlightOn = false;
+            UpdateTacticalFlashlightVisual();
+            ForceNetUpdate();
+        }
+    }
+
+    if (HasAuthority())
+    {
+        AuthoritativePlayerSuppression =
+            DecayPlayerSuppression(
+                AuthoritativePlayerSuppression,
+                PlayerSuppressionDecayPerSecond,
+                DeltaTime
+            );
+    }
+
+    if (IsLocallyControlled())
+    {
+        UpdateInputPromptDevice();
+        LocalPlayerSuppressionPresentation =
+            DecayPlayerSuppression(
+                LocalPlayerSuppressionPresentation,
+                PlayerSuppressionDecayPerSecond,
+                DeltaTime
+            );
+        if (IsValid(CombatStatusWidget))
+        {
+            CombatStatusWidget->SetSuppression(
+                LocalPlayerSuppressionPresentation
+            );
+        }
+        if (IsValid(ObjectiveNotificationWidget))
+        {
+            ObjectiveNotificationWidget->SetCombatIntensityActive(
+                IsLocalCombatIntensityActive()
+            );
+        }
+    }
+
     UpdateInitialWorldStreaming(DeltaTime);
 
     UpdateTraversal(DeltaTime);
+    UpdateWeaponBraceState();
 
     const float PreviousStamina = CurrentStamina;
 
+    ControlledBreathRecoveryRemaining = FMath::Max(
+        0.0f,
+        ControlledBreathRecoveryRemaining -
+            FMath::Max(0.0f, DeltaTime)
+    );
+
+    if (bHoldingControlledBreath)
+    {
+        const bool bCanMaintainControlledBreathing =
+            IsValid(WeaponComponent) &&
+            WeaponComponent->IsAiming() &&
+            !bIsSprinting &&
+            !bIsTraversing &&
+            !bIsHandlingDeath &&
+            CurrentStamina > KINDA_SMALL_NUMBER;
+        if (!bCanMaintainControlledBreathing)
+        {
+            bHoldingControlledBreath = false;
+            ControlledBreathHeldDuration = 0.0f;
+            ControlledBreathRecoveryRemaining = FMath::Max(
+                0.0f,
+                ControlledBreathRecoveryDuration
+            );
+            if (IsValid(CombatStatusWidget))
+            {
+                CombatStatusWidget->SetControlledBreathing(false);
+            }
+            ForceNetUpdate();
+        }
+        else
+        {
+            ControlledBreathHeldDuration += FMath::Max(0.0f, DeltaTime);
+            CurrentStamina = FMath::Clamp(
+                CurrentStamina -
+                    FMath::Max(0.0f, ControlledBreathStaminaDrainPerSecond) *
+                    FMath::Max(0.0f, DeltaTime),
+                0.0f,
+                MaxStamina
+            );
+            if (CurrentStamina <= KINDA_SMALL_NUMBER)
+            {
+                bHoldingControlledBreath = false;
+                ControlledBreathHeldDuration = 0.0f;
+                ControlledBreathRecoveryRemaining = FMath::Max(
+                    0.0f,
+                    ControlledBreathRecoveryDuration
+                );
+                if (IsValid(CombatStatusWidget))
+                {
+                    CombatStatusWidget->SetControlledBreathing(false);
+                }
+                ForceNetUpdate();
+            }
+        }
+    }
+
     if (bIsSprinting && GetVelocity().SizeSquared2D() > 0.0f)
     {
-        CurrentStamina -= StaminaDrainRate * DeltaTime;
+        CurrentStamina -= StaminaDrainRate *
+            GetCarryLoadProfile().StaminaDrainMultiplier * DeltaTime;
         CurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, MaxStamina);
 
         if (CurrentStamina <= 0.0f)
@@ -2186,7 +3808,8 @@ void ABHCharacter::Tick(float DeltaTime)
 
         if (TimeSinceSprintStopped >= StaminaRecoveryDelay)
         {
-            CurrentStamina += StaminaRecoveryRate * DeltaTime;
+            CurrentStamina += StaminaRecoveryRate *
+                GetCarryLoadProfile().StaminaRecoveryMultiplier * DeltaTime;
             CurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, MaxStamina);
         }
     }
@@ -2209,10 +3832,14 @@ void ABHCharacter::Tick(float DeltaTime)
     }
 
     UpdateProne(DeltaTime);
+    UpdateCarryLoadHUD();
+    UpdateMovementAudio(DeltaTime);
+    UpdateHeadBob(DeltaTime);
     UpdateLean(DeltaTime);
     SynchronizeReplicatedOperationPresentation();
     UpdateOperationWaypointHUD();
     UpdateSquadCommandWaypointHUD();
+    UpdateSquadPingWaypointHUD();
     UpdateResupplyWaypointHUD(DeltaTime);
     UpdateConvoyWaypointHUD(DeltaTime);
     UpdateTransportWaypointHUD(DeltaTime);
@@ -2220,6 +3847,11 @@ void ABHCharacter::Tick(float DeltaTime)
     UpdateVehicleReadinessHUD();
     UpdateFieldSquadStatusHUD();
     UpdateStrategicSituationHUD(DeltaTime);
+
+    if (HasAuthority())
+    {
+        UpdateFieldSquadContextAction();
+    }
 
     if (!bIsHandlingDeath &&
         !bIsHandlingMissionComplete &&
@@ -2230,6 +3862,566 @@ void ABHCharacter::Tick(float DeltaTime)
     }
 
     UpdateFirstPersonPresentationOffsets(DeltaTime);
+}
+
+void ABHCharacter::UpdateInputPromptDevice()
+{
+    APlayerController* PlayerController = Cast<APlayerController>(
+        GetController()
+    );
+    UGameInstance* GameInstance = GetGameInstance();
+    UBHUserSettingsSubsystem* Settings = IsValid(GameInstance)
+        ? GameInstance->GetSubsystem<UBHUserSettingsSubsystem>()
+        : nullptr;
+    if (!IsValid(PlayerController) || !IsValid(Settings) ||
+        Settings->GetInputPromptMode() != EBHInputPromptMode::Auto)
+    {
+        return;
+    }
+
+    const FKey GamepadAxes[] = {
+        EKeys::Gamepad_LeftX,
+        EKeys::Gamepad_LeftY,
+        EKeys::Gamepad_RightX,
+        EKeys::Gamepad_RightY,
+        EKeys::Gamepad_LeftTriggerAxis,
+        EKeys::Gamepad_RightTriggerAxis
+    };
+    bool bGamepadActive = false;
+    for (const FKey& Axis : GamepadAxes)
+    {
+        if (FMath::Abs(PlayerController->GetInputAnalogKeyState(Axis)) > 0.35f)
+        {
+            bGamepadActive = true;
+            break;
+        }
+    }
+
+    bool bKeyboardMouseActive =
+        FMath::Abs(PlayerController->GetInputAnalogKeyState(EKeys::MouseX)) >
+            KINDA_SMALL_NUMBER ||
+        FMath::Abs(PlayerController->GetInputAnalogKeyState(EKeys::MouseY)) >
+            KINDA_SMALL_NUMBER;
+    for (const FBHInputBindingDefinition& Definition :
+        UBHUserSettingsSubsystem::GetDefaultInputBindingDefinitions())
+    {
+        const FKey KeyboardKey = Settings->GetInputBinding(
+            Definition.BindingID,
+            false
+        );
+        const FKey GamepadKey = Settings->GetInputBinding(
+            Definition.BindingID,
+            true
+        );
+        bKeyboardMouseActive = bKeyboardMouseActive ||
+            (KeyboardKey.IsValid() &&
+                PlayerController->IsInputKeyDown(KeyboardKey));
+        bGamepadActive = bGamepadActive ||
+            (GamepadKey.IsValid() &&
+                PlayerController->IsInputKeyDown(GamepadKey));
+    }
+
+    if (bGamepadActive)
+    {
+        Settings->NotifyInputDeviceUsed(true);
+    }
+    else if (bKeyboardMouseActive)
+    {
+        Settings->NotifyInputDeviceUsed(false);
+    }
+}
+
+float ABHCharacter::CalculateMovementNoiseLoudness(
+    float HorizontalSpeed,
+    bool bSprinting,
+    bool bCrouched,
+    bool bProne,
+    float SurfaceLoudnessMultiplier,
+    float EquipmentLoudnessMultiplier
+)
+{
+    if (HorizontalSpeed < 10.0f)
+    {
+        return 0.0f;
+    }
+
+    const float SpeedAlpha = FMath::Clamp(
+        HorizontalSpeed / 700.0f,
+        0.0f,
+        1.0f
+    );
+    float PostureMultiplier = 1.0f;
+    if (bProne)
+    {
+        PostureMultiplier = 0.22f;
+    }
+    else if (bCrouched)
+    {
+        PostureMultiplier = 0.48f;
+    }
+    else if (bSprinting)
+    {
+        PostureMultiplier = 1.35f;
+    }
+
+    return FMath::Clamp(
+        FMath::Lerp(0.18f, 1.0f, SpeedAlpha) *
+            PostureMultiplier *
+            FMath::Max(0.0f, SurfaceLoudnessMultiplier) *
+            FMath::Max(0.0f, EquipmentLoudnessMultiplier),
+        0.0f,
+        2.0f
+    );
+}
+
+void ABHCharacter::UseEngineeringTool()
+{
+    if (bIsHandlingDeath || bIsHandlingMissionComplete || bIsTraversing)
+    {
+        return;
+    }
+    if (!HasAuthority())
+    {
+        ServerUseEngineeringTool();
+        return;
+    }
+    if (ActiveEngineeringCharges.ContainsByPredicate(
+            [](const ABHEngineeringCharge* Charge)
+            {
+                return IsValid(Charge);
+            }))
+    {
+        DetonateEngineeringCharges();
+        return;
+    }
+    PlaceEngineeringCharge(
+        nullptr,
+        EBHEngineeringChargeMode::AreaDenial
+    );
+}
+
+void ABHCharacter::ServerUseEngineeringTool_Implementation()
+{
+    UseEngineeringTool();
+}
+
+void ABHCharacter::ServerUseFieldDressing_Implementation()
+{
+    UseFieldDressing();
+}
+
+void ABHCharacter::ServerUseMedkit_Implementation()
+{
+    UseMedkit();
+}
+
+bool ABHCharacter::TryPlaceBreachingCharge(AActor* TargetActor)
+{
+    if (!HasAuthority() || !IsValid(TargetActor) ||
+        EngineeringChargeCount <= 0 ||
+        FVector::DistSquared(GetActorLocation(), TargetActor->GetActorLocation()) >
+            FMath::Square(InteractionDistance + 150.0f))
+    {
+        return false;
+    }
+    return PlaceEngineeringCharge(
+        TargetActor,
+        EBHEngineeringChargeMode::Breach
+    );
+}
+
+bool ABHCharacter::PlaceEngineeringCharge(
+    AActor* TargetActor,
+    EBHEngineeringChargeMode Mode
+)
+{
+    if (!HasAuthority() || EngineeringChargeCount <= 0 ||
+        !EngineeringChargeClass || !IsValid(GetWorld()))
+    {
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon", "EngineeringNoCharges",
+            "ENGINEERING // NO CHARGES AVAILABLE"
+        ));
+        return false;
+    }
+
+    FVector PlacementLocation;
+    FRotator PlacementRotation = FRotator::ZeroRotator;
+    if (IsValid(TargetActor))
+    {
+        const FVector TowardPlayer = (
+            GetActorLocation() - TargetActor->GetActorLocation()
+        ).GetSafeNormal2D();
+        PlacementLocation = TargetActor->GetActorLocation() +
+            TowardPlayer * 35.0f + FVector(0.0f, 0.0f, 90.0f);
+        PlacementRotation = (-TowardPlayer).Rotation();
+    }
+    else
+    {
+        if (!IsValid(FirstPersonCamera))
+        {
+            return false;
+        }
+        FHitResult PlacementHit;
+        FCollisionQueryParams Query(
+            SCENE_QUERY_STAT(BHEngineeringPlacement), true, this
+        );
+        const FVector Start = FirstPersonCamera->GetComponentLocation();
+        const FVector End = Start +
+            FirstPersonCamera->GetForwardVector() * 500.0f;
+        if (!GetWorld()->LineTraceSingleByChannel(
+                PlacementHit, Start, End, ECC_Visibility, Query))
+        {
+            ShowStatusNotification(NSLOCTEXT(
+                "BrokenHorizon", "EngineeringNoSurface",
+                "ENGINEERING // AIM AT A SURFACE WITHIN 5 METERS"
+            ));
+            return false;
+        }
+        PlacementLocation = PlacementHit.ImpactPoint +
+            PlacementHit.ImpactNormal * 5.0f;
+        PlacementRotation = PlacementHit.ImpactNormal.Rotation();
+        TargetActor = Cast<APawn>(PlacementHit.GetActor())
+            ? nullptr
+            : PlacementHit.GetActor();
+    }
+
+    FActorSpawnParameters SpawnParameters;
+    SpawnParameters.Owner = this;
+    SpawnParameters.Instigator = this;
+    SpawnParameters.SpawnCollisionHandlingOverride =
+        ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    ABHEngineeringCharge* Charge =
+        GetWorld()->SpawnActor<ABHEngineeringCharge>(
+            EngineeringChargeClass,
+            PlacementLocation,
+            PlacementRotation,
+            SpawnParameters
+        );
+    if (!IsValid(Charge))
+    {
+        return false;
+    }
+    Charge->InitializeCharge(this, TargetActor, Mode);
+    --EngineeringChargeCount;
+    ActiveEngineeringCharges.Add(Charge);
+    ActiveEngineeringChargeCount = ActiveEngineeringCharges.Num();
+    RefreshEngineeringHUD();
+    ForceNetUpdate();
+    ShowPriorityStatusNotification(
+        Mode == EBHEngineeringChargeMode::Breach
+            ? NSLOCTEXT(
+                "BrokenHorizon", "BreachChargePlaced",
+                "BREACH CHARGE PLACED // ARMING 2 SECONDS\n\n"
+                "Use the engineering control to detonate. Danger close."
+            )
+            : NSLOCTEXT(
+                "BrokenHorizon", "AreaChargePlaced",
+                "AREA-DENIAL CHARGE PLACED // ARMING 2 SECONDS\n\n"
+                "Use the engineering control to command detonate."
+            ),
+        EBHNotificationPriority::High
+    );
+    if (!FParse::Param(FCommandLine::Get(), TEXT("BHTestEngineeringRuntime")))
+    {
+        if (UBHSaveSubsystem* SaveSubsystem = GetGameInstance()
+                ? GetGameInstance()->GetSubsystem<UBHSaveSubsystem>() : nullptr)
+        {
+            SaveSubsystem->SavePlayerResources();
+        }
+    }
+    UE_LOG(LogTemp, Display,
+        TEXT("BH_ENGINEERING_CHARGE state=placed mode=%d carried=%d active=%d"),
+        static_cast<int32>(Mode), EngineeringChargeCount,
+        ActiveEngineeringChargeCount);
+    return true;
+}
+
+void ABHCharacter::DetonateEngineeringCharges()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+    TArray<TObjectPtr<ABHEngineeringCharge>> Charges =
+        ActiveEngineeringCharges;
+    int32 DetonatedCount = 0;
+    for (ABHEngineeringCharge* Charge : Charges)
+    {
+        if (IsValid(Charge) && Charge->Detonate(this))
+        {
+            ++DetonatedCount;
+        }
+    }
+    if (DetonatedCount <= 0)
+    {
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon", "EngineeringStillArming",
+            "ENGINEERING // CHARGE STILL ARMING"
+        ));
+    }
+}
+
+void ABHCharacter::NotifyEngineeringChargeRemoved(
+    ABHEngineeringCharge* Charge
+)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+    ActiveEngineeringCharges.Remove(Charge);
+    ActiveEngineeringCharges.RemoveAll(
+        [](const ABHEngineeringCharge* Candidate)
+        {
+            return !IsValid(Candidate);
+        }
+    );
+    ActiveEngineeringChargeCount = ActiveEngineeringCharges.Num();
+    RefreshEngineeringHUD();
+    ForceNetUpdate();
+}
+
+int32 ABHCharacter::GetEngineeringChargeCount() const
+{
+    return EngineeringChargeCount;
+}
+
+int32 ABHCharacter::GetMaxEngineeringCharges() const
+{
+    return FMath::Max(0, MaxEngineeringCharges);
+}
+
+int32 ABHCharacter::AddEngineeringCharges(int32 Amount)
+{
+    const int32 Previous = EngineeringChargeCount;
+    EngineeringChargeCount = FMath::Clamp(
+        EngineeringChargeCount + FMath::Max(0, Amount),
+        0,
+        GetMaxEngineeringCharges()
+    );
+    RefreshEngineeringHUD();
+    ForceNetUpdate();
+    return EngineeringChargeCount - Previous;
+}
+
+void ABHCharacter::RestoreEngineeringChargeCount(int32 SavedCount)
+{
+    EngineeringChargeCount = FMath::Clamp(
+        SavedCount, 0, GetMaxEngineeringCharges()
+    );
+    RefreshEngineeringHUD();
+}
+
+void ABHCharacter::OnRep_EngineeringInventory()
+{
+    RefreshEngineeringHUD();
+}
+
+void ABHCharacter::RefreshEngineeringHUD()
+{
+    if (IsValid(CombatStatusWidget))
+    {
+        CombatStatusWidget->SetEngineeringChargeState(
+            EngineeringChargeCount,
+            ActiveEngineeringChargeCount
+        );
+    }
+}
+
+float ABHCharacter::CalculateFootstepInterval(
+    float HorizontalSpeed,
+    bool bSprinting,
+    bool bCrouched,
+    bool bProne
+)
+{
+    if (HorizontalSpeed < 10.0f)
+    {
+        return BIG_NUMBER;
+    }
+    if (bProne)
+    {
+        return 1.05f;
+    }
+    if (bCrouched)
+    {
+        return 0.82f;
+    }
+    if (bSprinting)
+    {
+        return 0.38f;
+    }
+
+    return FMath::Lerp(
+        0.78f,
+        0.55f,
+        FMath::Clamp(HorizontalSpeed / 400.0f, 0.0f, 1.0f)
+    );
+}
+
+void ABHCharacter::UpdateMovementAudio(float DeltaTime)
+{
+    if (!HasAuthority() ||
+        !IsValid(GetCharacterMovement()) ||
+        !GetCharacterMovement()->IsMovingOnGround() ||
+        bIsTraversing ||
+        bIsHandlingDeath)
+    {
+        FootstepElapsed = 0.0f;
+        return;
+    }
+
+    const float HorizontalSpeed = GetVelocity().Size2D();
+    const float Interval = CalculateFootstepInterval(
+        HorizontalSpeed,
+        bIsSprinting,
+        bIsCrouched,
+        bIsProne
+    );
+    if (!FMath::IsFinite(Interval) || Interval >= BIG_NUMBER)
+    {
+        FootstepElapsed = 0.0f;
+        return;
+    }
+
+    FootstepElapsed += FMath::Max(0.0f, DeltaTime);
+    if (FootstepElapsed < Interval)
+    {
+        return;
+    }
+
+    FootstepElapsed = FMath::Fmod(FootstepElapsed, Interval);
+    EmitAuthoritativeFootstep();
+}
+
+uint8 ABHCharacter::ResolveFootstepSurfaceType() const
+{
+    if (!IsValid(GetWorld()))
+    {
+        return static_cast<uint8>(SurfaceType_Default);
+    }
+
+    FHitResult FloorHit;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BHFootstepSurface), false, this);
+    QueryParams.bReturnPhysicalMaterial = true;
+    const float TraceDistance =
+        IsValid(GetCapsuleComponent())
+            ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 35.0f
+            : 130.0f;
+    const FVector Start = GetActorLocation();
+    const FVector End = Start - FVector(0.0f, 0.0f, TraceDistance);
+    if (!GetWorld()->LineTraceSingleByChannel(
+            FloorHit,
+            Start,
+            End,
+            ECC_Visibility,
+            QueryParams
+        ))
+    {
+        return static_cast<uint8>(SurfaceType_Default);
+    }
+
+    return static_cast<uint8>(
+        UPhysicalMaterial::DetermineSurfaceType(
+            FloorHit.PhysMaterial.Get()
+        )
+    );
+}
+
+void ABHCharacter::EmitAuthoritativeFootstep()
+{
+    if (!HasAuthority() || !IsValid(GetWorld()))
+    {
+        return;
+    }
+
+    const uint8 SurfaceType = ResolveFootstepSurfaceType();
+    float SurfaceMultiplier = 1.0f;
+    switch (SurfaceType)
+    {
+        case SurfaceType1: SurfaceMultiplier = 1.10f; break;
+        case SurfaceType2: SurfaceMultiplier = 0.82f; break;
+        case SurfaceType3: SurfaceMultiplier = 0.68f; break;
+        case SurfaceType4: SurfaceMultiplier = 1.35f; break;
+        case SurfaceType5: SurfaceMultiplier = 1.20f; break;
+        default: break;
+    }
+
+    const float HorizontalSpeed = GetVelocity().Size2D();
+    const float Loudness = CalculateMovementNoiseLoudness(
+        HorizontalSpeed,
+        bIsSprinting,
+        bIsCrouched,
+        bIsProne,
+        SurfaceMultiplier,
+        EquipmentNoiseMultiplier *
+            GetCarryLoadProfile().MovementNoiseMultiplier
+    ) * UBHBattlefieldConditions::GetCurrentProfile(this).
+        MovementNoiseMultiplier;
+    if (Loudness <= KINDA_SMALL_NUMBER)
+    {
+        return;
+    }
+
+    UAISense_Hearing::ReportNoiseEvent(
+        this,
+        GetActorLocation(),
+        Loudness,
+        this,
+        0.0f,
+        TEXT("Footstep")
+    );
+
+    MulticastPlayFootstep(
+        SurfaceType,
+        FMath::Clamp(Loudness, 0.15f, 1.25f),
+        FMath::Lerp(
+            0.92f,
+            1.08f,
+            FMath::Clamp(HorizontalSpeed / SprintSpeed, 0.0f, 1.0f)
+        )
+    );
+}
+
+USoundBase* ABHCharacter::ResolveFootstepSound(uint8 SurfaceType) const
+{
+    USoundBase* SurfaceSound = nullptr;
+    switch (SurfaceType)
+    {
+        case SurfaceType1: SurfaceSound = ConcreteFootstepSound; break;
+        case SurfaceType2: SurfaceSound = DirtFootstepSound; break;
+        case SurfaceType3: SurfaceSound = GrassFootstepSound; break;
+        case SurfaceType4: SurfaceSound = MetalFootstepSound; break;
+        case SurfaceType5: SurfaceSound = WaterFootstepSound; break;
+        default: break;
+    }
+    return IsValid(SurfaceSound)
+        ? SurfaceSound
+        : DefaultFootstepSound.Get();
+}
+
+void ABHCharacter::MulticastPlayFootstep_Implementation(
+    uint8 SurfaceType,
+    float VolumeMultiplier,
+    float PitchMultiplier
+)
+{
+    if (GetNetMode() == NM_DedicatedServer)
+    {
+        return;
+    }
+
+    if (USoundBase* FootstepSound = ResolveFootstepSound(SurfaceType))
+    {
+        UGameplayStatics::PlaySoundAtLocation(
+            this,
+            FootstepSound,
+            GetActorLocation(),
+            FMath::Max(0.0f, VolumeMultiplier),
+            FMath::Clamp(PitchMultiplier, 0.5f, 2.0f)
+        );
+    }
 }
 
 void ABHCharacter::SynchronizeReplicatedOperationPresentation()
@@ -2299,7 +4491,8 @@ void ABHCharacter::SynchronizeReplicatedOperationPresentation()
                     "ReplicatedOperationDebriefSuccess",
                     "SHARED OPERATION COMPLETE\n\n"
                     "Campaign command is processing the outcome."
-                )
+                ),
+                EBHNotificationPriority::Critical
             );
         }
         else if (
@@ -2312,7 +4505,8 @@ void ABHCharacter::SynchronizeReplicatedOperationPresentation()
                     "ReplicatedOperationDebriefFailure",
                     "SHARED OPERATION FAILED\n\n"
                     "Campaign command is assessing the losses."
-                )
+                ),
+                EBHNotificationPriority::Critical
             );
         }
 
@@ -2380,7 +4574,8 @@ void ABHCharacter::SynchronizeReplicatedOperationPresentation()
                     "Support friendly forces in {0}."
                 ),
             FText::FromName(Snapshot.SectorID)
-        )
+        ),
+        EBHNotificationPriority::High
     );
 }
 
@@ -2671,6 +4866,120 @@ void ABHCharacter::UpdateSquadCommandWaypointHUD()
     );
 }
 
+void ABHCharacter::UpdateSquadPingWaypointHUD()
+{
+    if (!IsValid(CombatStatusWidget))
+    {
+        return;
+    }
+
+    const UWorld* World = GetWorld();
+    const ABHWarGameState* WarGameState = IsValid(World)
+        ? World->GetGameState<ABHWarGameState>()
+        : nullptr;
+
+    if (!IsValid(WarGameState))
+    {
+        CombatStatusWidget->SetSquadPingWaypoint(
+            false,
+            FVector::ZeroVector,
+            0.0f,
+            FString(),
+            FString()
+        );
+        return;
+    }
+
+    const FBHSquadPingSnapshot Ping =
+        WarGameState->GetSquadPingSnapshot();
+
+    if (!Ping.IsActiveAt(
+            WarGameState->GetServerWorldTimeSeconds()))
+    {
+        CombatStatusWidget->SetSquadPingWaypoint(
+            false,
+            FVector::ZeroVector,
+            0.0f,
+            FString(),
+            FString()
+        );
+        return;
+    }
+
+    FVector PresentedPingLocation = FVector(Ping.Location);
+    bool bTrackedTargetVisible = false;
+    const bool bTrackedTarget = IsValid(Ping.TrackedActor);
+
+    if (Ping.Revision != ObservedSquadPingRevision)
+    {
+        ObservedSquadPingRevision = Ping.Revision;
+        LastVisibleSquadPingLocation = PresentedPingLocation;
+    }
+
+    if (bTrackedTarget)
+    {
+        FCollisionQueryParams QueryParams(
+            SCENE_QUERY_STAT(BHSquadPingVisibility),
+            false,
+            this
+        );
+        const FVector TargetLocation =
+            Ping.TrackedActor->GetActorLocation();
+        FHitResult VisibilityHit;
+        const bool bBlockingHit = World->LineTraceSingleByChannel(
+            VisibilityHit,
+            GetPawnViewLocation(),
+            TargetLocation,
+            ECC_Visibility,
+            QueryParams
+        );
+        bTrackedTargetVisible =
+            UBHCombatStatusWidget::IsSquadPingTargetVisible(
+                bBlockingHit,
+                bBlockingHit ? VisibilityHit.GetActor() : nullptr,
+                Ping.TrackedActor
+            );
+        if (bTrackedTargetVisible)
+        {
+            LastVisibleSquadPingLocation = TargetLocation;
+        }
+        PresentedPingLocation = LastVisibleSquadPingLocation;
+
+        if (LoggedSquadPingPresentationRevision != Ping.Revision ||
+            bLoggedSquadPingTargetVisible != bTrackedTargetVisible)
+        {
+            LoggedSquadPingPresentationRevision = Ping.Revision;
+            bLoggedSquadPingTargetVisible = bTrackedTargetVisible;
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_SQUAD_PING_PRESENTATION revision=%d tracked=1 "
+                    "visible=%d mode=%s location=%s"
+                ),
+                Ping.Revision,
+                bTrackedTargetVisible ? 1 : 0,
+                bTrackedTargetVisible
+                    ? TEXT("TRACKED")
+                    : TEXT("LAST_KNOWN"),
+                *PresentedPingLocation.ToCompactString()
+            );
+        }
+    }
+
+    const FVector PresentedToPing =
+        PresentedPingLocation - GetActorLocation();
+    CombatStatusWidget->SetSquadPingWaypoint(
+        true,
+        PresentedToPing,
+        PresentedToPing.Size2D(),
+        Ping.ContextLabel.ToString(),
+        Ping.IssuerLabel.ToString(),
+        bTrackedTarget,
+        bTrackedTargetVisible
+    );
+}
+
 void ABHCharacter::UpdateResupplyWaypointHUD(float DeltaTime)
 {
     if (!IsValid(CombatStatusWidget))
@@ -2698,6 +5007,83 @@ void ABHCharacter::UpdateResupplyWaypointHUD(float DeltaTime)
         );
     };
 
+    if (bRuntimeWarOperation &&
+        AssignedWarPriorityType == EBHWarPriorityType::Resupply)
+    {
+        UWorld* OperationWorld = GetWorld();
+        UGameInstance* OperationGameInstance =
+            IsValid(OperationWorld)
+                ? OperationWorld->GetGameInstance()
+                : nullptr;
+        UBHWarSubsystem* OperationWar =
+            IsValid(OperationGameInstance)
+                ? OperationGameInstance->GetSubsystem<
+                    UBHWarSubsystem>()
+                : nullptr;
+        const ABHFieldTransport* DrivenTransport =
+            Cast<ABHFieldTransport>(GetAttachParentActor());
+        const bool bCarryingMissionCargo =
+            IsValid(DrivenTransport) &&
+            DrivenTransport->GetCargoSupply() >
+                KINDA_SMALL_NUMBER;
+        const FName WaypointSectorID =
+            bCarryingMissionCargo
+                ? AssignedWarSectorID
+                : AssignedWarSupplySourceSectorID;
+
+        if (IsValid(OperationWorld) &&
+            IsValid(OperationWar) &&
+            !WaypointSectorID.IsNone())
+        {
+            for (TActorIterator<ABHSectorResupplyStation> It(
+                    OperationWorld);
+                It;
+                ++It)
+            {
+                ABHSectorResupplyStation* Station = *It;
+
+                if (!IsValid(Station) ||
+                    Station->GetSectorID() != WaypointSectorID)
+                {
+                    continue;
+                }
+
+                const FBHWarSectorState Sector =
+                    OperationWar->GetSectorState(
+                        WaypointSectorID
+                    );
+                const FVector ToStation =
+                    Station->GetActorLocation() -
+                    GetActorLocation();
+                CombatStatusWidget->SetResupplyWaypoint(
+                    true,
+                    FText::Format(
+                        bCarryingMissionCargo
+                            ? NSLOCTEXT(
+                                "BrokenHorizon",
+                                "ResupplyOperationDeliveryWaypoint",
+                                "DELIVER // {0}"
+                            )
+                            : NSLOCTEXT(
+                                "BrokenHorizon",
+                                "ResupplyOperationPickupWaypoint",
+                                "LOAD CARGO // {0}"
+                            ),
+                        Sector.DisplayName.IsEmpty()
+                            ? FText::FromName(WaypointSectorID)
+                            : Sector.DisplayName
+                    ),
+                    ToStation,
+                    ToStation.Size2D()
+                );
+                return;
+            }
+        }
+
+        ClearWaypoint();
+        return;
+    }
+
     const bool bNeedsAmmo =
         IsValid(WeaponComponent) &&
         WeaponComponent->GetReserveAmmo() <=
@@ -2715,6 +5101,8 @@ void ABHCharacter::UpdateResupplyWaypointHUD(float DeltaTime)
          InjuryComponent->GetBodyArmorDurabilityPercentage() <= 0.35f);
     const bool bNeedsGrenades =
         GetFragGrenadeCount() < GetMaxFragGrenades();
+    const bool bNeedsEngineering =
+        GetEngineeringChargeCount() < GetMaxEngineeringCharges();
     const int32 FieldSquadMembersNeedingService =
         GetFieldSquadMembersNeedingServiceCount();
     const bool bNeedsFieldSquadService =
@@ -2799,6 +5187,7 @@ void ABHCharacter::UpdateResupplyWaypointHUD(float DeltaTime)
         !bNeedsMedical &&
         !bNeedsArmor &&
         !bNeedsGrenades &&
+        !bNeedsEngineering &&
         !bNeedsFieldSquadService &&
         !bNeedsVehicleService)
     {
@@ -2899,6 +5288,18 @@ void ABHCharacter::UpdateConvoyWaypointHUD(float DeltaTime)
     ConvoyWaypointRefreshRemaining = 0.25f;
 
     UWorld* World = GetWorld();
+    const UGameInstance* GameInstance = GetGameInstance();
+    const UBHWarSubsystem* WarSubsystem =
+        IsValid(GameInstance)
+            ? GameInstance->GetSubsystem<UBHWarSubsystem>()
+            : nullptr;
+    const FName AssignedEscortConvoyID =
+        bRuntimeWarOperation &&
+            AssignedWarPriorityType ==
+                EBHWarPriorityType::EscortRescue &&
+            IsValid(WarSubsystem)
+            ? WarSubsystem->GetCommittedOperationTargetID()
+            : NAME_None;
     ABHSupplyConvoyTarget* NearestTarget = nullptr;
     float NearestDistanceSquared = TNumericLimits<float>::Max();
 
@@ -2910,7 +5311,9 @@ void ABHCharacter::UpdateConvoyWaypointHUD(float DeltaTime)
         {
             ABHSupplyConvoyTarget* Target = *It;
 
-            if (!IsValid(Target) || Target->GetConvoyID().IsNone())
+            if (!IsValid(Target) || Target->GetConvoyID().IsNone() ||
+                (!AssignedEscortConvoyID.IsNone() &&
+                 Target->GetConvoyID() != AssignedEscortConvoyID))
             {
                 continue;
             }
@@ -2951,6 +5354,148 @@ void ABHCharacter::UpdateConvoyWaypointHUD(float DeltaTime)
         NearestTarget->GetSupplyPayload(),
         NearestTarget->GetHealthPercentage()
     );
+    const FBHRouteOperationProfile RouteProfile =
+        NearestTarget->GetRouteOperationProfile();
+    CombatStatusWidget->SetConvoyOperationProfile(
+        RouteProfile.Variation,
+        NearestTarget->GetOperationDeadlineRemaining()
+    );
+}
+
+void ABHCharacter::IssueSquadPing()
+{
+    if (bIsHandlingDeath || bPauseMenuOpen || bWarMapOpen)
+    {
+        return;
+    }
+
+    if (HasAuthority())
+    {
+        ExecuteSquadPing();
+    }
+    else
+    {
+        ServerRequestSquadPing();
+    }
+}
+
+void ABHCharacter::ServerRequestSquadPing_Implementation()
+{
+    ExecuteSquadPing();
+}
+
+void ABHCharacter::ExecuteSquadPing()
+{
+    UWorld* World = GetWorld();
+
+    if (!HasAuthority() || !IsValid(World) || bIsHandlingDeath ||
+        (IsValid(HealthComponent) && HealthComponent->IsDead()))
+    {
+        return;
+    }
+
+    const float CurrentTime = World->GetTimeSeconds();
+
+    if (CurrentTime < NextSquadPingTime)
+    {
+        return;
+    }
+
+    FVector ViewLocation;
+    FRotator ViewRotation;
+    GetActorEyesViewPoint(ViewLocation, ViewRotation);
+    const FVector TraceEnd = ViewLocation +
+        (ViewRotation.Vector() *
+         FMath::Max(1000.0f, SquadPingMaximumDistance));
+    FCollisionQueryParams QueryParams(
+        SCENE_QUERY_STAT(BHSquadPingTrace),
+        true,
+        this
+    );
+    QueryParams.AddIgnoredActor(this);
+
+    FHitResult HitResult;
+    const bool bHit = World->LineTraceSingleByChannel(
+        HitResult,
+        ViewLocation,
+        TraceEnd,
+        ECC_Visibility,
+        QueryParams
+    );
+    const FVector PingLocation = bHit
+        ? HitResult.ImpactPoint
+        : TraceEnd;
+    const FName ContextLabel = ResolveSquadPingContextLabel(
+        bHit ? HitResult.GetActor() : nullptr
+    );
+    ABHWarGameState* WarGameState =
+        World->GetGameState<ABHWarGameState>();
+
+    if (!IsValid(WarGameState))
+    {
+        return;
+    }
+
+    FName IssuerLabel(TEXT("SQUAD"));
+
+    if (const APlayerState* State = GetPlayerState())
+    {
+        FString PlayerName = State->GetPlayerName();
+        PlayerName.LeftInline(18, EAllowShrinking::No);
+
+        if (!PlayerName.IsEmpty())
+        {
+            IssuerLabel = FName(*PlayerName);
+        }
+    }
+
+    WarGameState->PublishSquadPing(
+        PingLocation,
+        ContextLabel,
+        IssuerLabel,
+        SquadPingLifetime,
+        bHit ? HitResult.GetActor() : nullptr
+    );
+    NextSquadPingTime = CurrentTime +
+        FMath::Max(0.1f, SquadPingCooldown);
+}
+
+FName ABHCharacter::ResolveSquadPingContextLabel(
+    AActor* HitActor
+) const
+{
+    const ABHEnemySoldier* Soldier =
+        Cast<ABHEnemySoldier>(HitActor);
+
+    if (IsValid(Soldier))
+    {
+        if (Soldier->IsDead())
+        {
+            return FName(TEXT("CASUALTY"));
+        }
+
+        return Soldier->GetCombatFaction() ==
+            EBHCombatFaction::Hostile
+            ? FName(TEXT("HOSTILE"))
+            : FName(TEXT("ALLY"));
+    }
+
+    if (IsValid(Cast<ABHFieldTransport>(HitActor)))
+    {
+        return FName(TEXT("TRANSPORT"));
+    }
+
+    if (IsValid(Cast<ABHSectorResupplyStation>(HitActor)))
+    {
+        return FName(TEXT("SUPPLY"));
+    }
+
+    if (IsValid(Cast<ABHSectorAnchor>(HitActor)))
+    {
+        return FName(TEXT("OBJECTIVE"));
+    }
+
+    return FName(TEXT("LOCATION"));
 }
 
 void ABHCharacter::UpdateTransportWaypointHUD(float DeltaTime)
@@ -3272,6 +5817,28 @@ void ABHCharacter::UpdateFieldSquadStatusHUD()
     const int32 LivingOperatives = GetLivingFieldSquadCount();
     const int32 MembersNeedingService =
         GetFieldSquadMembersNeedingServiceCount();
+    float TotalReadiness = 0.0f;
+    float LowestReadiness = 1.0f;
+    int32 ReadinessSampleCount = 0;
+    for (const ABHEnemySoldier* Member : FieldSquadMembers)
+    {
+        if (!IsValid(Member) || Member->IsDead() ||
+            Member->IsIncapacitated())
+        {
+            continue;
+        }
+
+        const float MemberReadiness = Member->GetCombatReadiness();
+        TotalReadiness += MemberReadiness;
+        LowestReadiness = FMath::Min(
+            LowestReadiness,
+            MemberReadiness
+        );
+        ++ReadinessSampleCount;
+    }
+    const float AverageReadiness = ReadinessSampleCount > 0
+        ? TotalReadiness / static_cast<float>(ReadinessSampleCount)
+        : 1.0f;
     CombatStatusWidget->SetFieldSquadStatus(
         LivingOperatives > 0,
         LivingOperatives,
@@ -3280,9 +5847,93 @@ void ABHCharacter::UpdateFieldSquadStatusHUD()
         bFieldSquadEmbarked
     );
     CombatStatusWidget->SetFieldSquadServiceNeeds(
-        MembersNeedingService
+        MembersNeedingService,
+        GetFieldSquadMembersRequiringEvacuationCount()
+    );
+    CombatStatusWidget->SetFieldSquadReadiness(
+        AverageReadiness,
+        LowestReadiness
+    );
+    const FString ContextActionLabel =
+        FieldSquadContextAction ==
+                EBHFieldSquadContextAction::CasualtyAid
+            ? TEXT("AID")
+            : FieldSquadContextAction ==
+                    EBHFieldSquadContextAction::Sabotage
+                ? TEXT("SABOTAGE")
+                : FieldSquadContextAction ==
+                        EBHFieldSquadContextAction::Secure
+                    ? TEXT("SECURE")
+                    : FieldSquadContextAction ==
+                            EBHFieldSquadContextAction::Defend
+                        ? TEXT("DEFEND")
+                        : FString();
+    CombatStatusWidget->SetFieldSquadContextStatus(
+        ContextActionLabel,
+        FieldSquadContextTargetLabel.ToString(),
+        bFieldSquadContextActionReachedTarget
     );
 }
+
+void ABHCharacter::OnRep_FieldSquadContextStatus()
+{
+    if (FieldSquadContextAction ==
+            EBHFieldSquadContextAction::None ||
+        FieldSquadContextTargetLabel.IsNone())
+    {
+        return;
+    }
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_FIELD_SQUAD_CONTEXT_REPLICATED character=%s local=%d action=%d target=%s reached=%d"),
+        *GetNameSafe(this),
+        IsLocallyControlled() ? 1 : 0,
+        static_cast<int32>(FieldSquadContextAction),
+        *FieldSquadContextTargetLabel.ToString(),
+        bFieldSquadContextActionReachedTarget ? 1 : 0
+    );
+}
+
+#if !UE_BUILD_SHIPPING
+bool ABHCharacter::ConfigureFieldSquadContextReplicationTest(
+    EBHFieldSquadContextAction Action,
+    FName TargetLabel,
+    bool bReachedTarget
+)
+{
+    if (!HasAuthority() ||
+        Action == EBHFieldSquadContextAction::None ||
+        TargetLabel.IsNone())
+    {
+        return false;
+    }
+
+    if (GetLivingFieldSquadCount() <= 0 &&
+        !SpawnFieldSquadMember(0))
+    {
+        return false;
+    }
+
+    FieldSquadContextAction = Action;
+    FieldSquadContextTargetLabel = TargetLabel;
+    bFieldSquadContextActionReachedTarget = bReachedTarget;
+    ForceNetUpdate();
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_TEST_FIELD_SQUAD_CONTEXT_CONFIGURED result=success character=%s action=%d target=%s reached=%d members=%d"),
+        *GetNameSafe(this),
+        static_cast<int32>(Action),
+        *TargetLabel.ToString(),
+        bReachedTarget ? 1 : 0,
+        GetLivingFieldSquadCount()
+    );
+    return true;
+}
+#endif
 
 void ABHCharacter::UpdateStrategicSituationHUD(float DeltaTime)
 {
@@ -3317,12 +5968,7 @@ void ABHCharacter::UpdateStrategicSituationHUD(float DeltaTime)
             EBHWarFaction::Neutral,
             0.0f,
             0.0f,
-            0,
-            0,
-            0,
-            0.0f,
-            1.0f,
-            true
+            0
         );
         CombatStatusWidget->SetEnemyResponsePressure(0.0f);
         CombatStatusWidget->SetCivilianSupport(50.0f);
@@ -3358,12 +6004,7 @@ void ABHCharacter::UpdateStrategicSituationHUD(float DeltaTime)
         SectorState.Owner,
         SectorState.Supply,
         WarSubsystem->GetSectorSupplyChangePerTurn(SectorID),
-        WarSubsystem->GetTurnNumber(),
-        WarSubsystem->GetSectorConstructedFortificationCount(SectorID),
-        WarSubsystem->GetSectorFortificationCapacity(SectorID),
-        WarSubsystem->GetSectorFortificationCoverage(SectorID),
-        WarSubsystem->GetSectorFortificationDefenseMultiplier(SectorID),
-        WarSubsystem->IsSectorConnectedToFactionLogistics(SectorID)
+        WarSubsystem->GetTurnNumber()
     );
     CombatStatusWidget->SetEnemyResponsePressure(
         SectorState.EnemyResponsePressure
@@ -3727,6 +6368,94 @@ void ABHCharacter::UpdateInteractionPrompt()
     }
 
     AActor* HitActor = HitResult.GetActor();
+    const UBHUserSettingsSubsystem* UserSettings = GetUserSettings();
+    const auto ResolveInputPrompts = [UserSettings](const FText& SourceText)
+    {
+        return IsValid(UserSettings)
+            ? UserSettings->ResolveLegacyInputPrompts(SourceText)
+            : SourceText;
+    };
+
+    if (ABHCharacter* PlayerCasualty = Cast<ABHCharacter>(HitActor);
+        IsValid(PlayerCasualty) && PlayerCasualty != this &&
+        PlayerCasualty->IsPlayerIncapacitated())
+    {
+        const bool bStabilized =
+            PlayerCasualty->IsPlayerCasualtyStabilized();
+        InteractionPromptWidget->SetInteractionText(
+            ResolveInputPrompts(
+                bStabilized
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "RevivePlayerCasualtyPrompt",
+                        "Hold [F] to revive teammate (1 medkit)"
+                    )
+                    : FText::Format(
+                        NSLOCTEXT(
+                            "BrokenHorizon",
+                            "StabilizePlayerCasualtyPrompt",
+                            "Hold [F] to stabilize teammate "
+                            "(1 field dressing // {0}s)"
+                        ),
+                        FText::AsNumber(FMath::CeilToInt(
+                            PlayerCasualty
+                                ->GetPlayerBleedOutSecondsRemaining()
+                        ))
+                    )
+            )
+        );
+        InteractionPromptWidget->SetVisibility(
+            ESlateVisibility::Visible
+        );
+        return;
+    }
+
+    if (ABHCharacter* Teammate = Cast<ABHCharacter>(HitActor);
+        IsValid(Teammate) && Teammate != this &&
+        Teammate->IsPlayerControlled())
+    {
+        InteractionPromptWidget->SetInteractionText(
+            ResolveInputPrompts(NSLOCTEXT(
+                "BrokenHorizon",
+                "ShareFieldSuppliesPrompt",
+                "Hold [F] to share ammunition and critical supplies"
+            ))
+        );
+        InteractionPromptWidget->SetVisibility(ESlateVisibility::Visible);
+        return;
+    }
+
+    if (ABHEnemySoldier* SurrenderedOperative =
+            Cast<ABHEnemySoldier>(HitActor);
+        IsValid(SurrenderedOperative) &&
+        !SurrenderedOperative->IsDead() &&
+        SurrenderedOperative->IsSurrendered())
+    {
+        const FText PromptText =
+            SurrenderedOperative->IsSurrenderSecured()
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "SurrenderSecuredPrompt",
+                    "SURRENDERED // CUSTODY SECURED"
+                )
+                : FText::Format(
+                    NSLOCTEXT(
+                        "BrokenHorizon",
+                        "SecureSurrenderPrompt",
+                        "Hold [F] to secure surrendered enemy "
+                        "(escape window // {0}s)"
+                    ),
+                    FText::AsNumber(FMath::CeilToInt(
+                        SurrenderedOperative
+                            ->GetSurrenderEscapeSecondsRemaining()
+                    ))
+                );
+        InteractionPromptWidget->SetInteractionText(
+            ResolveInputPrompts(PromptText)
+        );
+        InteractionPromptWidget->SetVisibility(ESlateVisibility::Visible);
+        return;
+    }
 
     if (ABHEnemySoldier* DownedOperative =
             Cast<ABHEnemySoldier>(HitActor);
@@ -3735,17 +6464,19 @@ void ABHCharacter::UpdateInteractionPrompt()
         IsSharedFieldSquadMember(DownedOperative))
     {
         InteractionPromptWidget->SetInteractionText(
-            FText::Format(
-                NSLOCTEXT(
-                    "BrokenHorizon",
-                    "StabilizeFieldOperativePrompt",
-                    "Press [F] to stabilize operative "
-                    "(1 field dressing // {0}s)"
-                ),
-                FText::AsNumber(
-                    FMath::CeilToInt(
-                        DownedOperative
-                            ->GetIncapacitationSecondsRemaining()
+            ResolveInputPrompts(
+                FText::Format(
+                    NSLOCTEXT(
+                        "BrokenHorizon",
+                        "StabilizeFieldOperativePrompt",
+                        "Press [F] to stabilize operative "
+                        "(1 field dressing // {0}s)"
+                    ),
+                    FText::AsNumber(
+                        FMath::CeilToInt(
+                            DownedOperative
+                                ->GetIncapacitationSecondsRemaining()
+                        )
                     )
                 )
             )
@@ -3764,7 +6495,9 @@ void ABHCharacter::UpdateInteractionPrompt()
         const FText PromptText =
             IBHInteractable::Execute_GetInteractionText(HitActor);
 
-        InteractionPromptWidget->SetInteractionText(PromptText);
+        InteractionPromptWidget->SetInteractionText(
+            ResolveInputPrompts(PromptText)
+        );
         InteractionPromptWidget->SetVisibility(
             ESlateVisibility::Visible
         );
@@ -3776,6 +6509,44 @@ void ABHCharacter::UpdateInteractionPrompt()
         );
     }
 } 
+
+void ABHCharacter::HandleInteractPressed()
+{
+    const UBHUserSettingsSubsystem* Settings = GetUserSettings();
+    if (!IsValid(Settings) || !Settings->IsHoldInteractionEnabled())
+    {
+        Interact();
+        return;
+    }
+
+    bInteractionInputHeld = true;
+    InteractionPressTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+}
+
+void ABHCharacter::HandleInteractReleased()
+{
+    if (!bInteractionInputHeld)
+    {
+        return;
+    }
+    const float ReleaseTime = GetWorld()
+        ? GetWorld()->GetTimeSeconds()
+        : InteractionPressTime;
+    const float HeldDuration = FMath::Max(
+        0.0f,
+        ReleaseTime - InteractionPressTime
+    );
+    bInteractionInputHeld = false;
+    if (ShouldCommitHeldInteraction(HeldDuration, HoldInteractionDuration))
+    {
+        Interact();
+    }
+}
+
+void ABHCharacter::CancelInteractionInput()
+{
+    bInteractionInputHeld = false;
+}
 
 void ABHCharacter::Interact()
 {
@@ -3818,6 +6589,584 @@ void ABHCharacter::ServerInteract_Implementation(
     }
 
     ExecuteInteraction(AuthoritativeTarget);
+}
+
+void ABHCharacter::IssueFieldSquadContextAction()
+{
+    if (bIsHandlingDeath ||
+        bIsHandlingMissionComplete ||
+        bIsTraversing)
+    {
+        return;
+    }
+
+    AActor* TargetActor = nullptr;
+
+    if (!ResolveFieldSquadContextTarget(TargetActor))
+    {
+        ShowStatusNotification(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextNoTarget",
+                "SQUAD CONTEXT // NO SUPPORTED TARGET\n\n"
+                "Aim at a downed friendly operative or active raid "
+                "target, or the assigned attack/defense sector marker, "
+                "and press X."
+            )
+        );
+        return;
+    }
+
+    if (HasAuthority())
+    {
+        ExecuteFieldSquadContextAction(TargetActor);
+    }
+    else
+    {
+        ServerRequestFieldSquadContextAction(TargetActor);
+    }
+}
+
+void ABHCharacter::ExecuteFieldSquadContextAction(
+    AActor* TargetActor
+)
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    ABHEnemySoldier* Casualty = Cast<ABHEnemySoldier>(TargetActor);
+    ABHCharacter* CasualtyOwner = FindFieldSquadOwner(Casualty);
+    ABHRaidSabotageTarget* SabotageTarget =
+        Cast<ABHRaidSabotageTarget>(TargetActor);
+    ABHSectorAnchor* ObjectiveAnchor =
+        Cast<ABHSectorAnchor>(TargetActor);
+    const bool bCasualtyAidTarget =
+        IsValid(Casualty) &&
+        Casualty->IsIncapacitated() &&
+        IsValid(CasualtyOwner);
+    const bool bSabotageTarget =
+        IsValid(SabotageTarget) &&
+        SabotageTarget->CanAcceptFieldSquadSabotage();
+    const bool bObjectivePresenceTarget =
+        IsValid(ObjectiveAnchor) &&
+        bRuntimeWarOperation &&
+        IsValid(OpenWorldOperationDirector) &&
+        OpenWorldOperationDirector->IsOperationActivated() &&
+        ObjectiveAnchor->MatchesSector(AssignedWarSectorID) &&
+        (AssignedWarPriorityType == EBHWarPriorityType::Attack ||
+         AssignedWarPriorityType == EBHWarPriorityType::Defend);
+
+    if (!bCasualtyAidTarget &&
+        !bSabotageTarget &&
+        !bObjectivePresenceTarget)
+    {
+        ShowStatusNotification(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextUnsupportedTarget",
+                "SQUAD CONTEXT // ACTION UNSUPPORTED\n\n"
+                "Aim at a downed friendly operative, active raid "
+                "target, or assigned attack/defense sector marker."
+            )
+        );
+        return;
+    }
+
+    if (bFieldSquadEmbarked)
+    {
+        ShowStatusNotification(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextEmbarked",
+                "SQUAD CONTEXT // DISEMBARK REQUIRED\n\n"
+                "Your operatives cannot perform Context actions while embarked."
+            )
+        );
+        return;
+    }
+
+    if (bCasualtyAidTarget &&
+        (!IsValid(InjuryComponent) ||
+         InjuryComponent->GetFieldDressingCount() <= 0))
+    {
+        ShowStatusNotification(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextNoDressing",
+                "SQUAD CONTEXT // NO FIELD DRESSING\n\n"
+                "Resupply before assigning casualty aid."
+            )
+        );
+        return;
+    }
+
+    ABHEnemySoldier* BestResponder = nullptr;
+    float BestDistanceSquared = TNumericLimits<float>::Max();
+
+    for (ABHEnemySoldier* Member : FieldSquadMembers)
+    {
+        if (!IsValid(Member) ||
+            (bCasualtyAidTarget && Member == Casualty) ||
+            Member->IsDead() ||
+            Member->IsIncapacitated())
+        {
+            continue;
+        }
+
+        const FVector ContextDestination =
+            bObjectivePresenceTarget
+                ? OpenWorldOperationDirector->GetOperationCenter()
+                : TargetActor->GetActorLocation();
+        const float DistanceSquared = FVector::DistSquared2D(
+            Member->GetActorLocation(),
+            ContextDestination
+        );
+
+        if (DistanceSquared < BestDistanceSquared)
+        {
+            BestDistanceSquared = DistanceSquared;
+            BestResponder = Member;
+        }
+    }
+
+    const bool bCanAssign = bCasualtyAidTarget
+        ? BHWarOperationRules::CanAssignFieldSquadCasualtyAid(
+            IsValid(BestResponder),
+            true,
+            bFieldSquadEmbarked,
+            IsValid(InjuryComponent)
+                ? InjuryComponent->GetFieldDressingCount()
+                : 0)
+        : bSabotageTarget
+            ? BHWarOperationRules::CanAssignFieldSquadSabotage(
+            IsValid(BestResponder),
+            bSabotageTarget,
+            bFieldSquadEmbarked
+            )
+            : BHWarOperationRules::
+                CanAssignFieldSquadObjectivePresence(
+                    IsValid(BestResponder),
+                    IsValid(OpenWorldOperationDirector) &&
+                        OpenWorldOperationDirector->
+                            IsOperationActivated(),
+                    AssignedWarPriorityType,
+                    IsValid(ObjectiveAnchor) &&
+                        ObjectiveAnchor->MatchesSector(
+                            AssignedWarSectorID
+                        ),
+                    bFieldSquadEmbarked
+                );
+
+    if (!bCanAssign)
+    {
+        ShowStatusNotification(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextNoResponder",
+                "SQUAD CONTEXT // NO AVAILABLE OPERATIVE\n\n"
+                "Only a living operative under your command can receive "
+                "this order. Another player's order was not changed."
+            )
+        );
+        return;
+    }
+
+    CancelFieldSquadContextAction(false);
+    FieldSquadContextResponder = BestResponder;
+    FieldSquadContextTarget = TargetActor;
+    FieldSquadContextAction = bCasualtyAidTarget
+        ? EBHFieldSquadContextAction::CasualtyAid
+        : bSabotageTarget
+            ? EBHFieldSquadContextAction::Sabotage
+            : AssignedWarPriorityType == EBHWarPriorityType::Defend
+                ? EBHFieldSquadContextAction::Defend
+                : EBHFieldSquadContextAction::Secure;
+    FieldSquadContextTargetLabel = bCasualtyAidTarget
+        ? (
+            Casualty->GetFieldOperativeID().IsNone()
+                ? FName(*GetNameSafe(Casualty))
+                : Casualty->GetFieldOperativeID()
+        )
+        : bSabotageTarget
+            ? FName(TEXT("LOGISTICS CACHE"))
+            : ObjectiveAnchor->GetSectorID();
+    bFieldSquadContextActionReachedTarget = false;
+    FieldSquadContextActionDeadline =
+        GetWorld() ? GetWorld()->GetTimeSeconds() + 35.0f : 35.0f;
+    ForceNetUpdate();
+
+    if (ABHEnemyAIController* ResponderController =
+            Cast<ABHEnemyAIController>(BestResponder->GetController()))
+    {
+        ResponderController->ClearHoldPosition();
+        if (bObjectivePresenceTarget)
+        {
+            const float CommandYaw =
+                IsValid(FirstPersonCamera)
+                    ? FirstPersonCamera->GetComponentRotation().Yaw
+                    : GetActorRotation().Yaw;
+            ResponderController->SetMoveAndHoldPosition(
+                OpenWorldOperationDirector->GetOperationCenter(),
+                CommandYaw
+            );
+        }
+        else
+        {
+            ResponderController->SetFollowTarget(
+                TargetActor,
+                FVector::ZeroVector
+            );
+        }
+    }
+    else
+    {
+        CancelFieldSquadContextAction(
+            true,
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextNoController",
+                "The selected operative cannot currently navigate to the target."
+            )
+        );
+        return;
+    }
+
+    ShowPriorityStatusNotification(
+        FText::Format(
+            bCasualtyAidTarget
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "FieldSquadContextAidAssigned",
+                    "SQUAD CONTEXT // CASUALTY AID ASSIGNED\n\n"
+                    "Your operative {0} is moving to stabilize {1}. "
+                    "Press C to cancel and restore the formation order."
+                )
+                : bSabotageTarget
+                    ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "FieldSquadContextSabotageAssigned",
+                    "SQUAD CONTEXT // SABOTAGE ASSIGNED\n\n"
+                    "Your operative {0} is moving to arm charges at {1}. "
+                    "Press C to cancel and restore the formation order."
+                    )
+                    : NSLOCTEXT(
+                        "BrokenHorizon",
+                        "FieldSquadContextObjectiveAssigned",
+                        "SQUAD CONTEXT // OBJECTIVE ASSIGNED\n\n"
+                        "Your operative {0} is moving to secure or "
+                        "defend {1}. Press C to cancel."
+                    ),
+            FText::FromString(GetNameSafe(BestResponder)),
+            FText::FromString(GetNameSafe(TargetActor))
+        ),
+        EBHNotificationPriority::High
+    );
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_FIELD_SQUAD_CONTEXT action=%s commander=%s responder=%s target=%s target_owner=%s"),
+        bCasualtyAidTarget
+            ? TEXT("casualty_aid")
+            : bSabotageTarget
+                ? TEXT("sabotage")
+                : TEXT("objective_presence"),
+        *GetNameSafe(this),
+        *GetNameSafe(BestResponder),
+        *GetNameSafe(TargetActor),
+        *GetNameSafe(CasualtyOwner)
+    );
+}
+
+void ABHCharacter::UpdateFieldSquadContextAction()
+{
+    if (!IsValid(FieldSquadContextResponder) ||
+        !IsValid(FieldSquadContextTarget))
+    {
+        if (IsValid(FieldSquadContextResponder) ||
+            IsValid(FieldSquadContextTarget))
+        {
+            CancelFieldSquadContextAction(false);
+        }
+        return;
+    }
+
+    ABHEnemySoldier* Casualty =
+        Cast<ABHEnemySoldier>(FieldSquadContextTarget);
+    ABHRaidSabotageTarget* SabotageTarget =
+        Cast<ABHRaidSabotageTarget>(FieldSquadContextTarget);
+    ABHSectorAnchor* ObjectiveAnchor =
+        Cast<ABHSectorAnchor>(FieldSquadContextTarget);
+    const bool bCasualtyStillEligible =
+        IsValid(Casualty) && Casualty->IsIncapacitated();
+    const bool bSabotageStillEligible =
+        IsValid(SabotageTarget) &&
+        SabotageTarget->CanAcceptFieldSquadSabotage();
+    const bool bObjectiveStillEligible =
+        IsValid(ObjectiveAnchor) &&
+        bRuntimeWarOperation &&
+        IsValid(OpenWorldOperationDirector) &&
+        OpenWorldOperationDirector->IsOperationActivated() &&
+        ObjectiveAnchor->MatchesSector(AssignedWarSectorID) &&
+        (AssignedWarPriorityType == EBHWarPriorityType::Attack ||
+         AssignedWarPriorityType == EBHWarPriorityType::Defend);
+
+    if (IsValid(ObjectiveAnchor) && !bObjectiveStillEligible)
+    {
+        CancelFieldSquadContextAction(false);
+        return;
+    }
+
+    if (FieldSquadContextResponder->IsDead() ||
+        FieldSquadContextResponder->IsIncapacitated() ||
+        (!bCasualtyStillEligible &&
+         !bSabotageStillEligible &&
+         !bObjectiveStillEligible))
+    {
+        CancelFieldSquadContextAction(
+            true,
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextEnded",
+                "The Context assignment ended because its responder or target is no longer eligible."
+            )
+        );
+        return;
+    }
+
+    const float CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+    if (!bFieldSquadContextActionReachedTarget &&
+        CurrentTime >= FieldSquadContextActionDeadline)
+    {
+        CancelFieldSquadContextAction(
+            true,
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextTimedOut",
+                "The assigned operative could not reach the target and has returned to the formation order."
+            )
+        );
+        return;
+    }
+
+    // Follow movement settles within 300 cm of its target; keep the action
+    // completion radius just beyond that bounded stop distance.
+    constexpr float ContextActionRadius = 325.0f;
+    const FVector ContextDestination =
+        bObjectiveStillEligible
+            ? OpenWorldOperationDirector->GetOperationCenter()
+            : FieldSquadContextTarget->GetActorLocation();
+    if (FVector::DistSquared2D(
+            FieldSquadContextResponder->GetActorLocation(),
+            ContextDestination) >
+        FMath::Square(ContextActionRadius))
+    {
+        return;
+    }
+
+    if (bObjectiveStillEligible)
+    {
+        if (!bFieldSquadContextActionReachedTarget)
+        {
+            bFieldSquadContextActionReachedTarget = true;
+            FieldSquadContextActionDeadline = 0.0f;
+            ForceNetUpdate();
+            ShowPriorityStatusNotification(
+                FText::Format(
+                    AssignedWarPriorityType ==
+                            EBHWarPriorityType::Defend
+                        ? NSLOCTEXT(
+                            "BrokenHorizon",
+                            "FieldSquadContextDefenseEstablished",
+                            "SQUAD CONTEXT // DEFENSIVE LINE ESTABLISHED\n\n"
+                            "Your operative is holding {0} and now "
+                            "counts as a living defender."
+                        )
+                        : NSLOCTEXT(
+                            "BrokenHorizon",
+                            "FieldSquadContextSecureEstablished",
+                            "SQUAD CONTEXT // SECURE PRESENCE ESTABLISHED\n\n"
+                            "Your operative is holding {0} and now "
+                            "contributes to objective security."
+                        ),
+                    ObjectiveAnchor->GetSectorDisplayName()
+                ),
+                EBHNotificationPriority::High
+            );
+
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT("BH_FIELD_SQUAD_CONTEXT_REACHED action=objective_presence commander=%s responder=%s sector=%s operation=%d"),
+                *GetNameSafe(this),
+                *GetNameSafe(FieldSquadContextResponder),
+                *ObjectiveAnchor->GetSectorID().ToString(),
+                static_cast<int32>(AssignedWarPriorityType)
+            );
+        }
+        return;
+    }
+
+    if (bSabotageStillEligible)
+    {
+        const FString TargetName = GetNameSafe(SabotageTarget);
+        const bool bSabotaged =
+            SabotageTarget->SabotageByFieldOperative(
+                FieldSquadContextResponder,
+                this
+            );
+
+        if (!bSabotaged)
+        {
+            CancelFieldSquadContextAction(
+                true,
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "FieldSquadContextSabotageFailed",
+                    "The operative reached the target, but the sabotage contract was no longer valid."
+                )
+            );
+            return;
+        }
+
+        CancelFieldSquadContextAction(false);
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT("BH_FIELD_SQUAD_CONTEXT_COMPLETE action=sabotage commander=%s target=%s"),
+            *GetNameSafe(this),
+            *TargetName
+        );
+        return;
+    }
+
+    ABHEnemySoldier* StabilizedTarget = Casualty;
+    ABHCharacter* StabilizedTargetOwner =
+        FindFieldSquadOwner(StabilizedTarget);
+    const bool bConsumedDressing =
+        IsValid(InjuryComponent) &&
+        InjuryComponent->ConsumeFieldDressingForSquadAid();
+    const bool bStabilized =
+        bConsumedDressing &&
+        StabilizedTarget->StabilizeIncapacitatedSoldier();
+
+    if (!bStabilized)
+    {
+        if (bConsumedDressing && IsValid(InjuryComponent))
+        {
+            InjuryComponent->AddMedicalSupplies(0, 1);
+        }
+        CancelFieldSquadContextAction(
+            true,
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextAidFailed",
+                "Casualty aid could not be completed. Check medical supplies and target condition."
+            )
+        );
+        return;
+    }
+
+    CancelFieldSquadContextAction(false);
+
+    if (IsValid(StabilizedTargetOwner) &&
+        StabilizedTargetOwner != this)
+    {
+        StabilizedTargetOwner->ApplyFieldSquadOrder();
+    }
+
+    ShowPriorityStatusNotification(
+        FText::Format(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextAidComplete",
+                "SQUAD CONTEXT // CASUALTY STABILIZED\n\n"
+                "The operative completed aid. {0} field dressing(s) remain."
+            ),
+            FText::AsNumber(InjuryComponent->GetFieldDressingCount())
+        ),
+        EBHNotificationPriority::High
+    );
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_FIELD_SQUAD_CONTEXT_COMPLETE commander=%s target=%s dressings=%d"),
+        *GetNameSafe(this),
+        *GetNameSafe(StabilizedTarget),
+        InjuryComponent->GetFieldDressingCount()
+    );
+
+    if (UBHSaveSubsystem* SaveSubsystem = GetGameInstance()
+            ? GetGameInstance()->GetSubsystem<UBHSaveSubsystem>()
+            : nullptr)
+    {
+        SaveSubsystem->SaveProgress();
+    }
+}
+
+void ABHCharacter::CancelFieldSquadContextAction(
+    bool bNotifyCommander,
+    const FText& Reason
+)
+{
+    const bool bHadAction =
+        IsValid(FieldSquadContextResponder) ||
+        IsValid(FieldSquadContextTarget);
+
+    FieldSquadContextResponder = nullptr;
+    FieldSquadContextTarget = nullptr;
+    FieldSquadContextActionDeadline = 0.0f;
+    FieldSquadContextAction = EBHFieldSquadContextAction::None;
+    FieldSquadContextTargetLabel = NAME_None;
+    bFieldSquadContextActionReachedTarget = false;
+
+    if (bHadAction)
+    {
+        ApplyFieldSquadOrder();
+        ForceNetUpdate();
+    }
+
+    if (bNotifyCommander && !Reason.IsEmpty())
+    {
+        ShowStatusNotification(
+            FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "FieldSquadContextCancelled",
+                    "SQUAD CONTEXT // ASSIGNMENT ENDED\n\n{0}"
+                ),
+                Reason
+            )
+        );
+    }
+}
+
+void ABHCharacter::
+    ServerRequestFieldSquadContextAction_Implementation(
+        AActor* RequestedTarget
+    )
+{
+    AActor* AuthoritativeTarget = nullptr;
+
+    if (!IsValid(RequestedTarget) ||
+        !ResolveFieldSquadContextTarget(AuthoritativeTarget) ||
+        AuthoritativeTarget != RequestedTarget)
+    {
+        ShowStatusNotification(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextTargetLost",
+                "SQUAD CONTEXT // TARGET LOST\n\n"
+                "Keep the supported ally or objective in view and press X again."
+            )
+        );
+        return;
+    }
+
+    ExecuteFieldSquadContextAction(AuthoritativeTarget);
 }
 
 void ABHCharacter::ServerRequestDeployOperation_Implementation(
@@ -3905,6 +7254,45 @@ bool ABHCharacter::ResolveInteractionTarget(
     return IsValid(OutTarget);
 }
 
+bool ABHCharacter::ResolveFieldSquadContextTarget(
+    AActor*& OutTarget
+) const
+{
+    OutTarget = nullptr;
+
+    if (!IsValid(FirstPersonCamera) || !IsValid(GetWorld()))
+    {
+        return false;
+    }
+
+    const FVector TraceStart =
+        FirstPersonCamera->GetComponentLocation();
+    const FVector TraceEnd =
+        TraceStart +
+        (FirstPersonCamera->GetForwardVector() *
+         FMath::Max(1000.0f, FieldSquadCommandDistance));
+    FHitResult Hit;
+    FCollisionQueryParams QueryParams(
+        SCENE_QUERY_STAT(BHFieldSquadContextCommand),
+        true,
+        this
+    );
+    QueryParams.AddIgnoredActor(this);
+
+    if (!GetWorld()->LineTraceSingleByChannel(
+            Hit,
+            TraceStart,
+            TraceEnd,
+            ECC_Visibility,
+            QueryParams))
+    {
+        return false;
+    }
+
+    OutTarget = Hit.GetActor();
+    return IsValid(OutTarget);
+}
+
 void ABHCharacter::ExecuteInteraction(AActor* TargetActor)
 {
     if (!HasAuthority() || !IsValid(TargetActor))
@@ -3912,13 +7300,43 @@ void ABHCharacter::ExecuteInteraction(AActor* TargetActor)
         return;
     }
 
-    if (ABHEnemySoldier* DownedOperative =
+    if (ABHCharacter* PlayerCasualty = Cast<ABHCharacter>(TargetActor);
+        IsValid(PlayerCasualty) && PlayerCasualty != this &&
+        PlayerCasualty->IsPlayerIncapacitated())
+    {
+        TryTreatPlayerCasualty(PlayerCasualty);
+    }
+    else if (ABHCharacter* Teammate = Cast<ABHCharacter>(TargetActor);
+        IsValid(Teammate) && Teammate != this &&
+        Teammate->IsPlayerControlled())
+    {
+        TryShareFieldSuppliesWith(Teammate);
+    }
+    else if (ABHEnemySoldier* DownedOperative =
             Cast<ABHEnemySoldier>(TargetActor);
         IsValid(DownedOperative) &&
         DownedOperative->IsIncapacitated() &&
         IsSharedFieldSquadMember(DownedOperative))
     {
         TryStabilizeFieldSquadMember(DownedOperative);
+    }
+    else if (ABHEnemySoldier* SurrenderedOperative =
+            Cast<ABHEnemySoldier>(TargetActor);
+        IsValid(SurrenderedOperative) &&
+        !SurrenderedOperative->IsDead() &&
+        SurrenderedOperative->IsSurrendered())
+    {
+        if (SurrenderedOperative->SecureSurrender())
+        {
+            ShowPriorityStatusNotification(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "SurrenderSecuredNotification",
+                    "CUSTODY SECURED // ENEMY SURRENDERED"
+                ),
+                EBHNotificationPriority::High
+            );
+        }
     }
     else if (TargetActor->Implements<UBHInteractable>())
     {
@@ -3940,6 +7358,14 @@ void ABHCharacter::EndPlay(
 {
     if (UGameInstance* GameInstance = GetGameInstance())
     {
+        if (UBHUserSettingsSubsystem* SettingsSubsystem =
+            GameInstance->GetSubsystem<UBHUserSettingsSubsystem>())
+        {
+            SettingsSubsystem->OnInputBindingsChanged.RemoveDynamic(
+                this,
+                &ABHCharacter::HandleInputBindingsChanged
+            );
+        }
         if (UBHWarSubsystem* WarSubsystem =
             GameInstance->GetSubsystem<UBHWarSubsystem>())
         {
@@ -3962,7 +7388,7 @@ void ABHCharacter::EndPlay(
 
     bWarMapOpen = false;
 
-    if (bPauseMenuOpen)
+    if (bPauseMenuOpen && ShouldPauseWorldForMenu(GetNetMode()))
     {
         UGameplayStatics::SetGamePaused(this, false);
     }
@@ -4028,6 +7454,117 @@ bool ABHCharacter::CompleteObjective(FName ObjectiveID)
     }
 
     return ObjectiveComponent->CompleteObjectiveByID(ObjectiveID);
+}
+
+bool ABHCharacter::CompleteSharedObjective(FName ObjectiveID)
+{
+    if (!HasAuthority() || ObjectiveID.IsNone())
+    {
+        return false;
+    }
+
+    bool bInitiatingCharacterCompleted = false;
+    int32 CompletedPlayerCount = 0;
+    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+    {
+        ABHCharacter* PlayerCharacter = *It;
+        if (!IsValid(PlayerCharacter) ||
+            !PlayerCharacter->IsPlayerControlled() ||
+            PlayerCharacter->GetCurrentObjectiveID() != ObjectiveID)
+        {
+            continue;
+        }
+
+        const bool bCompleted =
+            PlayerCharacter->CompleteObjective(ObjectiveID);
+        if (bCompleted)
+        {
+            ++CompletedPlayerCount;
+        }
+        if (PlayerCharacter == this)
+        {
+            bInitiatingCharacterCompleted = bCompleted;
+        }
+    }
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_SHARED_OBJECTIVE_COMPLETED objective=%s players=%d "
+            "initiator=%s result=%s"
+        ),
+        *ObjectiveID.ToString(),
+        CompletedPlayerCount,
+        *GetName(),
+        bInitiatingCharacterCompleted ? TEXT("success") : TEXT("failure")
+    );
+    return bInitiatingCharacterCompleted;
+}
+
+void ABHCharacter::RefreshReplicatedMissionPresentation()
+{
+    if (HasAuthority())
+    {
+        return;
+    }
+
+    RefreshObjectiveWidget();
+    if (IsMissionComplete() && !bIsHandlingMissionComplete)
+    {
+        EnterMissionCompleteState(false);
+    }
+}
+
+bool ABHCharacter::AdoptSharedMissionStateFrom(
+    const ABHCharacter* SourceCharacter
+)
+{
+    if (!HasAuthority() ||
+        !IsValid(SourceCharacter) ||
+        SourceCharacter == this ||
+        !IsValid(ObjectiveComponent) ||
+        !IsValid(SourceCharacter->GetMissionData()))
+    {
+        return false;
+    }
+
+    MissionData = SourceCharacter->GetMissionData();
+    OwnedKeycards.Reset();
+    for (const FName KeycardID :
+         SourceCharacter->GetOwnedKeycardIDs())
+    {
+        OwnedKeycards.Add(KeycardID);
+    }
+    CollectedKeycardPersistenceIDs.Reset();
+    for (const FName PersistenceID :
+         SourceCharacter->GetCollectedKeycardPersistenceIDs())
+    {
+        CollectedKeycardPersistenceIDs.Add(PersistenceID);
+    }
+
+    const bool bAdopted = ObjectiveComponent->RestoreMissionState(
+        MissionData,
+        SourceCharacter->GetCurrentObjectiveID(),
+        SourceCharacter->GetCompletedObjectiveIDs(),
+        SourceCharacter->IsMissionComplete(),
+        SourceCharacter->IsMissionFailed()
+    );
+    RefreshObjectiveWidget();
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_SHARED_MISSION_ADOPTED target=%s source=%s "
+            "completed=%d complete=%d result=%s"
+        ),
+        *GetName(),
+        *SourceCharacter->GetName(),
+        GetCompletedObjectiveIDs().Num(),
+        IsMissionComplete() ? 1 : 0,
+        bAdopted ? TEXT("success") : TEXT("failure")
+    );
+    return bAdopted;
 }
 
 UBHMissionData* ABHCharacter::GetMissionData() const
@@ -4109,6 +7646,17 @@ bool ABHCharacter::ReplayMission()
 
 void ABHCharacter::TogglePauseMenu()
 {
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_PAUSE_INPUT_RECEIVED open=%d war_map=%d net_mode=%d"
+        ),
+        bPauseMenuOpen ? 1 : 0,
+        bWarMapOpen ? 1 : 0,
+        static_cast<int32>(GetNetMode())
+    );
+
     if (bWarMapOpen)
     {
         CloseWarMap();
@@ -4132,7 +7680,7 @@ void ABHCharacter::TogglePauseMenu()
         ResolveOwningPlayerController();
 
     if (!IsValid(PlayerController) ||
-        !PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() == nullptr)
     {
         return;
     }
@@ -4158,6 +7706,16 @@ void ABHCharacter::TogglePauseMenu()
     PauseMenuWidget->SetIsFocusable(true);
     PauseMenuWidget->AddToViewport(300);
 
+    // Objective notifications can remain active while single-player world time
+    // is paused. Keep their timers/content intact, but do not let them compete
+    // with the modal pause menu for the center of the screen.
+    if (IsValid(ObjectiveNotificationWidget))
+    {
+        ObjectiveNotificationWidget->SetVisibility(
+            ESlateVisibility::Collapsed
+        );
+    }
+
     PlayerController->SetIgnoreMoveInput(true);
     PlayerController->SetIgnoreLookInput(true);
 
@@ -4169,20 +7727,38 @@ void ABHCharacter::TogglePauseMenu()
     InputMode.SetHideCursorDuringCapture(false);
     PlayerController->SetInputMode(InputMode);
     PlayerController->bShowMouseCursor = true;
+    PauseMenuWidget->FocusInitialControl();
 
-    bPauseMenuOpen = UGameplayStatics::SetGamePaused(
-        this,
-        true
-    );
+    bPauseMenuOpen = true;
+    if (ShouldPauseWorldForMenu(GetNetMode()))
+    {
+        bPauseMenuOpen = UGameplayStatics::SetGamePaused(this, true);
+    }
 
     if (!bPauseMenuOpen)
     {
         PauseMenuWidget->RemoveFromParent();
         PauseMenuWidget = nullptr;
+        if (IsValid(ObjectiveNotificationWidget))
+        {
+            ObjectiveNotificationWidget->SetVisibility(
+                ESlateVisibility::SelfHitTestInvisible
+            );
+        }
         PlayerController->SetIgnoreMoveInput(false);
         PlayerController->SetIgnoreLookInput(false);
         PlayerController->SetInputMode(FInputModeGameOnly());
         PlayerController->bShowMouseCursor = false;
+    }
+    else
+    {
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT("BH_PAUSE_MENU_OPENED cursor=%d world_paused=%d"),
+            PlayerController->bShowMouseCursor ? 1 : 0,
+            UGameplayStatics::IsGamePaused(this) ? 1 : 0
+        );
     }
 }
 
@@ -4194,12 +7770,22 @@ void ABHCharacter::ResumeFromPause()
     }
 
     bPauseMenuOpen = false;
-    UGameplayStatics::SetGamePaused(this, false);
+    if (ShouldPauseWorldForMenu(GetNetMode()))
+    {
+        UGameplayStatics::SetGamePaused(this, false);
+    }
 
     if (IsValid(PauseMenuWidget))
     {
         PauseMenuWidget->RemoveFromParent();
         PauseMenuWidget = nullptr;
+    }
+
+    if (IsValid(ObjectiveNotificationWidget))
+    {
+        ObjectiveNotificationWidget->SetVisibility(
+            ESlateVisibility::SelfHitTestInvisible
+        );
     }
 
     APlayerController* PlayerController =
@@ -4212,6 +7798,12 @@ void ABHCharacter::ResumeFromPause()
         PlayerController->SetInputMode(FInputModeGameOnly());
         PlayerController->bShowMouseCursor = false;
     }
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_PAUSE_MENU_CLOSED input_mode=game_only")
+    );
 }
 
 void ABHCharacter::ToggleFriendlySquadOrder()
@@ -4219,6 +7811,21 @@ void ABHCharacter::ToggleFriendlySquadOrder()
     if (!HasAuthority())
     {
         ServerRequestToggleFriendlySquadOrder();
+        return;
+    }
+
+    if (IsValid(FieldSquadContextResponder) ||
+        IsValid(FieldSquadContextTarget))
+    {
+        CancelFieldSquadContextAction(
+            true,
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "FieldSquadContextCancelledByOrder",
+                "The assigned operative is returning to the current "
+                "formation order. Press C again to change that order."
+            )
+        );
         return;
     }
 
@@ -4919,6 +8526,7 @@ bool ABHCharacter::SpawnFieldSquadMember(int32 FormationIndex)
 
         Soldier->SetFlags(RF_Transient);
         Soldier->SetCombatFaction(EBHCombatFaction::Friendly);
+        Soldier->SetFieldOperativeID(NAME_None);
         Soldier->SetObjectiveIdToCompleteOnDeath(NAME_None);
         UGameplayStatics::FinishSpawningActor(Soldier, SpawnTransform);
 
@@ -4956,11 +8564,11 @@ bool ABHCharacter::SpawnFieldSquadMember(int32 FormationIndex)
 
         Soldier->OnFriendlyCasualtyExpired.AddDynamic(
             this,
-            &ABHCharacter::
-                HandleFieldSquadMemberCasualtyExpired
+            &ABHCharacter::HandleFieldSquadMemberCasualtyExpired
         );
 
         FieldSquadMembers.Add(Soldier);
+        ForceNetUpdate();
         return true;
     }
 
@@ -4991,6 +8599,12 @@ void ABHCharacter::ApplyFieldSquadOrder()
             continue;
         }
 
+        SquadAIController->OnHoldMoveFailed.RemoveAll(this);
+        SquadAIController->OnHoldMoveFailed.AddUObject(
+            this,
+            &ABHCharacter::NotifySquadMoveAndHoldFailure
+        );
+
         if (bFieldSquadHolding)
         {
             FVector HoldLocation = Member->GetActorLocation();
@@ -5016,9 +8630,17 @@ void ABHCharacter::ApplyFieldSquadOrder()
                     (CommandRight * FormationOffset.Y);
             }
 
-            SquadAIController->SetHoldPosition(
-                HoldLocation
-            );
+            if (bFieldSquadHasCommandLocation)
+            {
+                SquadAIController->SetMoveAndHoldPosition(
+                    HoldLocation,
+                    FieldSquadCommandRotation.Yaw
+                );
+            }
+            else
+            {
+                SquadAIController->SetHoldPosition(HoldLocation);
+            }
         }
         else
         {
@@ -5034,6 +8656,70 @@ void ABHCharacter::ApplyFieldSquadOrder()
 
         ++FormationIndex;
     }
+}
+
+bool ABHCharacter::ShouldPauseWorldForMenu(ENetMode NetMode)
+{
+    return NetMode == NM_Standalone;
+}
+
+void ABHCharacter::NotifySquadMoveAndHoldFailure(
+    ABHEnemySoldier* SquadMember,
+    const FVector& FailedDestination,
+    const FVector& FallbackLocation
+)
+{
+    UWorld* World = GetWorld();
+
+    if (!HasAuthority() || !IsValid(World))
+    {
+        return;
+    }
+
+    const float CurrentTime = World->GetTimeSeconds();
+
+    if (CurrentTime < NextSquadCommandFailureNotificationTime)
+    {
+        return;
+    }
+
+    NextSquadCommandFailureNotificationTime = CurrentTime + 2.5f;
+    const int32 DistanceMeters = FMath::Max(
+        1,
+        FMath::RoundToInt(
+            FVector::Dist2D(FailedDestination, FallbackLocation) /
+            100.0f
+        )
+    );
+
+    ShowPriorityStatusNotification(
+        FText::Format(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "SquadMoveHoldNavigationFailed",
+                "SQUAD // ROUTE BLOCKED\n\n"
+                "{0} could not reach the designated position "
+                "({1} m away) and is holding safely in place. "
+                "Aim at reachable ground and press C to redirect."
+            ),
+            FText::FromString(GetNameSafe(SquadMember)),
+            FText::AsNumber(DistanceMeters)
+        ),
+        EBHNotificationPriority::High
+    );
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_SQUAD_MOVE_HOLD_REPORTED commander=%s soldier=%s "
+            "destination=%s fallback=%s"
+        ),
+        *GetNameSafe(this),
+        *GetNameSafe(SquadMember),
+        *FailedDestination.ToCompactString(),
+        *FallbackLocation.ToCompactString()
+    );
 }
 
 int32 ABHCharacter::GetLivingFieldSquadCount() const
@@ -5069,6 +8755,44 @@ int32 ABHCharacter::GetIncapacitatedFieldSquadCount() const
     return IncapacitatedCount;
 }
 
+int32 ABHCharacter::
+    GetFieldSquadMembersRequiringEvacuationCount() const
+{
+    int32 EvacuationCount = 0;
+
+    for (const ABHEnemySoldier* Member : FieldSquadMembers)
+    {
+        EvacuationCount +=
+            IsValid(Member) &&
+            Member->RequiresMedicalEvacuation()
+                ? 1
+                : 0;
+    }
+
+    return EvacuationCount;
+}
+
+FName ABHCharacter::GetFieldSquadRescueTargetID() const
+{
+    for (const ABHEnemySoldier* Member : FieldSquadMembers)
+    {
+        if (IsValid(Member) &&
+            (Member->IsIncapacitated() ||
+             Member->RequiresMedicalEvacuation()) &&
+            !Member->GetFieldOperativeID().IsNone())
+        {
+            return Member->GetFieldOperativeID();
+        }
+    }
+
+    return NAME_None;
+}
+
+bool ABHCharacter::HasFieldSquadRescueTarget() const
+{
+    return !GetFieldSquadRescueTargetID().IsNone();
+}
+
 TArray<FBHFieldSquadMemberState>
 ABHCharacter::GetFieldSquadMemberStates() const
 {
@@ -5087,6 +8811,7 @@ ABHCharacter::GetFieldSquadMemberStates() const
 
         FBHFieldSquadMemberState& MemberState =
             MemberStates.AddDefaulted_GetRef();
+        MemberState.MemberID = Member->GetFieldOperativeID();
         MemberState.MagazineAmmo =
             Member->GetCurrentMagazineAmmo();
         MemberState.ReserveAmmo =
@@ -5097,6 +8822,8 @@ ABHCharacter::GetFieldSquadMemberStates() const
             Member->GetCombatReadiness();
         MemberState.bIncapacitated =
             Member->IsIncapacitated();
+        MemberState.bRequiresMedicalEvacuation =
+            Member->RequiresMedicalEvacuation();
         const bool bMemberEmbarked =
             IsValid(FieldSquadTransport) &&
             Member->GetAttachParentActor() ==
@@ -5219,6 +8946,16 @@ int32 ABHCharacter::ServiceFieldSquadMembers(
     );
     int32 ServicedCount = 0;
     bool bStabilizedCasualty = false;
+    bool bCompletedRescue = false;
+    const UBHWarSubsystem* WarSubsystem = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UBHWarSubsystem>()
+        : nullptr;
+    const FName RescueTargetID =
+        IsValid(WarSubsystem) &&
+            WarSubsystem->GetCommittedOperationType() ==
+                EBHWarPriorityType::Rescue
+            ? WarSubsystem->GetCommittedOperationTargetID()
+            : NAME_None;
 
     for (ABHEnemySoldier* Member : FieldSquadMembers)
     {
@@ -5235,9 +8972,14 @@ int32 ABHCharacter::ServiceFieldSquadMembers(
         {
             if (Member->StabilizeIncapacitatedSoldier())
             {
-                Member->ServiceCombatLoadout();
+                const bool bServiced =
+                    Member->ServiceCombatLoadout();
                 ++ServicedCount;
                 bStabilizedCasualty = true;
+                bCompletedRescue = bCompletedRescue ||
+                    (bServiced &&
+                     Member->GetFieldOperativeID() ==
+                        RescueTargetID);
             }
             continue;
         }
@@ -5247,12 +8989,21 @@ int32 ABHCharacter::ServiceFieldSquadMembers(
             continue;
         }
 
-        ServicedCount += Member->ServiceCombatLoadout() ? 1 : 0;
+        const bool bServiced = Member->ServiceCombatLoadout();
+        ServicedCount += bServiced ? 1 : 0;
+        bCompletedRescue = bCompletedRescue ||
+            (bServiced &&
+             Member->GetFieldOperativeID() == RescueTargetID);
     }
 
     if (bStabilizedCasualty)
     {
         ApplyFieldSquadOrder();
+    }
+
+    if (bCompletedRescue)
+    {
+        CompleteObjective(BHObjectiveIds::EvacuateCasualty);
     }
 
     return ServicedCount;
@@ -5384,6 +9135,10 @@ bool ABHCharacter::RestoreFieldSquadState(
         const FBHFieldSquadMemberState& SavedMember =
             SavedMembers[Index];
 
+        RestoredMember->SetFieldOperativeID(
+            SavedMember.MemberID
+        );
+
         if (SavedMember.bEmbarked)
         {
             PendingFieldSquadTransportPassengers.Add(
@@ -5407,6 +9162,9 @@ bool ABHCharacter::RestoreFieldSquadState(
             SavedMember.ReserveAmmo,
             SavedMember.FragGrenades,
             SavedMember.CombatReadiness
+        );
+        RestoredMember->RestoreMedicalEvacuationState(
+            SavedMember.bRequiresMedicalEvacuation
         );
 
         if (SavedMember.bIncapacitated)
@@ -5480,7 +9238,8 @@ int32 ABHCharacter::BoardFieldSquadTransport(
                     IsFieldSquadMemberTransportEligible(
                         Member->IsDead(),
                         Member->IsIncapacitated(),
-                        bFieldSquadHolding
+                        bFieldSquadHolding,
+                        Member->RequiresMedicalEvacuation()
                     );
 
         if (!bEligibleToBoard)
@@ -5712,6 +9471,13 @@ FName ABHCharacter::GetFieldSquadTransportPersistenceID() const
 
 void ABHCharacter::DestroyFieldSquad()
 {
+    FieldSquadContextResponder = nullptr;
+    FieldSquadContextTarget = nullptr;
+    FieldSquadContextActionDeadline = 0.0f;
+    FieldSquadContextAction = EBHFieldSquadContextAction::None;
+    FieldSquadContextTargetLabel = NAME_None;
+    bFieldSquadContextActionReachedTarget = false;
+
     for (ABHEnemySoldier* Member : FieldSquadMembers)
     {
         if (IsValid(Member))
@@ -5727,6 +9493,7 @@ void ABHCharacter::DestroyFieldSquad()
     FieldSquadCommandLocation = FVector::ZeroVector;
     FieldSquadCommandRotation = FRotator::ZeroRotator;
     bFieldSquadEmbarked = false;
+    ForceNetUpdate();
 }
 
 void ABHCharacter::HandleFieldSquadMemberDeath(
@@ -5790,10 +9557,37 @@ void ABHCharacter::HandleFieldSquadMemberCasualtyExpired(
 {
     ABHEnemySoldier* LostOperative =
         Cast<ABHEnemySoldier>(ExpiredOperative);
-    if (!IsValid(LostOperative) ||
-        FieldSquadMembers.RemoveSingle(LostOperative) <= 0)
+    if (!IsValid(LostOperative))
     {
         return;
+    }
+
+    const UBHWarSubsystem* WarSubsystem = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UBHWarSubsystem>()
+        : nullptr;
+    const bool bLostRescueTarget =
+        IsValid(WarSubsystem) &&
+        WarSubsystem->GetCommittedOperationType() ==
+            EBHWarPriorityType::Rescue &&
+        WarSubsystem->GetCommittedOperationTargetID() ==
+            LostOperative->GetFieldOperativeID();
+
+    if (FieldSquadMembers.RemoveSingle(LostOperative) <= 0)
+    {
+        return;
+    }
+    ForceNetUpdate();
+
+    if (bLostRescueTarget)
+    {
+        FailCurrentWarOperation(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "RescueCasualtyExpiredFailureReason",
+                "The assigned casualty died before reaching "
+                "a friendly treatment point."
+            )
+        );
     }
 
     const int32 RemainingOperatives =
@@ -5817,7 +9611,7 @@ void ABHCharacter::HandleFieldSquadMemberCasualtyExpired(
         }
     }
 
-    ShowStatusNotification(
+    ShowStatusNotificationWithAudioCue(
         FText::Format(
             NSLOCTEXT(
                 "BrokenHorizon",
@@ -5827,7 +9621,9 @@ void ABHCharacter::HandleFieldSquadMemberCasualtyExpired(
                 "{0} operative(s) remain."
             ),
             FText::AsNumber(RemainingOperatives)
-        )
+        ),
+        EBHNotificationPriority::Critical,
+        EBHNotificationAudioCue::StrategicWarning
     );
 
     UE_LOG(
@@ -5894,7 +9690,7 @@ bool ABHCharacter::TryStabilizeFieldSquadMember(
     {
         ApplyFieldSquadOrder();
     }
-    ShowStatusNotification(
+    ShowPriorityStatusNotification(
         FText::Format(
             NSLOCTEXT(
                 "BrokenHorizon",
@@ -5908,7 +9704,8 @@ bool ABHCharacter::TryStabilizeFieldSquadMember(
             FText::AsNumber(
                 InjuryComponent->GetFieldDressingCount()
             )
-        )
+        ),
+        EBHNotificationPriority::High
     );
 
     UE_LOG(
@@ -6013,7 +9810,7 @@ void ABHCharacter::OpenWarMap(bool bDeploymentMode)
         : nullptr;
 
     if (!IsValid(PlayerController) ||
-        !PlayerController->IsLocalController() ||
+        PlayerController->GetLocalPlayer() == nullptr ||
         !IsValid(WarSubsystem))
     {
         return;
@@ -6075,6 +9872,14 @@ void ABHCharacter::OpenWarMap(bool bDeploymentMode)
     );
     WarMapWidget->AddToViewport(250);
 
+    if (UGameInstance* TelemetryGameInstance = GetGameInstance())
+    {
+        TelemetryGameInstance->GetSubsystem<UBHPlaytestTelemetrySubsystem>()->RecordEvent(
+            TEXT("war_map_opened"),
+            {{TEXT("deploymentMode"), bDeploymentMode ? TEXT("true") : TEXT("false")}}
+        );
+    }
+
     PlayerController->SetIgnoreMoveInput(true);
     PlayerController->SetIgnoreLookInput(true);
 
@@ -6103,6 +9908,13 @@ void ABHCharacter::CloseWarMap()
     if (!bWarMapOpen && !IsValid(WarMapWidget))
     {
         return;
+    }
+
+    if (UGameInstance* TelemetryGameInstance = GetGameInstance())
+    {
+        TelemetryGameInstance->GetSubsystem<UBHPlaytestTelemetrySubsystem>()->RecordEvent(
+            TEXT("war_map_closed")
+        );
     }
 
     bWarMapOpen = false;
@@ -6445,6 +10257,38 @@ bool ABHCharacter::ExecuteWithdrawOperationRequest()
                 "The raid withdrew before enemy logistics were "
                 "disrupted."
             )
+            : WithdrawnOperationType ==
+                    EBHWarPriorityType::Resupply
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "ResupplyWithdrawalFailureReason",
+                "The logistics team withdrew before the assigned "
+                "supply load reached its destination."
+            )
+            : WithdrawnOperationType ==
+                    EBHWarPriorityType::EscortRescue
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "EscortWithdrawalFailureReason",
+                "The escort withdrew before the protected convoy "
+                "cleared the route."
+            )
+            : WithdrawnOperationType ==
+                    EBHWarPriorityType::Rescue
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "RescueWithdrawalFailureReason",
+                "The rescue team withdrew before the assigned "
+                "casualty reached treatment."
+            )
+            : WithdrawnOperationType ==
+                    EBHWarPriorityType::Recon
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "ReconWithdrawalFailureReason",
+                "The reconnaissance team withdrew before filing a "
+                "confirmed intelligence report."
+            )
             : NSLOCTEXT(
                 "BrokenHorizon",
                 "AttackWithdrawalFailureReason",
@@ -6759,13 +10603,13 @@ void ABHCharacter::HandleWarStateChanged(
             Sector.Owner == EBHWarFaction::Friendly
                 ? NSLOCTEXT(
                     "BrokenHorizon",
-                    "FriendlySectorControl",
+                    "WarMapFriendlySectorOwner",
                     "FRIENDLY"
                 )
                 : Sector.Owner == EBHWarFaction::Enemy
                     ? NSLOCTEXT(
                         "BrokenHorizon",
-                        "EnemySectorControl",
+                        "WarMapEnemySectorOwner",
                         "ENEMY"
                     )
                     : NSLOCTEXT(
@@ -7174,14 +11018,14 @@ void ABHCharacter::HandleWarStateChanged(
 
     if (!StrategicUpdate.IsEmpty() &&
         IsValid(PlayerController) &&
-        PlayerController->IsLocalController() &&
+        PlayerController->GetLocalPlayer() != nullptr &&
         (
             !IsMissionComplete() ||
             CurrentCampaignOutcome !=
                 EBHWarCampaignOutcome::Ongoing
         ))
     {
-        ShowStatusNotification(StrategicUpdate);
+        ShowDeferredStrategicStatusNotification(StrategicUpdate);
     }
 }
 
@@ -7208,6 +11052,10 @@ bool ABHCharacter::BeginOperationInWorld(
     UBHWarSubsystem* WarSubsystem = GameInstance
         ? GameInstance->GetSubsystem<UBHWarSubsystem>()
         : nullptr;
+    const FName RescueTargetID =
+        OperationType == EBHWarPriorityType::Rescue
+            ? GetFieldSquadRescueTargetID()
+            : NAME_None;
 
     if (!IsValid(WarSubsystem) ||
         bRuntimeWarOperation ||
@@ -7220,6 +11068,8 @@ bool ABHCharacter::BeginOperationInWorld(
             SectorID,
             OperationType
         ) ||
+        (OperationType == EBHWarPriorityType::Rescue &&
+         RescueTargetID.IsNone()) ||
         !IsValid(ObjectiveComponent))
     {
         return false;
@@ -7328,10 +11178,17 @@ bool ABHCharacter::BeginOperationInWorld(
         return false;
     }
 
-    if (!WarSubsystem->SetCommittedOperation(
-            AssignedWarSectorID,
-            AssignedWarPriorityType
-        ))
+    const bool bOperationCommitted =
+        AssignedWarPriorityType == EBHWarPriorityType::Rescue
+            ? WarSubsystem->SetCommittedRescueOperation(
+                AssignedWarSectorID,
+                RescueTargetID
+            )
+            : WarSubsystem->SetCommittedOperation(
+                AssignedWarSectorID,
+                AssignedWarPriorityType
+            );
+    if (!bOperationCommitted)
     {
         RollBackDeployment();
         return false;
@@ -7348,14 +11205,58 @@ bool ABHCharacter::BeginOperationInWorld(
     }
     bCommittedThisDeployment = false;
 
+    const bool bSupportsTacticalPreparation =
+        OperationType == EBHWarPriorityType::Attack ||
+        OperationType == EBHWarPriorityType::Defend ||
+        OperationType == EBHWarPriorityType::Raid;
+    if (bSupportsTacticalPreparation &&
+        IsValid(InjuryComponent))
+    {
+        int32 BonusMedkits = 0;
+        int32 BonusFieldDressings = 0;
+        BHWarOperationRules::GetTacticalMedicalSupplyGrant(
+            WarSubsystem->GetActiveTacticalOption(),
+            BonusMedkits,
+            BonusFieldDressings
+        );
+        if (BonusMedkits > 0 || BonusFieldDressings > 0)
+        {
+            InjuryComponent->AddMedicalSupplies(
+                BonusMedkits,
+                BonusFieldDressings
+            );
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_MEDICAL_PREPARATION_APPLIED "
+                    "medkits=%d dressings=%d"
+                ),
+                BonusMedkits,
+                BonusFieldDressings
+            );
+        }
+    }
+
     FBHObjectiveDefinition OperationObjective;
     OperationObjective.ObjectiveID =
-        BHObjectiveIds::EliminateGuard;
+        AssignedWarPriorityType == EBHWarPriorityType::Resupply
+            ? BHObjectiveIds::DeliverResupply
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::EscortRescue
+                ? BHObjectiveIds::ProtectConvoy
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Rescue
+                ? BHObjectiveIds::EvacuateCasualty
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Recon
+                ? BHObjectiveIds::ObserveSector
+            : BHObjectiveIds::EliminateGuard;
     OperationObjective.DisplayText =
         WarSubsystem->GetOperationObjectiveText(
             AssignedWarSectorID,
             AssignedWarPriorityType,
-            BHObjectiveIds::EliminateGuard
+            OperationObjective.ObjectiveID
         );
     ObjectiveComponent->StartRuntimeMission(
         { OperationObjective }
@@ -7443,6 +11344,18 @@ bool ABHCharacter::BeginOperationInWorld(
         ),
         AssignedWarPriorityType == EBHWarPriorityType::Defend
             ? TEXT("DEFEND")
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Resupply
+                ? TEXT("RESUPPLY")
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::EscortRescue
+                ? TEXT("ESCORT")
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Rescue
+                ? TEXT("RESCUE")
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Recon
+                ? TEXT("RECON")
             : TEXT("ATTACK"),
         *AssignedWarSectorID.ToString()
     );
@@ -7690,6 +11603,8 @@ bool ABHCharacter::FailCurrentWarOperation(
 
     const FBHWarSectorState PreviousSector =
         WarSubsystem->GetSectorState(AssignedWarSectorID);
+    const FName ResolvedOperationID =
+        WarSubsystem->GetCommittedOperationID();
     const int32 FriendlySupportLosses =
         IsValid(OpenWorldOperationDirector)
             ? OpenWorldOperationDirector
@@ -7772,6 +11687,40 @@ bool ABHCharacter::FailCurrentWarOperation(
 
     const FBHWarSectorState UpdatedSector =
         WarSubsystem->GetSectorState(AssignedWarSectorID);
+    const FBHOperationAfterActionRecord AfterAction =
+        UBHWarSubsystem::BuildAfterActionRecord(
+            ResolvedOperationID,
+            AssignedWarSectorID,
+            AssignedWarPriorityType,
+            false,
+            FriendlySupportLosses,
+            EnemyLosses,
+            EnemyRouted,
+            UpdatedSector.Supply - PreviousSector.Supply,
+            0.0f,
+            WarSubsystem->GetActiveTacticalOption(),
+            WarSubsystem->GetActiveTacticalOptionSupplyCost()
+        );
+    WarSubsystem->RecordOperationAfterAction(AfterAction);
+    const TCHAR* AfterActionGrade =
+        AfterAction.Grade == EBHAfterActionGrade::Exceptional
+            ? TEXT("EXCEPTIONAL")
+            : AfterAction.Grade == EBHAfterActionGrade::Strong
+                ? TEXT("STRONG")
+                : AfterAction.Grade == EBHAfterActionGrade::Effective
+                    ? TEXT("EFFECTIVE")
+                    : TEXT("DIMINISHED");
+    const TCHAR* TacticalPlanName =
+        AfterAction.TacticalOption ==
+                EBHOperationTacticalOption::ReconPlanning
+            ? TEXT("RECON")
+            : AfterAction.TacticalOption ==
+                    EBHOperationTacticalOption::ReinforcementPriority
+                ? TEXT("REINFORCEMENT")
+                : AfterAction.TacticalOption ==
+                        EBHOperationTacticalOption::MedicalPreparation
+                    ? TEXT("MEDICAL")
+                    : TEXT("STANDARD");
     const FText OperationLabel =
         AssignedWarPriorityType == EBHWarPriorityType::Defend
             ? NSLOCTEXT(
@@ -7784,6 +11733,34 @@ bool ABHCharacter::FailCurrentWarOperation(
                 "BrokenHorizon",
                 "WarRaidFailure",
                 "RAID"
+            )
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Resupply
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WarResupplyFailure",
+                "RESUPPLY"
+            )
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::EscortRescue
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WarEscortFailure",
+                "ESCORT"
+            )
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Rescue
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WarRescueFailure",
+                "RESCUE"
+            )
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Recon
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WarReconFailure",
+                "RECON"
             )
             : NSLOCTEXT(
                 "BrokenHorizon",
@@ -7824,6 +11801,34 @@ bool ABHCharacter::FailCurrentWarOperation(
                     "RAID REPULSED // {0} SIGNATURE"
                 ),
                 RaidSignatureLabel
+            )
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Resupply
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WarResupplyFailedDebrief",
+                "SUPPLY LINE NOT RESTORED"
+            )
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::EscortRescue
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WarEscortFailedDebrief",
+                "PROTECTED CONVOY LOST"
+            )
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Rescue
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WarRescueFailedDebrief",
+                "CASUALTY NOT EVACUATED"
+            )
+            : AssignedWarPriorityType ==
+                    EBHWarPriorityType::Recon
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WarReconFailedDebrief",
+                "INTELLIGENCE UNCONFIRMED"
             )
             : NSLOCTEXT(
                 "BrokenHorizon",
@@ -7898,6 +11903,34 @@ bool ABHCharacter::FailCurrentWarOperation(
             )
         )
     );
+    DebriefArguments.Add(
+        TEXT("AfterActionGrade"),
+        FText::FromString(AfterActionGrade)
+    );
+    DebriefArguments.Add(
+        TEXT("AfterActionScore"),
+        FText::AsNumber(AfterAction.TotalScore)
+    );
+    DebriefArguments.Add(
+        TEXT("CampaignMerit"),
+        FText::AsNumber(
+            WarSubsystem->GetCampaignProgression().CampaignMerit
+        )
+    );
+    DebriefArguments.Add(
+        TEXT("TacticalPlan"),
+        FText::FromString(TacticalPlanName)
+    );
+    DebriefArguments.Add(
+        TEXT("TacticalCost"),
+        FText::AsNumber(
+            FMath::RoundToInt(AfterAction.TacticalSupplyCost)
+        )
+    );
+    DebriefArguments.Add(
+        TEXT("TacticalScore"),
+        FText::AsNumber(AfterAction.TacticalExecutionScore)
+    );
 
     MissionCompleteMessage = FText::Format(
         NSLOCTEXT(
@@ -7912,6 +11945,10 @@ bool ABHCharacter::FailCurrentWarOperation(
             "SUPPORT LOSSES {SupportLosses} // "
             "HOSTILE LOSSES {HostileLosses} // "
             "ROUTED {HostileRouted}\n"
+            "AFTER ACTION // {AfterActionGrade} // "
+            "SCORE +{AfterActionScore} // MERIT {CampaignMerit}\n"
+            "TACTICAL PLAN // {TacticalPlan} // COST {TacticalCost} "
+            "// EFFECT +{TacticalScore}\n"
             "WAR TURN {WarTurn} // "
             "FRIENDLY CONTROL {FriendlyControl}%"
         ),
@@ -8044,6 +12081,320 @@ UBHHealthComponent* ABHCharacter::GetHealthComponent() const
     return HealthComponent;
 }
 
+bool ABHCharacter::IsPlayerIncapacitated() const
+{
+    return bPlayerIncapacitated;
+}
+
+bool ABHCharacter::IsPlayerCasualtyStabilized() const
+{
+    return bPlayerIncapacitated && bPlayerCasualtyStabilized;
+}
+
+float ABHCharacter::GetPlayerBleedOutSecondsRemaining() const
+{
+    if (!bPlayerIncapacitated || bPlayerCasualtyStabilized ||
+        !IsValid(GetWorld()))
+    {
+        return 0.0f;
+    }
+    return FMath::Max(
+        0.0f,
+        PlayerBleedOutDeadline - GetWorld()->GetTimeSeconds()
+    );
+}
+
+bool ABHCharacter::CanEnterCooperativeCasualty(
+    bool bMultiplayerWorld,
+    bool bAlreadyIncapacitated,
+    bool bAlreadyDownedThisLife
+)
+{
+    return bMultiplayerWorld &&
+        !bAlreadyIncapacitated &&
+        !bAlreadyDownedThisLife;
+}
+
+bool ABHCharacter::ShouldEscalateFriendlyFire(
+    int32 RecentFriendlyHits,
+    int32 EscalationThreshold
+)
+{
+    return FMath::Max(0, RecentFriendlyHits) >=
+        FMath::Max(1, EscalationThreshold);
+}
+
+bool ABHCharacter::CanBeginCasualtyDrag(
+    bool bTargetIsPlayer,
+    bool bTargetIsIncapacitated,
+    bool bTargetIsFriendly,
+    bool bAlreadyClaimed,
+    float DistanceCentimeters,
+    float MaximumDistanceCentimeters
+)
+{
+    return bTargetIsPlayer &&
+        bTargetIsIncapacitated &&
+        bTargetIsFriendly &&
+        !bAlreadyClaimed &&
+        DistanceCentimeters >= 0.0f &&
+        DistanceCentimeters <= FMath::Max(
+            0.0f,
+            MaximumDistanceCentimeters
+        );
+}
+
+bool ABHCharacter::CanPerformWeaponBash(
+    bool bSprinting,
+    bool bTraversing,
+    bool bHandlingDeath,
+    bool bDraggingCasualty,
+    float CurrentStamina,
+    float RequiredStamina,
+    float CurrentTime,
+    float LastBashTime
+)
+{
+    return !bSprinting &&
+        !bTraversing &&
+        !bHandlingDeath &&
+        !bDraggingCasualty &&
+        CurrentStamina >= FMath::Max(0.0f, RequiredStamina) &&
+        CurrentTime >= LastBashTime;
+}
+
+bool ABHCharacter::CanPerformFieldObservation(
+    bool bSprinting,
+    bool bTraversing,
+    bool bAiming,
+    bool bHandlingDeath,
+    bool bInVehicle,
+    float HorizontalSpeed,
+    float MaximumStableSpeed,
+    float CurrentTime,
+    float LastReportTime
+)
+{
+    return bAiming &&
+        !bSprinting &&
+        !bTraversing &&
+        !bHandlingDeath &&
+        !bInVehicle &&
+        HorizontalSpeed >= 0.0f &&
+        HorizontalSpeed <= FMath::Max(0.0f, MaximumStableSpeed) &&
+        CurrentTime >= LastReportTime;
+}
+
+float ABHCharacter::CalculateBlastConcussionIntensity(
+    float DistanceCentimeters,
+    float InnerRadiusCentimeters,
+    float OuterRadiusCentimeters,
+    bool bHardCover,
+    float HardCoverAttenuation
+)
+{
+    const float SafeDistance = FMath::Max(0.0f, DistanceCentimeters);
+    const float SafeInnerRadius = FMath::Max(0.0f, InnerRadiusCentimeters);
+    const float SafeOuterRadius = FMath::Max(
+        SafeInnerRadius,
+        OuterRadiusCentimeters
+    );
+    float Intensity = 0.0f;
+    if (SafeDistance <= SafeInnerRadius)
+    {
+        Intensity = 1.0f;
+    }
+    else if (SafeDistance < SafeOuterRadius)
+    {
+        Intensity = 1.0f - FMath::Clamp(
+            (SafeDistance - SafeInnerRadius) /
+                FMath::Max(1.0f, SafeOuterRadius - SafeInnerRadius),
+            0.0f,
+            1.0f
+        );
+    }
+
+    if (bHardCover)
+    {
+        Intensity *= FMath::Clamp(
+            HardCoverAttenuation,
+            0.0f,
+            1.0f
+        );
+    }
+    return FMath::Clamp(Intensity, 0.0f, 1.0f);
+}
+
+bool ABHCharacter::CanStartControlledBreathing(
+    bool bAiming,
+    bool bSprinting,
+    bool bAlreadyHolding,
+    float CurrentStamina,
+    float MinimumStamina,
+    float RecoveryRemaining
+)
+{
+    return bAiming &&
+        !bSprinting &&
+        !bAlreadyHolding &&
+        CurrentStamina >= FMath::Max(0.0f, MinimumStamina) &&
+        RecoveryRemaining <= 0.0f;
+}
+
+float ABHCharacter::CalculateControlledBreathSpreadMultiplier(
+    bool bHolding,
+    float HeldDuration,
+    float MaximumHeldDuration,
+    float MinimumMultiplier,
+    float MaximumMultiplier
+)
+{
+    if (!bHolding)
+    {
+        return 1.0f;
+    }
+
+    const float SafeMaximumDuration = FMath::Max(
+        0.01f,
+        MaximumHeldDuration
+    );
+    const float Alpha = FMath::Clamp(
+        FMath::Max(0.0f, HeldDuration) / SafeMaximumDuration,
+        0.0f,
+        1.0f
+    );
+    const float StableWindowAlpha = 0.25f;
+    const float StrainAlpha = Alpha <= StableWindowAlpha
+        ? 0.0f
+        : (Alpha - StableWindowAlpha) /
+            (1.0f - StableWindowAlpha);
+    return FMath::Lerp(
+        FMath::Clamp(MinimumMultiplier, 0.1f, 1.0f),
+        FMath::Max(1.0f, MaximumMultiplier),
+        FMath::Clamp(StrainAlpha, 0.0f, 1.0f)
+    );
+}
+
+bool ABHCharacter::CanBraceWeapon(
+    bool bAiming,
+    bool bSprinting,
+    bool bTraversing,
+    float HorizontalSpeed,
+    float MaximumStableSpeed,
+    float DistanceToSupport,
+    float MaximumSupportDistance,
+    float SupportAlignment,
+    float MinimumAlignment,
+    bool bSupportUsable,
+    float SupportIntegrity
+)
+{
+    return bAiming &&
+        !bSprinting &&
+        !bTraversing &&
+        HorizontalSpeed >= 0.0f &&
+        HorizontalSpeed <= FMath::Max(0.0f, MaximumStableSpeed) &&
+        DistanceToSupport >= 0.0f &&
+        DistanceToSupport <= FMath::Max(0.0f, MaximumSupportDistance) &&
+        SupportAlignment >= FMath::Clamp(MinimumAlignment, 0.0f, 1.0f) &&
+        bSupportUsable &&
+        SupportIntegrity > 0.0f;
+}
+
+float ABHCharacter::CalculateWeaponBraceMultiplier(
+    bool bBraced,
+    float SupportQuality,
+    float MinimumMultiplier
+)
+{
+    if (!bBraced)
+    {
+        return 1.0f;
+    }
+
+    return FMath::Lerp(
+        1.0f,
+        FMath::Clamp(MinimumMultiplier, 0.1f, 1.0f),
+        FMath::Clamp(SupportQuality, 0.0f, 1.0f)
+    );
+}
+
+void ABHCharacter::SetControlledBreathingRequested(bool bRequested)
+{
+    if (!HasAuthority())
+    {
+        ServerSetControlledBreathingRequested(bRequested);
+        return;
+    }
+
+    const bool bAiming = IsValid(WeaponComponent) &&
+        WeaponComponent->IsAiming();
+    const bool bWasHolding = bHoldingControlledBreath;
+    if (!bRequested)
+    {
+        bHoldingControlledBreath = false;
+        ControlledBreathHeldDuration = 0.0f;
+        if (bWasHolding)
+        {
+            ControlledBreathRecoveryRemaining = FMath::Max(
+                0.0f,
+                ControlledBreathRecoveryDuration
+            );
+        }
+    }
+    else if (CanStartControlledBreathing(
+        bAiming,
+        bIsSprinting,
+        bHoldingControlledBreath,
+        CurrentStamina,
+        20.0f,
+        ControlledBreathRecoveryRemaining
+    ))
+    {
+        bHoldingControlledBreath = true;
+        ControlledBreathHeldDuration = 0.0f;
+    }
+
+    if (IsValid(CombatStatusWidget))
+    {
+        CombatStatusWidget->SetControlledBreathing(
+            bHoldingControlledBreath
+        );
+    }
+    ForceNetUpdate();
+}
+
+void ABHCharacter::ServerSetControlledBreathingRequested_Implementation(
+    bool bRequested
+)
+{
+    SetControlledBreathingRequested(bRequested);
+}
+
+void ABHCharacter::OnRep_ControlledBreathing()
+{
+    if (!bHoldingControlledBreath)
+    {
+        ControlledBreathHeldDuration = 0.0f;
+    }
+    if (IsValid(CombatStatusWidget))
+    {
+        CombatStatusWidget->SetControlledBreathing(
+            bHoldingControlledBreath
+        );
+    }
+}
+
+void ABHCharacter::OnRep_CurrentStamina()
+{
+    OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina);
+
+    if (IsValid(CombatStatusWidget))
+    {
+        CombatStatusWidget->SetStamina(CurrentStamina, MaxStamina);
+    }
+}
+
 UBHInjuryComponent* ABHCharacter::GetInjuryComponent() const
 {
     return InjuryComponent;
@@ -8150,12 +12501,270 @@ float ABHCharacter::GetWeaponSpreadMultiplier() const
         FMath::Max(1.0f, ExhaustedWeaponSpreadMultiplier),
         ExhaustionAlpha
     );
+    const float SuppressionMultiplier = FMath::Lerp(
+        1.0f,
+        FMath::Max(1.0f, MaximumSuppressionSpreadMultiplier),
+        FMath::Clamp(
+            AuthoritativePlayerSuppression,
+            0.0f,
+            1.0f
+        )
+    );
+    const float ControlledBreathMultiplier =
+        CalculateControlledBreathSpreadMultiplier(
+            bHoldingControlledBreath,
+            ControlledBreathHeldDuration,
+            ControlledBreathMaximumDuration,
+            ControlledBreathMinimumSpreadMultiplier,
+            ControlledBreathMaximumStrainMultiplier
+        );
+    const float WeaponBraceMultiplier = CalculateWeaponBraceMultiplier(
+        bWeaponBraced,
+        WeaponBraceSupportQuality,
+        MinimumWeaponBraceSpreadMultiplier
+    );
 
     return InjuryMultiplier *
         LeanMultiplier *
         MovementMultiplier *
         StanceMultiplier *
-        ExhaustionMultiplier;
+        ExhaustionMultiplier *
+        SuppressionMultiplier *
+        ControlledBreathMultiplier *
+        WeaponBraceMultiplier *
+        UBHBattlefieldConditions::GetCurrentProfile(this).
+            WeaponSpreadMultiplier *
+        GetCarryLoadProfile().WeaponSpreadMultiplier;
+}
+
+FBHCarryLoadProfile ABHCharacter::GetCarryLoadProfile() const
+{
+    return UBHLoadoutWeight::BuildCarryLoadProfile(
+        IsValid(WeaponComponent)
+            ? WeaponComponent->GetWeaponRole() : EBHWeaponRole::Assault,
+        IsValid(WeaponComponent) ? WeaponComponent->GetMagazineAmmo() : 0,
+        IsValid(WeaponComponent) ? WeaponComponent->GetReserveAmmo() : 0,
+        FragGrenadeCount,
+        SmokeGrenadeCount,
+        EngineeringChargeCount,
+        IsValid(InjuryComponent) ? InjuryComponent->GetMedkitCount() : 0,
+        IsValid(InjuryComponent)
+            ? InjuryComponent->GetFieldDressingCount() : 0
+    );
+}
+
+int32 ABHCharacter::CalculateSupplyShareAmount(
+    int32 DonorCount,
+    int32 DonorEmergencyReserve,
+    int32 ReceiverCount,
+    int32 ReceiverCapacity,
+    int32 TransferBatch
+)
+{
+    return FMath::Max(
+        0,
+        FMath::Min3(
+            FMath::Max(0, DonorCount - DonorEmergencyReserve),
+            FMath::Max(0, ReceiverCapacity - ReceiverCount),
+            FMath::Max(0, TransferBatch)
+        )
+    );
+}
+
+bool ABHCharacter::TryShareFieldSuppliesWith(ABHCharacter* Teammate)
+{
+    if (!HasAuthority() || !IsValid(Teammate) || Teammate == this ||
+        !Teammate->IsPlayerControlled() || IsPlayerIncapacitated() ||
+        Teammate->IsPlayerIncapacitated() ||
+        FVector::DistSquared(GetActorLocation(), Teammate->GetActorLocation()) >
+            FMath::Square(FMath::Max(100.0f, InteractionDistance + 50.0f)))
+    {
+        return false;
+    }
+
+    int32 AmmoShared = 0;
+    int32 FragsShared = 0;
+    int32 ChargesShared = 0;
+    int32 MedkitsShared = 0;
+    int32 DressingsShared = 0;
+    UBHWeaponComponent* ReceiverWeapon = Teammate->GetWeaponComponent();
+    if (IsValid(WeaponComponent) && IsValid(ReceiverWeapon) &&
+        WeaponComponent->GetWeaponRole() == ReceiverWeapon->GetWeaponRole())
+    {
+        AmmoShared = CalculateSupplyShareAmount(
+            WeaponComponent->GetReserveAmmo(),
+            30,
+            ReceiverWeapon->GetReserveAmmo(),
+            ReceiverWeapon->GetMaxReserveAmmo(),
+            30
+        );
+        if (AmmoShared > 0)
+        {
+            AmmoShared = WeaponComponent->RemoveReserveAmmo(AmmoShared);
+            const int32 Accepted = ReceiverWeapon->AddReserveAmmo(AmmoShared);
+            if (Accepted < AmmoShared)
+            {
+                WeaponComponent->AddReserveAmmo(AmmoShared - Accepted);
+                AmmoShared = Accepted;
+            }
+        }
+    }
+
+    FragsShared = CalculateSupplyShareAmount(
+        FragGrenadeCount, 1, Teammate->FragGrenadeCount,
+        Teammate->GetMaxFragGrenades(), 1);
+    if (FragsShared > 0)
+    {
+        FragGrenadeCount -= FragsShared;
+        Teammate->FragGrenadeCount += FragsShared;
+        OnRep_FragInventory();
+        Teammate->OnRep_FragInventory();
+    }
+
+    ChargesShared = CalculateSupplyShareAmount(
+        EngineeringChargeCount, 1, Teammate->EngineeringChargeCount,
+        Teammate->GetMaxEngineeringCharges(), 1);
+    if (ChargesShared > 0)
+    {
+        EngineeringChargeCount -= ChargesShared;
+        Teammate->EngineeringChargeCount += ChargesShared;
+        OnRep_EngineeringInventory();
+        Teammate->OnRep_EngineeringInventory();
+    }
+
+    if (IsValid(InjuryComponent) && IsValid(Teammate->InjuryComponent))
+    {
+        MedkitsShared = CalculateSupplyShareAmount(
+            InjuryComponent->GetMedkitCount(), 1,
+            Teammate->InjuryComponent->GetMedkitCount(), 2, 1);
+        DressingsShared = CalculateSupplyShareAmount(
+            InjuryComponent->GetFieldDressingCount(), 1,
+            Teammate->InjuryComponent->GetFieldDressingCount(), 3, 1);
+        if (MedkitsShared > 0 || DressingsShared > 0)
+        {
+            InjuryComponent->AddMedicalSupplies(
+                -MedkitsShared, -DressingsShared);
+            Teammate->InjuryComponent->AddMedicalSupplies(
+                MedkitsShared, DressingsShared);
+        }
+    }
+
+    const bool bSharedAnything = AmmoShared + FragsShared + ChargesShared +
+        MedkitsShared + DressingsShared > 0;
+    if (!bSharedAnything)
+    {
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon", "ShareFieldSuppliesUnavailable",
+            "SUPPLY SHARE // NO COMPATIBLE SHORTFALL\n\n"
+            "Keep an emergency reserve or match weapon roles to share ammunition."
+        ));
+        return false;
+    }
+
+    ForceNetUpdate();
+    Teammate->ForceNetUpdate();
+    UpdateCarryLoadHUD();
+    Teammate->UpdateCarryLoadHUD();
+    const FText Summary = FText::FromString(FString::Printf(
+        TEXT("SUPPLIES SHARED // AMMO %d  FRAG %d  CHARGE %d  MEDKIT %d  DRESSING %d"),
+        AmmoShared, FragsShared, ChargesShared, MedkitsShared, DressingsShared));
+    ShowStatusNotification(Summary);
+    Teammate->ShowStatusNotification(Summary);
+    UE_LOG(LogTemp, Display, TEXT(
+        "BH_COOP_SUPPLY_SHARED donor=%s receiver=%s ammo=%d frags=%d "
+        "charges=%d medkits=%d dressings=%d donor_kg=%.2f receiver_kg=%.2f"),
+        *GetName(), *Teammate->GetName(), AmmoShared, FragsShared,
+        ChargesShared, MedkitsShared, DressingsShared,
+        GetCarriedWeightKilograms(), Teammate->GetCarriedWeightKilograms());
+    return true;
+}
+
+float ABHCharacter::GetCarriedWeightKilograms() const
+{
+    return GetCarryLoadProfile().TotalKilograms;
+}
+
+void ABHCharacter::UpdateCarryLoadHUD()
+{
+    ApplyMovementSpeed();
+    if (!IsValid(CombatStatusWidget))
+    {
+        return;
+    }
+    const FBHCarryLoadProfile Profile = GetCarryLoadProfile();
+    CombatStatusWidget->SetCarryLoad(
+        Profile.TotalKilograms,
+        Profile.State,
+        Profile.MovementSpeedMultiplier,
+        Profile.StaminaDrainMultiplier
+    );
+}
+
+void ABHCharacter::OnRep_FragInventory()
+{
+    FragGrenadeCount = FMath::Clamp(
+        FragGrenadeCount,
+        0,
+        FMath::Max(0, MaxFragGrenades)
+    );
+    if (IsValid(CombatStatusWidget))
+    {
+        CombatStatusWidget->SetFragGrenadeCount(FragGrenadeCount);
+    }
+    UpdateCarryLoadHUD();
+}
+
+void ABHCharacter::OnRep_SmokeGrenadeInventory()
+{
+    SmokeGrenadeCount = FMath::Clamp(
+        SmokeGrenadeCount,
+        0,
+        FMath::Max(0, MaxSmokeGrenades)
+    );
+    RefreshSmokeGrenadeHUD();
+    UpdateCarryLoadHUD();
+}
+
+float ABHCharacter::GetCurrentPlayerSuppression() const
+{
+    return HasAuthority()
+        ? AuthoritativePlayerSuppression
+        : LocalPlayerSuppressionPresentation;
+}
+
+float ABHCharacter::AccumulatePlayerSuppression(
+    float CurrentSuppression,
+    float IncomingIntensity,
+    float AccumulationScale
+)
+{
+    const float SafeCurrent = FMath::Clamp(
+        CurrentSuppression,
+        0.0f,
+        1.0f
+    );
+    const float AppliedPressure =
+        FMath::Clamp(IncomingIntensity, 0.0f, 1.0f) *
+        FMath::Clamp(AccumulationScale, 0.0f, 1.0f);
+    return FMath::Clamp(
+        SafeCurrent + ((1.0f - SafeCurrent) * AppliedPressure),
+        0.0f,
+        1.0f
+    );
+}
+
+float ABHCharacter::DecayPlayerSuppression(
+    float CurrentSuppression,
+    float DecayPerSecond,
+    float DeltaTime
+)
+{
+    return FMath::Max(
+        0.0f,
+        FMath::Clamp(CurrentSuppression, 0.0f, 1.0f) -
+            (FMath::Max(0.0f, DecayPerSecond) *
+             FMath::Max(0.0f, DeltaTime))
+    );
 }
 
 float ABHCharacter::GetCurrentStamina() const
@@ -8180,13 +12789,26 @@ bool ABHCharacter::IsProne() const
 
 float ABHCharacter::GetAISightRangeMultiplier() const
 {
-    return bIsProne
+    const float PostureMultiplier = bIsProne
         ? FMath::Clamp(
             ProneAISightRangeMultiplier,
             0.1f,
             1.0f
         )
         : 1.0f;
+    const UGameInstance* GameInstance = GetGameInstance();
+    const UBHWarSubsystem* WarSubsystem = GameInstance
+        ? GameInstance->GetSubsystem<UBHWarSubsystem>()
+        : nullptr;
+    const float DifficultyMultiplier = IsValid(WarSubsystem)
+        ? FMath::Clamp(
+            WarSubsystem->GetCampaignDifficulty()
+                .EnemyPerceptionMultiplier,
+            0.5f,
+            2.0f
+        )
+        : 1.0f;
+    return PostureMultiplier * DifficultyMultiplier;
 }
 
 UBHWeaponComponent* ABHCharacter::GetWeaponComponent() const
@@ -8197,6 +12819,29 @@ UBHWeaponComponent* ABHCharacter::GetWeaponComponent() const
 int32 ABHCharacter::GetFragGrenadeCount() const
 {
     return FragGrenadeCount;
+}
+
+int32 ABHCharacter::GetSmokeGrenadeCount() const
+{
+    return SmokeGrenadeCount;
+}
+
+int32 ABHCharacter::GetMaxSmokeGrenades() const
+{
+    return FMath::Max(0, MaxSmokeGrenades);
+}
+
+int32 ABHCharacter::AddSmokeGrenades(int32 Amount)
+{
+    const int32 PreviousCount = SmokeGrenadeCount;
+    SmokeGrenadeCount = FMath::Clamp(
+        SmokeGrenadeCount + FMath::Max(0, Amount),
+        0,
+        GetMaxSmokeGrenades()
+    );
+    RefreshSmokeGrenadeHUD();
+    UpdateCarryLoadHUD();
+    return SmokeGrenadeCount - PreviousCount;
 }
 
 int32 ABHCharacter::GetMaxFragGrenades() const
@@ -8226,12 +12871,33 @@ void ABHCharacter::RestoreFragGrenadeCount(int32 SavedCount)
     RefreshFragGrenadeHUD();
 }
 
+void ABHCharacter::RestoreSmokeGrenadeCount(int32 SavedCount)
+{
+    SmokeGrenadeCount = FMath::Clamp(
+        SavedCount,
+        0,
+        GetMaxSmokeGrenades()
+    );
+    RefreshSmokeGrenadeHUD();
+    UpdateCarryLoadHUD();
+}
+
 void ABHCharacter::RefreshFragGrenadeHUD()
 {
     if (IsValid(CombatStatusWidget))
     {
         CombatStatusWidget->SetFragGrenadeCount(
             FragGrenadeCount
+        );
+    }
+}
+
+void ABHCharacter::RefreshSmokeGrenadeHUD()
+{
+    if (IsValid(CombatStatusWidget))
+    {
+        CombatStatusWidget->SetSmokeGrenadeCount(
+            SmokeGrenadeCount
         );
     }
 }
@@ -8449,6 +13115,7 @@ void ABHCharacter::OnObjectiveCompleted(
     FText CompletedObjectiveText
 )
 {
+    QueueObjectiveCompletionRadio(CompletedObjectiveID);
     UE_LOG(
         LogTemp,
         Log,
@@ -8456,7 +13123,7 @@ void ABHCharacter::OnObjectiveCompleted(
         *CompletedObjectiveID.ToString()
     );
 
-    ShowStatusNotification(
+    ShowStatusNotificationWithAudioCue(
         FText::Format(
             NSLOCTEXT(
                 "BrokenHorizon",
@@ -8464,10 +13131,18 @@ void ABHCharacter::OnObjectiveCompleted(
                 "OBJECTIVE COMPLETE\n\n\u2713 {0}"
             ),
             CompletedObjectiveText
-        )
+        ),
+        EBHNotificationPriority::Critical,
+        EBHNotificationAudioCue::QuietConfirmation
     );
 
     RefreshObjectiveWidget();
+    if (IsValid(ObjectiveComponent))
+    {
+        QueueObjectiveActivationRadio(
+            ObjectiveComponent->GetCurrentObjectiveID()
+        );
+    }
 
     if (IsValid(ObjectiveComponent) &&
         !ObjectiveComponent->IsMissionComplete())
@@ -8509,28 +13184,104 @@ void ABHCharacter::ShowStatusNotification(
     const FText& Message
 )
 {
+    ShowPriorityStatusNotification(
+        Message,
+        EBHNotificationPriority::Normal
+    );
+}
+
+void ABHCharacter::ShowPriorityStatusNotification(
+    const FText& Message,
+    EBHNotificationPriority NotificationPriority
+)
+{
+    ShowStatusNotificationWithAudioCue(
+        Message,
+        NotificationPriority,
+        UBHObjectiveNotificationWidget::ResolveDefaultAudioCue(
+            NotificationPriority
+        )
+    );
+}
+
+void ABHCharacter::ShowDeferredStrategicStatusNotification(
+    const FText& Message
+)
+{
     if (HasAuthority() && !IsLocallyControlled())
     {
         if (GetNetOwningPlayer())
         {
-            ClientShowStatusNotification(Message);
+            ClientShowDeferredStrategicStatusNotification(Message);
+        }
+        return;
+    }
+
+    DisplayDeferredStrategicStatusNotificationLocally(Message);
+}
+
+void ABHCharacter::ShowStatusNotificationWithAudioCue(
+    const FText& Message,
+    EBHNotificationPriority NotificationPriority,
+    EBHNotificationAudioCue AudioCue
+)
+{
+    if (HasAuthority() && !IsLocallyControlled())
+    {
+        if (GetNetOwningPlayer())
+        {
+            ClientShowStatusNotificationWithAudioCue(
+                Message,
+                NotificationPriority,
+                AudioCue
+            );
         }
 
         return;
     }
 
-    DisplayStatusNotificationLocally(Message);
+    DisplayStatusNotificationLocally(
+        Message,
+        NotificationPriority,
+        AudioCue
+    );
 }
 
 void ABHCharacter::DisplayStatusNotificationLocally(
     const FText& Message
 )
 {
+    DisplayStatusNotificationLocally(
+        Message,
+        EBHNotificationPriority::Normal
+    );
+}
+
+void ABHCharacter::DisplayStatusNotificationLocally(
+    const FText& Message,
+    EBHNotificationPriority NotificationPriority
+)
+{
+    DisplayStatusNotificationLocally(
+        Message,
+        NotificationPriority,
+        UBHObjectiveNotificationWidget::ResolveDefaultAudioCue(
+            NotificationPriority
+        )
+    );
+}
+
+void ABHCharacter::DisplayStatusNotificationLocally(
+    const FText& Message,
+    EBHNotificationPriority NotificationPriority,
+    EBHNotificationAudioCue AudioCue
+)
+{
     APlayerController* PlayerController =
         ResolveOwningPlayerController();
 
     if (!IsValid(PlayerController) ||
-        !PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() == nullptr)
     {
         return;
     }
@@ -8553,7 +13304,14 @@ void ABHCharacter::DisplayStatusNotificationLocally(
 
     if (ObjectiveNotificationWidget)
     {
-        ObjectiveNotificationWidget->ShowNotification(Message);
+        ObjectiveNotificationWidget->SetCombatIntensityActive(
+            IsLocalCombatIntensityActive()
+        );
+        ObjectiveNotificationWidget->ShowNotificationWithAudioCue(
+            Message,
+            NotificationPriority,
+            AudioCue
+        );
     }
 }
 
@@ -8561,7 +13319,87 @@ void ABHCharacter::ClientShowStatusNotification_Implementation(
     const FText& Message
 )
 {
-    DisplayStatusNotificationLocally(Message);
+    DisplayStatusNotificationLocally(
+        Message,
+        EBHNotificationPriority::Normal
+    );
+}
+
+void ABHCharacter::DisplayDeferredStrategicStatusNotificationLocally(
+    const FText& Message
+)
+{
+    APlayerController* PlayerController = ResolveOwningPlayerController();
+    if (!IsValid(PlayerController) ||
+        PlayerController->GetLocalPlayer() == nullptr)
+    {
+        return;
+    }
+
+    if (!ObjectiveNotificationWidget && ObjectiveNotificationWidgetClass)
+    {
+        ObjectiveNotificationWidget =
+            CreateWidget<UBHObjectiveNotificationWidget>(
+                PlayerController,
+                ObjectiveNotificationWidgetClass
+            );
+        if (ObjectiveNotificationWidget)
+        {
+            ObjectiveNotificationWidget->AddToViewport();
+        }
+    }
+
+    if (ObjectiveNotificationWidget)
+    {
+        ObjectiveNotificationWidget->SetCombatIntensityActive(
+            IsLocalCombatIntensityActive()
+        );
+        ObjectiveNotificationWidget->ShowDeferredStrategicNotification(
+            Message
+        );
+    }
+}
+
+bool ABHCharacter::IsLocalCombatIntensityActive() const
+{
+    const UWorld* World = GetWorld();
+    const bool bRecentlyDamaged = IsValid(World) &&
+        LastPlayerDamageTimeSeconds > -BIG_NUMBER &&
+        World->GetTimeSeconds() - LastPlayerDamageTimeSeconds <
+            FMath::Max(0.0f, StrategicNotificationCombatQuietSeconds);
+    return bRecentlyDamaged ||
+        LocalPlayerSuppressionPresentation > 0.05f;
+}
+
+void ABHCharacter::ClientShowPriorityStatusNotification_Implementation(
+    const FText& Message,
+    EBHNotificationPriority NotificationPriority
+)
+{
+    DisplayStatusNotificationLocally(
+        Message,
+        NotificationPriority
+    );
+}
+
+void ABHCharacter::ClientShowStatusNotificationWithAudioCue_Implementation(
+    const FText& Message,
+    EBHNotificationPriority NotificationPriority,
+    EBHNotificationAudioCue AudioCue
+)
+{
+    DisplayStatusNotificationLocally(
+        Message,
+        NotificationPriority,
+        AudioCue
+    );
+}
+
+void ABHCharacter::ClientShowDeferredStrategicStatusNotification_Implementation(
+    const FText& Message
+)
+{
+    DisplayDeferredStrategicStatusNotificationLocally(Message);
 }
 
 void ABHCharacter::ClientPresentDeath_Implementation(
@@ -8569,6 +13407,7 @@ void ABHCharacter::ClientPresentDeath_Implementation(
 )
 {
     bIsHandlingDeath = true;
+    LocalPlayerSuppressionPresentation = 0.0f;
 
     if (bWarMapOpen)
     {
@@ -8593,7 +13432,7 @@ void ABHCharacter::ClientPresentDeath_Implementation(
         ResolveOwningPlayerController();
 
     if (!IsValid(PlayerController) ||
-        !PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() == nullptr)
     {
         return;
     }
@@ -8677,7 +13516,7 @@ void ABHCharacter::ClientCompleteFieldRespawn_Implementation()
         ResolveOwningPlayerController();
 
     if (IsValid(PlayerController) &&
-        PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() != nullptr)
     {
         EnableInput(PlayerController);
         PlayerController->SetIgnoreMoveInput(false);
@@ -8708,7 +13547,16 @@ void ABHCharacter::ClientConfirmOperationDeployment_Implementation(
     {
         FBHObjectiveDefinition OperationObjective;
         OperationObjective.ObjectiveID =
-            BHObjectiveIds::EliminateGuard;
+            OperationType == EBHWarPriorityType::Resupply
+                ? BHObjectiveIds::DeliverResupply
+                : OperationType ==
+                        EBHWarPriorityType::EscortRescue
+                    ? BHObjectiveIds::ProtectConvoy
+                : OperationType == EBHWarPriorityType::Rescue
+                    ? BHObjectiveIds::EvacuateCasualty
+                : OperationType == EBHWarPriorityType::Recon
+                    ? BHObjectiveIds::ObserveSector
+                : BHObjectiveIds::EliminateGuard;
         ObjectiveComponent->StartRuntimeMission(
             {OperationObjective}
         );
@@ -8716,6 +13564,13 @@ void ABHCharacter::ClientConfirmOperationDeployment_Implementation(
 
     ConfigureStrategicMissionPresentation();
     RefreshObjectiveWidget();
+
+    if (IsValid(ObjectiveComponent))
+    {
+        QueueObjectiveActivationRadio(
+            ObjectiveComponent->GetCurrentObjectiveID()
+        );
+    }
     UpdateOperationWaypointHUD();
 
     if (IsValid(ObjectiveWidget))
@@ -8840,7 +13695,11 @@ void ABHCharacter::ConfigureStrategicMissionPresentation()
         BHObjectiveIds::UnlockSecurityDoor,
         BHObjectiveIds::ExploreBeyondSecurityDoor,
         BHObjectiveIds::EliminateGuard,
-        BHObjectiveIds::ReachExtraction
+        BHObjectiveIds::ReachExtraction,
+        BHObjectiveIds::DeliverResupply,
+        BHObjectiveIds::ProtectConvoy,
+        BHObjectiveIds::EvacuateCasualty,
+        BHObjectiveIds::ObserveSector
     };
 
     for (const FName ObjectiveID : ObjectiveIDs)
@@ -8861,7 +13720,7 @@ void ABHCharacter::ConfigureStrategicMissionPresentation()
         }
     }
 
-    ShowStatusNotification(
+    ShowPriorityStatusNotification(
         FText::Format(
             NSLOCTEXT(
                 "BrokenHorizon",
@@ -8876,7 +13735,8 @@ void ABHCharacter::ConfigureStrategicMissionPresentation()
                 AssignedWarSectorID,
                 AssignedWarPriorityType
             )
-        )
+        ),
+        EBHNotificationPriority::High
     );
 }
 
@@ -8889,6 +13749,21 @@ bool ABHCharacter::StartOpenWorldOperationDirector(
         AssignedWarPriorityType == EBHWarPriorityType::None)
     {
         return false;
+    }
+
+    if (AssignedWarPriorityType == EBHWarPriorityType::Resupply ||
+        AssignedWarPriorityType ==
+            EBHWarPriorityType::EscortRescue ||
+        AssignedWarPriorityType == EBHWarPriorityType::Rescue ||
+        AssignedWarPriorityType == EBHWarPriorityType::Recon)
+    {
+        if (IsValid(OpenWorldOperationDirector))
+        {
+            OpenWorldOperationDirector->Destroy();
+            OpenWorldOperationDirector = nullptr;
+        }
+
+        return true;
     }
 
     if (IsValid(OpenWorldOperationDirector))
@@ -8972,6 +13847,8 @@ void ABHCharacter::OnMissionCompleted()
                 : WarSubsystem->GetPriorityType();
         const FBHWarSectorState ResolvedSector =
             WarSubsystem->GetSectorState(ResolvedSectorID);
+        const FName ResolvedOperationID =
+            WarSubsystem->GetCommittedOperationID();
         bool bWarResultApplied = false;
         EBHRaidOperationalSignature RaidSignature =
             EBHRaidOperationalSignature::Contested;
@@ -9033,7 +13910,15 @@ void ABHCharacter::OnMissionCompleted()
             );
         }
         const float RecoveredMateriel =
-            bWarResultApplied
+            bWarResultApplied &&
+                ResolvedMissionType !=
+                    EBHWarPriorityType::Resupply &&
+                ResolvedMissionType !=
+                    EBHWarPriorityType::EscortRescue &&
+                ResolvedMissionType !=
+                    EBHWarPriorityType::Rescue &&
+                ResolvedMissionType !=
+                    EBHWarPriorityType::Recon
                 ? WarSubsystem->RecoverBattlefieldMateriel(
                     ResolvedSectorID,
                     EnemyLosses,
@@ -9043,6 +13928,24 @@ void ABHCharacter::OnMissionCompleted()
                 : 0.0f;
         const FBHWarSectorState UpdatedSector =
             WarSubsystem->GetSectorState(ResolvedSectorID);
+        const FBHOperationAfterActionRecord AfterAction =
+            UBHWarSubsystem::BuildAfterActionRecord(
+                ResolvedOperationID,
+                ResolvedSectorID,
+                ResolvedMissionType,
+                true,
+                FriendlySupportLosses,
+                EnemyLosses,
+                EnemyRouted,
+                UpdatedSector.Supply - ResolvedSector.Supply,
+                RecoveredMateriel,
+                WarSubsystem->GetActiveTacticalOption(),
+                WarSubsystem->GetActiveTacticalOptionSupplyCost()
+            );
+        if (bHasDeploymentAssignment && bWarResultApplied)
+        {
+            WarSubsystem->RecordOperationAfterAction(AfterAction);
+        }
         const FBHWarSectorState StagingSector =
             WarSubsystem->GetSectorState(
                 AssignedWarSupplySourceSectorID
@@ -9066,6 +13969,34 @@ void ABHCharacter::OnMissionCompleted()
                         "BrokenHorizon",
                         "WarRaidSuccess",
                         "RAID"
+                    )
+                    : ResolvedMissionType ==
+                            EBHWarPriorityType::Resupply
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WarResupplySuccess",
+                        "RESUPPLY"
+                    )
+                    : ResolvedMissionType ==
+                            EBHWarPriorityType::EscortRescue
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WarEscortSuccess",
+                        "ESCORT"
+                    )
+                    : ResolvedMissionType ==
+                            EBHWarPriorityType::Rescue
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WarRescueSuccess",
+                        "RESCUE"
+                    )
+                    : ResolvedMissionType ==
+                            EBHWarPriorityType::Recon
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WarReconSuccess",
+                        "RECON"
                     )
                     : NSLOCTEXT(
                         "BrokenHorizon",
@@ -9148,6 +14079,34 @@ void ABHCharacter::OnMissionCompleted()
                             "LOGISTICS DISRUPTED // {0} SIGNATURE"
                         ),
                         RaidSignatureLabel
+                    )
+                    : ResolvedMissionType ==
+                            EBHWarPriorityType::Resupply
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WarSupplyLineRestoredDebrief",
+                        "SUPPLY LINE RESTORED"
+                    )
+                    : ResolvedMissionType ==
+                            EBHWarPriorityType::EscortRescue
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WarConvoySecuredDebrief",
+                        "PROTECTED CONVOY SECURED"
+                    )
+                    : ResolvedMissionType ==
+                            EBHWarPriorityType::Rescue
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WarCasualtyEvacuatedDebrief",
+                        "CASUALTY EVACUATED"
+                    )
+                    : ResolvedMissionType ==
+                            EBHWarPriorityType::Recon
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WarReconConfirmedDebrief",
+                        "INTELLIGENCE CONFIRMED"
                     )
                     : ResolvedSector.Owner !=
                             EBHWarFaction::Friendly &&
@@ -9290,6 +14249,58 @@ void ABHCharacter::OnMissionCompleted()
                     )
                 )
             );
+            const TCHAR* AfterActionGrade =
+                AfterAction.Grade == EBHAfterActionGrade::Exceptional
+                    ? TEXT("EXCEPTIONAL")
+                    : AfterAction.Grade == EBHAfterActionGrade::Strong
+                        ? TEXT("STRONG")
+                        : AfterAction.Grade == EBHAfterActionGrade::Effective
+                            ? TEXT("EFFECTIVE")
+                            : TEXT("DIMINISHED");
+            DebriefArguments.Add(
+                TEXT("AfterActionGrade"),
+                FText::FromString(AfterActionGrade)
+            );
+            DebriefArguments.Add(
+                TEXT("AfterActionScore"),
+                FText::AsNumber(AfterAction.TotalScore)
+            );
+            DebriefArguments.Add(
+                TEXT("CampaignMerit"),
+                FText::AsNumber(
+                    WarSubsystem->GetCampaignProgression()
+                        .CampaignMerit
+                )
+            );
+            const TCHAR* TacticalPlanName =
+                AfterAction.TacticalOption ==
+                        EBHOperationTacticalOption::ReconPlanning
+                    ? TEXT("RECON")
+                    : AfterAction.TacticalOption ==
+                            EBHOperationTacticalOption::ReinforcementPriority
+                        ? TEXT("REINFORCEMENT")
+                        : AfterAction.TacticalOption ==
+                                EBHOperationTacticalOption::MedicalPreparation
+                            ? TEXT("MEDICAL")
+                            : TEXT("STANDARD");
+            DebriefArguments.Add(
+                TEXT("TacticalPlan"),
+                FText::FromString(TacticalPlanName)
+            );
+            DebriefArguments.Add(
+                TEXT("TacticalCost"),
+                FText::AsNumber(
+                    FMath::RoundToInt(
+                        AfterAction.TacticalSupplyCost
+                    )
+                )
+            );
+            DebriefArguments.Add(
+                TEXT("TacticalScore"),
+                FText::AsNumber(
+                    AfterAction.TacticalExecutionScore
+                )
+            );
 
             MissionCompleteMessage = FText::Format(
                 NSLOCTEXT(
@@ -9311,6 +14322,10 @@ void ABHCharacter::OnMissionCompleted()
                     "ROUTED {HostileRouted}\n"
                     "BATTLEFIELD RECOVERY "
                     "+{RecoveredMateriel} SUPPLY\n"
+                    "AFTER ACTION // {AfterActionGrade} // "
+                    "SCORE +{AfterActionScore} // MERIT {CampaignMerit}\n"
+                    "TACTICAL PLAN // {TacticalPlan} // "
+                    "COST {TacticalCost} // EFFECT +{TacticalScore}\n"
                     "WAR TURN {WarTurn} // "
                     "FRIENDLY CONTROL {FriendlyControl}%"
                 ),
@@ -9403,7 +14418,7 @@ void ABHCharacter::EnterMissionCompleteState(
     }
 
     if (IsValid(PlayerController) &&
-        PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() != nullptr)
     {
         TSubclassOf<UBHMissionCompleteWidget> DebriefWidgetClass =
             MissionCompleteWidgetClass;
@@ -9700,14 +14715,237 @@ void ABHCharacter::EnterPostOperationFreeRoam(
     }
 }
 
+void ABHCharacter::OnRep_PlayerCasualtyState()
+{
+    if (IsLocallyControlled())
+    {
+        ClientSetPlayerCasualtyPresentation_Implementation(
+            bPlayerIncapacitated,
+            bPlayerCasualtyStabilized,
+            GetPlayerBleedOutSecondsRemaining()
+        );
+    }
+}
+
+void ABHCharacter::EnterPlayerIncapacitation(AActor* DamageCauser)
+{
+    if (!HasAuthority() || bPlayerIncapacitated)
+    {
+        return;
+    }
+    bPlayerIncapacitated = true;
+    bPlayerCasualtyStabilized = false;
+    bHasEnteredPlayerCasualtyThisLife = true;
+    bIsHandlingDeath = true;
+    PlayerBleedOutDeadline = GetWorld()->GetTimeSeconds() +
+        FMath::Max(5.0f, PlayerBleedOutDuration);
+    if (IsValid(HealthComponent))
+    {
+        HealthComponent->ReviveAtHealth(1.0f);
+    }
+    if (IsValid(InjuryComponent))
+    {
+        InjuryComponent->CancelMedkitTreatment();
+    }
+    if (IsValid(WeaponComponent))
+    {
+        WeaponComponent->StopAllActions();
+    }
+    GetCharacterMovement()->DisableMovement();
+    GetWorldTimerManager().SetTimer(
+        PlayerBleedOutTimerHandle,
+        this,
+        &ABHCharacter::HandlePlayerBleedOutExpired,
+        FMath::Max(5.0f, PlayerBleedOutDuration),
+        false
+    );
+    ClientSetPlayerCasualtyPresentation(
+        true,
+        false,
+        FMath::Max(5.0f, PlayerBleedOutDuration)
+    );
+    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+    {
+        ABHCharacter* Teammate = *It;
+        if (IsValid(Teammate) && Teammate != this &&
+            Teammate->IsPlayerControlled())
+        {
+            Teammate->ShowPriorityStatusNotification(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "PlayerCasualtyTeamAlert",
+                    "TEAMMATE DOWN // 45 SECOND WINDOW\n\n"
+                    "Stabilize with a field dressing, then revive with a medkit."
+                ),
+                EBHNotificationPriority::Critical
+            );
+        }
+    }
+    ForceNetUpdate();
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_PLAYER_CASUALTY state=incapacitated causer=%s deadline=%.1f"),
+        IsValid(DamageCauser) ? *DamageCauser->GetName() : TEXT("None"),
+        PlayerBleedOutDeadline
+    );
+}
+
+void ABHCharacter::HandlePlayerBleedOutExpired()
+{
+    if (!HasAuthority() || !bPlayerIncapacitated ||
+        bPlayerCasualtyStabilized || !IsValid(HealthComponent))
+    {
+        return;
+    }
+    HealthComponent->ApplyDamage(
+        HealthComponent->GetCurrentHealth() + 1.0f,
+        this
+    );
+}
+
+void ABHCharacter::FinalizePlayerCasualtyDeath(AActor* DamageCauser)
+{
+    GetWorldTimerManager().ClearTimer(PlayerBleedOutTimerHandle);
+    bPlayerIncapacitated = false;
+    bPlayerCasualtyStabilized = false;
+    PlayerBleedOutDeadline = 0.0f;
+    bIsHandlingDeath = false;
+    ClientSetPlayerCasualtyPresentation(false, false, 0.0f);
+    ForceNetUpdate();
+    HandleDeath(DamageCauser);
+}
+
+void ABHCharacter::TryTreatPlayerCasualty(ABHCharacter* Casualty)
+{
+    if (!HasAuthority() || !IsValid(Casualty) || Casualty == this ||
+        !Casualty->IsPlayerIncapacitated() || bPlayerIncapacitated ||
+        !IsValid(InjuryComponent) ||
+        FVector::DistSquared(GetActorLocation(), Casualty->GetActorLocation()) >
+            FMath::Square(InteractionDistance + 100.0f))
+    {
+        return;
+    }
+    if (!Casualty->IsPlayerCasualtyStabilized())
+    {
+        if (!InjuryComponent->ConsumeFieldDressingForSquadAid())
+        {
+            ShowStatusNotification(NSLOCTEXT(
+                "BrokenHorizon", "PlayerCasualtyNoDressing",
+                "CASUALTY AID FAILED // FIELD DRESSING REQUIRED"
+            ));
+            return;
+        }
+        Casualty->bPlayerCasualtyStabilized = true;
+        Casualty->PlayerBleedOutDeadline = 0.0f;
+        Casualty->GetWorldTimerManager().ClearTimer(
+            Casualty->PlayerBleedOutTimerHandle
+        );
+        if (IsValid(Casualty->InjuryComponent))
+        {
+            Casualty->InjuryComponent->ClearBleedingForSquadAid();
+        }
+        Casualty->ClientSetPlayerCasualtyPresentation(true, true, 0.0f);
+        Casualty->ForceNetUpdate();
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon", "PlayerCasualtyStabilizedReviver",
+            "CASUALTY STABILIZED // MEDKIT REQUIRED TO REVIVE"
+        ));
+        UE_LOG(LogTemp, Display, TEXT("BH_PLAYER_CASUALTY state=stabilized"));
+        return;
+    }
+    if (!InjuryComponent->ConsumeMedkitForSquadAid())
+    {
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon", "PlayerCasualtyNoMedkit",
+            "REVIVE FAILED // MEDKIT REQUIRED"
+        ));
+        return;
+    }
+    Casualty->CompletePlayerRevive(this);
+}
+
+void ABHCharacter::CompletePlayerRevive(ABHCharacter* Reviver)
+{
+    if (!HasAuthority() || !bPlayerIncapacitated ||
+        !bPlayerCasualtyStabilized)
+    {
+        return;
+    }
+    bPlayerIncapacitated = false;
+    bPlayerCasualtyStabilized = false;
+    PlayerBleedOutDeadline = 0.0f;
+    bIsHandlingDeath = false;
+    GetWorldTimerManager().ClearTimer(PlayerBleedOutTimerHandle);
+    if (IsValid(HealthComponent))
+    {
+        HealthComponent->ReviveAtHealth(PlayerReviveHealth);
+    }
+    GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+    ApplyMovementSpeed();
+    ClientSetPlayerCasualtyPresentation(false, false, 0.0f);
+    ShowPriorityStatusNotification(NSLOCTEXT(
+        "BrokenHorizon", "PlayerCasualtyRevived",
+        "REVIVED // COMBAT EFFECTIVE\n\nHealth restored to 35. Reassess injuries."
+    ), EBHNotificationPriority::High);
+    ForceNetUpdate();
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_PLAYER_CASUALTY state=revived reviver=%s health=%.1f"),
+        IsValid(Reviver) ? *Reviver->GetName() : TEXT("None"),
+        IsValid(HealthComponent) ? HealthComponent->GetCurrentHealth() : 0.0f
+    );
+}
+
 void ABHCharacter::HandleDeath(AActor* DamageCauser)
 {
+    if (HasAuthority() && bPlayerIncapacitated)
+    {
+        FinalizePlayerCasualtyDeath(DamageCauser);
+        return;
+    }
+
+    bool bHasAvailableTeammate = false;
+    if (HasAuthority() && IsValid(GetWorld()))
+    {
+        for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+        {
+            const ABHCharacter* Teammate = *It;
+            if (IsValid(Teammate) && Teammate != this &&
+                Teammate->IsPlayerControlled() &&
+                !Teammate->IsPlayerIncapacitated() &&
+                IsValid(Teammate->HealthComponent) &&
+                !Teammate->HealthComponent->IsDead())
+            {
+                bHasAvailableTeammate = true;
+                break;
+            }
+        }
+    }
+    const bool bRuntimeProbe = FParse::Param(
+        FCommandLine::Get(), TEXT("BHTestPlayerCasualtyRuntime")
+    );
+    const bool bCooperativeWorld = IsValid(GetWorld()) &&
+        ((GetWorld()->GetNetMode() != NM_Standalone &&
+          bHasAvailableTeammate) || bRuntimeProbe);
+    if (HasAuthority() && CanEnterCooperativeCasualty(
+            bCooperativeWorld,
+            bPlayerIncapacitated,
+            bHasEnteredPlayerCasualtyThisLife))
+    {
+        EnterPlayerIncapacitation(DamageCauser);
+        return;
+    }
+
     if (bIsHandlingDeath || bIsHandlingMissionComplete)
     {
         return;
     }
 
     bIsHandlingDeath = true;
+    AuthoritativePlayerSuppression = 0.0f;
+    LocalPlayerSuppressionPresentation = 0.0f;
 
     if (bWarMapOpen)
     {
@@ -9733,7 +14971,7 @@ void ABHCharacter::HandleDeath(AActor* DamageCauser)
 
     if (HasAuthority() &&
         IsValid(PlayerController) &&
-        !PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() == nullptr)
     {
         ClientPresentDeath(RespawnDelay);
     }
@@ -9769,7 +15007,7 @@ void ABHCharacter::HandleDeath(AActor* DamageCauser)
     if (!IsValid(DeathWidget) &&
         DeathWidgetClass &&
         IsValid(PlayerController) &&
-        PlayerController->IsLocalController())
+        PlayerController->GetLocalPlayer() != nullptr)
     {
         DeathWidget = CreateWidget<UBHDeathWidget>(
             PlayerController,
@@ -9828,6 +15066,20 @@ void ABHCharacter::HandlePlayerDamaged(
     if (!IsValid(HealthComponent))
     {
         return;
+    }
+
+    const bool bReloadInterrupted = IsValid(WeaponComponent) &&
+        WeaponComponent->InterruptReload(FName(TEXT("damage")));
+    if (bReloadInterrupted && IsLocallyControlled())
+    {
+        ShowStatusNotification(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "ReloadInterruptedByDamage",
+                "RELOAD INTERRUPTED // INCOMING FIRE\n\n"
+                "Break contact before clearing the weapon."
+            )
+        );
     }
 
     FVector DamageSourceDirection = FVector::ZeroVector;
@@ -9962,28 +15214,188 @@ void ABHCharacter::ShowHitConfirmation(
     bool bHeadshot
 )
 {
+    ShowDetailedHitConfirmation(
+        bLethalHit,
+        bHeadshot,
+        false
+    );
+}
+
+void ABHCharacter::ClientSetPlayerCasualtyPresentation_Implementation(
+    bool bIncapacitated,
+    bool bStabilized,
+    float BleedOutSeconds
+)
+{
+    bPlayerIncapacitated = bIncapacitated;
+    bPlayerCasualtyStabilized = bStabilized;
+    bIsHandlingDeath = bIncapacitated;
+    APlayerController* PlayerController = ResolveOwningPlayerController();
+    if (bIncapacitated)
+    {
+        if (IsValid(WeaponComponent))
+        {
+            WeaponComponent->StopAllActions();
+        }
+        GetCharacterMovement()->DisableMovement();
+        if (IsValid(PlayerController))
+        {
+            DisableInput(PlayerController);
+            PlayerController->SetIgnoreMoveInput(true);
+            PlayerController->SetIgnoreLookInput(false);
+        }
+        DisplayStatusNotificationLocally(
+            bStabilized
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "PlayerCasualtyStabilizedLocal",
+                    "STABILIZED // AWAITING REVIVE\n\n"
+                    "A teammate must use one medkit."
+                )
+                : FText::Format(
+                    NSLOCTEXT(
+                        "BrokenHorizon",
+                        "PlayerCasualtyDownLocal",
+                        "INCAPACITATED // {0}s TO BLEED OUT\n\n"
+                        "A teammate must stabilize you."
+                    ),
+                    FText::AsNumber(FMath::CeilToInt(BleedOutSeconds))
+                ),
+            EBHNotificationPriority::Critical
+        );
+        return;
+    }
+
+    if (IsValid(DeathWidget))
+    {
+        DeathWidget->SetVisibility(ESlateVisibility::Collapsed);
+    }
+    GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+    ApplyMovementSpeed();
+    if (IsValid(PlayerController))
+    {
+        EnableInput(PlayerController);
+        PlayerController->SetIgnoreMoveInput(false);
+        PlayerController->SetIgnoreLookInput(false);
+    }
+    if (IsValid(AmmoHUDWidget))
+    {
+        AmmoHUDWidget->SetVisibility(ESlateVisibility::Visible);
+    }
+    if (IsValid(CombatStatusWidget))
+    {
+        CombatStatusWidget->SetVisibility(ESlateVisibility::Visible);
+    }
+}
+
+void ABHCharacter::HandleWeaponRoleChanged(
+    EBHWeaponRole NewRole
+)
+{
+    if (IsValid(AmmoHUDWidget))
+    {
+        AmmoHUDWidget->SetWeaponRole(
+            UBHWeaponComponent::BuildWeaponRoleProfile(NewRole)
+                .DisplayName
+        );
+        if (IsValid(WeaponComponent))
+        {
+            AmmoHUDWidget->SetFireMode(
+                WeaponComponent->GetFireMode() ==
+                    EBHFireMode::Automatic
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WeaponFireModeAutomaticShort",
+                        "AUTO"
+                    )
+                    : NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WeaponFireModeSemiAutomaticShort",
+                        "SEMI"
+                    )
+            );
+        }
+    }
+}
+
+void ABHCharacter::RefreshWeaponFireModeHUD(
+    EBHFireMode NewFireMode
+)
+{
+    if (!IsValid(AmmoHUDWidget))
+    {
+        return;
+    }
+
+    AmmoHUDWidget->SetFireMode(
+        NewFireMode == EBHFireMode::Automatic
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WeaponFireModeAutomaticShort",
+                "AUTO"
+            )
+            : NSLOCTEXT(
+                "BrokenHorizon",
+                "WeaponFireModeSemiAutomaticShort",
+                "SEMI"
+            )
+    );
+}
+
+void ABHCharacter::HandleWeaponHeatChanged(
+    float HeatNormalized,
+    bool bOverheated
+)
+{
+    if (IsValid(AmmoHUDWidget))
+    {
+        AmmoHUDWidget->SetWeaponHeat(HeatNormalized, bOverheated);
+    }
+}
+
+void ABHCharacter::ShowDetailedHitConfirmation(
+    bool bLethalHit,
+    bool bHeadshot,
+    bool bArmorHit
+)
+{
     if (HasAuthority() && !IsLocallyControlled())
     {
         if (GetNetOwningPlayer())
         {
-            ClientShowHitConfirmation(
+            ClientShowDetailedHitConfirmation(
                 bLethalHit,
-                bHeadshot
+                bHeadshot,
+                bArmorHit
             );
         }
 
         return;
     }
 
-    DisplayHitConfirmationLocally(
+    DisplayDetailedHitConfirmationLocally(
         bLethalHit,
-        bHeadshot
+        bHeadshot,
+        bArmorHit
     );
 }
 
 void ABHCharacter::DisplayHitConfirmationLocally(
     bool bLethalHit,
     bool bHeadshot
+)
+{
+    DisplayDetailedHitConfirmationLocally(
+        bLethalHit,
+        bHeadshot,
+        false
+    );
+}
+
+void ABHCharacter::DisplayDetailedHitConfirmationLocally(
+    bool bLethalHit,
+    bool bHeadshot,
+    bool bArmorHit
 )
 {
     if (!IsLocallyControlled())
@@ -9995,11 +15407,25 @@ void ABHCharacter::DisplayHitConfirmationLocally(
         !bIsHandlingDeath &&
         !bIsHandlingMissionComplete)
     {
-        HitMarkerWidget->ShowHitMarker(
+        HitMarkerWidget->ShowDetailedHitMarker(
             bLethalHit,
-            bHeadshot
+            bHeadshot,
+            bArmorHit
         );
     }
+}
+
+void ABHCharacter::ClientShowDetailedHitConfirmation_Implementation(
+    bool bLethalHit,
+    bool bHeadshot,
+    bool bArmorHit
+)
+{
+    DisplayDetailedHitConfirmationLocally(
+        bLethalHit,
+        bHeadshot,
+        bArmorHit
+    );
 }
 
 void ABHCharacter::ClientShowHitConfirmation_Implementation(
@@ -10018,6 +15444,16 @@ void ABHCharacter::NotifyIncomingRound(
     float Intensity
 )
 {
+    if (HasAuthority())
+    {
+        AuthoritativePlayerSuppression =
+            AccumulatePlayerSuppression(
+                AuthoritativePlayerSuppression,
+                Intensity,
+                PlayerSuppressionAccumulationScale
+            );
+    }
+
     if (HasAuthority() && !IsLocallyControlled())
     {
         ClientNotifyIncomingRound(
@@ -10043,15 +15479,51 @@ void ABHCharacter::DisplayIncomingRoundLocally(
         return;
     }
 
+    LocalPlayerSuppressionPresentation =
+        AccumulatePlayerSuppression(
+            LocalPlayerSuppressionPresentation,
+            Intensity,
+            PlayerSuppressionAccumulationScale
+        );
+
+    if (IsValid(NearMissSound) && IsValid(GetWorld()) &&
+        GetWorld()->GetTimeSeconds() - LastNearMissSoundTimeSeconds >=
+            FMath::Max(0.0f, MinimumNearMissSoundInterval))
+    {
+        const FVector CueLocation = GetActorLocation() +
+            SourceDirection.GetSafeNormal() * 120.0f +
+            FVector(0.0f, 0.0f, 60.0f);
+        UGameplayStatics::PlaySoundAtLocation(
+            this,
+            NearMissSound,
+            CueLocation,
+            FMath::Lerp(0.45f, 1.0f, FMath::Clamp(Intensity, 0.0f, 1.0f)),
+            CalculateNearMissPitch(Intensity)
+        );
+        LastNearMissSoundTimeSeconds = GetWorld()->GetTimeSeconds();
+    }
+
     if (IsValid(CombatStatusWidget) &&
         !bIsHandlingDeath &&
         !bIsHandlingMissionComplete)
     {
+        CombatStatusWidget->SetSuppression(
+            LocalPlayerSuppressionPresentation
+        );
         CombatStatusWidget->NotifyNearMiss(
             SourceDirection,
             Intensity
         );
     }
+}
+
+float ABHCharacter::CalculateNearMissPitch(float Intensity)
+{
+    return FMath::Lerp(
+        0.92f,
+        1.08f,
+        FMath::Clamp(Intensity, 0.0f, 1.0f)
+    );
 }
 
 void ABHCharacter::ClientNotifyIncomingRound_Implementation(
@@ -10103,6 +15575,20 @@ void ABHCharacter::ClientNotifyCombatDamage_Implementation(
     AActor* DamageCauser
 )
 {
+    if (IsValid(WeaponComponent) &&
+        WeaponComponent->InterruptReload(FName(TEXT("damage"))))
+    {
+        DisplayStatusNotificationLocally(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "ReloadInterruptedByDamage",
+                "RELOAD INTERRUPTED // INCOMING FIRE\n\n"
+                "Break contact before clearing the weapon."
+            ),
+            EBHNotificationPriority::High
+        );
+    }
+
     DisplayCombatDamageLocally(
         DamageApplied,
         HealthPercentage,
@@ -10137,6 +15623,12 @@ void ABHCharacter::NotifyGrenadeThreat(
 
 void ABHCharacter::RespawnAfterDeath()
 {
+    GetWorldTimerManager().ClearTimer(PlayerBleedOutTimerHandle);
+    bPlayerIncapacitated = false;
+    bPlayerCasualtyStabilized = false;
+    bHasEnteredPlayerCasualtyThisLife = false;
+    PlayerBleedOutDeadline = 0.0f;
+
     if (IsValid(InjuryComponent))
     {
         InjuryComponent->ResetInjuries();

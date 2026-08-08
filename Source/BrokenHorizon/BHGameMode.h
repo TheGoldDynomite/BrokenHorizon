@@ -7,11 +7,19 @@
 #include "BHGameMode.generated.h"
 
 /**
- * 
+ *
  */
 UCLASS()
 class BROKENHORIZON_API ABHGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
-	
+
+public:
+	ABHGameMode();
+
+	virtual void InitGameState() override;
+	virtual void HandleStartingNewPlayer_Implementation(
+		APlayerController* NewPlayer
+	) override;
+	virtual void PostSeamlessTravel() override;
 };

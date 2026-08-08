@@ -1,0 +1,4117 @@
+﻿# Game English translation.
+# Fill out your copyright notice in the Description page of Project Settings.
+# 
+msgid ""
+msgstr ""
+"Project-Id-Version: Game\n"
+"POT-Creation-Date: 2026-08-02 14:59\n"
+"PO-Revision-Date: 2026-08-02 14:59\n"
+"Language-Team: \n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. Key:	ED976AFE42F6C6D98F1779BB2E6569E5
+#. SourceLocation:	/Game/BrokenHorizon/UI/MBP_InteractionPrompt.MBP_InteractionPrompt_C:WidgetTree.InteractionText.Text
+#: /Game/BrokenHorizon/UI/MBP_InteractionPrompt.MBP_InteractionPrompt_C:WidgetTree.InteractionText.Text
+msgctxt ",ED976AFE42F6C6D98F1779BB2E6569E5"
+msgid "Press F to Interact"
+msgstr "Press F to Interact"
+
+#. Key:	TextBlockDefaultValue
+#. SourceLocation:	/Game/BrokenHorizon/UI/WBP_Objective.WBP_Objective_C:WidgetTree.ObjectiveText.Text
+#: /Game/BrokenHorizon/UI/WBP_Objective.WBP_Objective_C:WidgetTree.ObjectiveText.Text
+msgctxt "UMG,TextBlockDefaultValue"
+msgid "Text Block"
+msgstr "Text Block"
+
+#. Key:	3B81090A4417DDD042170EB14791B6B7
+#. SourceLocation:	/Game/BrokenHorizon/UI/WBP_ObjectiveNotification.WBP_ObjectiveNotification_C:WidgetTree.NotificationText.Text
+#: /Game/BrokenHorizon/UI/WBP_ObjectiveNotification.WBP_ObjectiveNotification_C:WidgetTree.NotificationText.Text
+msgctxt ",3B81090A4417DDD042170EB14791B6B7"
+msgid "OBJECTIVE COMPLETE"
+msgstr "OBJECTIVE COMPLETE"
+
+#. Key:	WarDefenseFailure
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10369)
+#: Source/BrokenHorizon/BHCharacter.cpp(10369)
+msgctxt "BrokenHorizon,WarDefenseFailure"
+msgid "DEFENSE"
+msgstr "DEFENSE"
+
+#. Key:	WarRaidFailure
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10375)
+#: Source/BrokenHorizon/BHCharacter.cpp(10375)
+msgctxt "BrokenHorizon,WarRaidFailure"
+msgid "RAID"
+msgstr "RAID"
+
+#. Key:	WarResupplyFailure
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10382)
+#: Source/BrokenHorizon/BHCharacter.cpp(10382)
+msgctxt "BrokenHorizon,WarResupplyFailure"
+msgid "RESUPPLY"
+msgstr "RESUPPLY"
+
+#. Key:	WarEscortFailure
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10389)
+#: Source/BrokenHorizon/BHCharacter.cpp(10389)
+msgctxt "BrokenHorizon,WarEscortFailure"
+msgid "ESCORT"
+msgstr "ESCORT"
+
+#. Key:	WarRescueFailure
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10396)
+#: Source/BrokenHorizon/BHCharacter.cpp(10396)
+msgctxt "BrokenHorizon,WarRescueFailure"
+msgid "RESCUE"
+msgstr "RESCUE"
+
+#. Key:	SectorSupplyStarved
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(104)
+#: Source/BrokenHorizon/BHCharacter.cpp(104)
+msgctxt "BrokenHorizon,SectorSupplyStarved"
+msgid "STARVED"
+msgstr "STARVED"
+
+#. Key:	WarReconFailure
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10403)
+#: Source/BrokenHorizon/BHCharacter.cpp(10403)
+msgctxt "BrokenHorizon,WarReconFailure"
+msgid "RECON"
+msgstr "RECON"
+
+#. Key:	WarAttackFailure
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10408)
+#: Source/BrokenHorizon/BHCharacter.cpp(10408)
+msgctxt "BrokenHorizon,WarAttackFailure"
+msgid "ATTACK"
+msgstr "ATTACK"
+
+#. Key:	FailedCleanRaidSignatureDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10415)
+#: Source/BrokenHorizon/BHCharacter.cpp(10415)
+msgctxt "BrokenHorizon,FailedCleanRaidSignatureDebrief"
+msgid "CLEAN"
+msgstr "CLEAN"
+
+#. Key:	FailedLoudRaidSignatureDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10422)
+#: Source/BrokenHorizon/BHCharacter.cpp(10422)
+msgctxt "BrokenHorizon,FailedLoudRaidSignatureDebrief"
+msgid "LOUD"
+msgstr "LOUD"
+
+#. Key:	FailedContestedRaidSignatureDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10427)
+#: Source/BrokenHorizon/BHCharacter.cpp(10427)
+msgctxt "BrokenHorizon,FailedContestedRaidSignatureDebrief"
+msgid "CONTESTED"
+msgstr "CONTESTED"
+
+#. Key:	WarSectorLostDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10434)
+#: Source/BrokenHorizon/BHCharacter.cpp(10434)
+msgctxt "BrokenHorizon,WarSectorLostDebrief"
+msgid "SECTOR LOST"
+msgstr "SECTOR LOST"
+
+#. Key:	WarRaidRepelledDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10441)
+#: Source/BrokenHorizon/BHCharacter.cpp(10441)
+msgctxt "BrokenHorizon,WarRaidRepelledDebrief"
+msgid "RAID REPULSED // {0} SIGNATURE"
+msgstr "RAID REPULSED // {0} SIGNATURE"
+
+#. Key:	WarResupplyFailedDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10450)
+#: Source/BrokenHorizon/BHCharacter.cpp(10450)
+msgctxt "BrokenHorizon,WarResupplyFailedDebrief"
+msgid "SUPPLY LINE NOT RESTORED"
+msgstr "SUPPLY LINE NOT RESTORED"
+
+#. Key:	WarEscortFailedDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10457)
+#: Source/BrokenHorizon/BHCharacter.cpp(10457)
+msgctxt "BrokenHorizon,WarEscortFailedDebrief"
+msgid "PROTECTED CONVOY LOST"
+msgstr "PROTECTED CONVOY LOST"
+
+#. Key:	WarRescueFailedDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10464)
+#: Source/BrokenHorizon/BHCharacter.cpp(10464)
+msgctxt "BrokenHorizon,WarRescueFailedDebrief"
+msgid "CASUALTY NOT EVACUATED"
+msgstr "CASUALTY NOT EVACUATED"
+
+#. Key:	WarReconFailedDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10471)
+#: Source/BrokenHorizon/BHCharacter.cpp(10471)
+msgctxt "BrokenHorizon,WarReconFailedDebrief"
+msgid "INTELLIGENCE UNCONFIRMED"
+msgstr "INTELLIGENCE UNCONFIRMED"
+
+#. Key:	WarAssaultRepelledDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10476)
+#: Source/BrokenHorizon/BHCharacter.cpp(10476)
+msgctxt "BrokenHorizon,WarAssaultRepelledDebrief"
+msgid "ASSAULT REPELLED"
+msgstr "ASSAULT REPELLED"
+
+#. Key:	WarOperationFailureDefaultReason
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10483)
+#: Source/BrokenHorizon/BHCharacter.cpp(10483)
+msgctxt "BrokenHorizon,WarOperationFailureDefaultReason"
+msgid "Friendly forces could not hold the objective."
+msgstr "Friendly forces could not hold the objective."
+
+#. Key:	WarMissionFailedMessage
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(10579)
+#: Source/BrokenHorizon/BHCharacter.cpp(10579)
+msgctxt "BrokenHorizon,WarMissionFailedMessage"
+msgid "MISSION FAILED\n\n{OperationType} FAILED // {SectorName} // {Outcome}\n{Reason}\nSECTOR FORCE // FRIENDLY {FriendlyStrength} // ENEMY {EnemyStrength} // SUPPLY {SectorSupply}%\n{EnemyResponse}\nSUPPORT LOSSES {SupportLosses} // HOSTILE LOSSES {HostileLosses} // ROUTED {HostileRouted}\nAFTER ACTION // {AfterActionGrade} // SCORE +{AfterActionScore} // MERIT {CampaignMerit}\nTACTICAL PLAN // {TacticalPlan} // COST {TacticalCost} // EFFECT +{TacticalScore}\nWAR TURN {WarTurn} // FRIENDLY CONTROL {FriendlyControl}%"
+msgstr "MISSION FAILED\n\n{OperationType} FAILED // {SectorName} // {Outcome}\n{Reason}\nSECTOR FORCE // FRIENDLY {FriendlyStrength} // ENEMY {EnemyStrength} // SUPPLY {SectorSupply}%\n{EnemyResponse}\nSUPPORT LOSSES {SupportLosses} // HOSTILE LOSSES {HostileLosses} // ROUTED {HostileRouted}\nAFTER ACTION // {AfterActionGrade} // SCORE +{AfterActionScore} // MERIT {CampaignMerit}\nTACTICAL PLAN // {TacticalPlan} // COST {TacticalCost} // EFFECT +{TacticalScore}\nWAR TURN {WarTurn} // FRIENDLY CONTROL {FriendlyControl}%"
+
+#. Key:	SectorSupplyCritical
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(110)
+#: Source/BrokenHorizon/BHCharacter.cpp(110)
+msgctxt "BrokenHorizon,SectorSupplyCritical"
+msgid "CRITICAL"
+msgstr "CRITICAL"
+
+#. Key:	RestoredMissionFailureMessage
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(11057)
+#: Source/BrokenHorizon/BHCharacter.cpp(11057)
+msgctxt "BrokenHorizon,RestoredMissionFailureMessage"
+msgid "MISSION FAILED\n\nThe failed operation is recorded in the campaign."
+msgstr "MISSION FAILED\n\nThe failed operation is recorded in the campaign."
+
+#. Key:	RestoredWarOperationFailureMessage
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(11178)
+#: Source/BrokenHorizon/BHCharacter.cpp(11178)
+msgctxt "BrokenHorizon,RestoredWarOperationFailureMessage"
+msgid "MISSION FAILED\n\nThe sector loss is recorded in the persistent war."
+msgstr "MISSION FAILED\n\nThe sector loss is recorded in the persistent war."
+
+#. Key:	ObjectiveCompletedNotification
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(11207)
+#: Source/BrokenHorizon/BHCharacter.cpp(11207)
+msgctxt "BrokenHorizon,ObjectiveCompletedNotification"
+msgid "OBJECTIVE COMPLETE\n\n✓ {0}"
+msgstr "OBJECTIVE COMPLETE\n\n✓ {0}"
+
+#. Key:	SectorSupplyStable
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(116)
+#: Source/BrokenHorizon/BHCharacter.cpp(116)
+msgctxt "BrokenHorizon,SectorSupplyStable"
+msgid "STABLE"
+msgstr "STABLE"
+
+#. Key:	StrategicMissionBriefingNotification
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(11804)
+#: Source/BrokenHorizon/BHCharacter.cpp(11804)
+msgctxt "BrokenHorizon,StrategicMissionBriefingNotification"
+msgid "STRATEGIC BRIEFING\n\n{0}\n\n{1}"
+msgstr "STRATEGIC BRIEFING\n\n{0}\n\n{1}"
+
+#. Key:	WarDefenseSuccess
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12040)
+#: Source/BrokenHorizon/BHCharacter.cpp(12040)
+msgctxt "BrokenHorizon,WarDefenseSuccess"
+msgid "DEFENSE"
+msgstr "DEFENSE"
+
+#. Key:	WarRaidSuccess
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12047)
+#: Source/BrokenHorizon/BHCharacter.cpp(12047)
+msgctxt "BrokenHorizon,WarRaidSuccess"
+msgid "RAID"
+msgstr "RAID"
+
+#. Key:	WarResupplySuccess
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12054)
+#: Source/BrokenHorizon/BHCharacter.cpp(12054)
+msgctxt "BrokenHorizon,WarResupplySuccess"
+msgid "RESUPPLY"
+msgstr "RESUPPLY"
+
+#. Key:	WarEscortSuccess
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12061)
+#: Source/BrokenHorizon/BHCharacter.cpp(12061)
+msgctxt "BrokenHorizon,WarEscortSuccess"
+msgid "ESCORT"
+msgstr "ESCORT"
+
+#. Key:	WarRescueSuccess
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12068)
+#: Source/BrokenHorizon/BHCharacter.cpp(12068)
+msgctxt "BrokenHorizon,WarRescueSuccess"
+msgid "RESCUE"
+msgstr "RESCUE"
+
+#. Key:	WarReconSuccess
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12075)
+#: Source/BrokenHorizon/BHCharacter.cpp(12075)
+msgctxt "BrokenHorizon,WarReconSuccess"
+msgid "RECON"
+msgstr "RECON"
+
+#. Key:	WarAttackSuccess
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12080)
+#: Source/BrokenHorizon/BHCharacter.cpp(12080)
+msgctxt "BrokenHorizon,WarAttackSuccess"
+msgid "ATTACK"
+msgstr "ATTACK"
+
+#. Key:	UnassignedStagingSector
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12087)
+#: Source/BrokenHorizon/BHCharacter.cpp(12087)
+msgctxt "BrokenHorizon,UnassignedStagingSector"
+msgid "UNASSIGNED"
+msgstr "UNASSIGNED"
+
+#. Key:	WarFactionFriendlyDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12105)
+#: Source/BrokenHorizon/BHCharacter.cpp(12105)
+msgctxt "BrokenHorizon,WarFactionFriendlyDebrief"
+msgid "FRIENDLY"
+msgstr "FRIENDLY"
+
+#. Key:	WarFactionEnemyDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12111)
+#: Source/BrokenHorizon/BHCharacter.cpp(12111)
+msgctxt "BrokenHorizon,WarFactionEnemyDebrief"
+msgid "ENEMY"
+msgstr "ENEMY"
+
+#. Key:	WarFactionNeutralDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12117)
+#: Source/BrokenHorizon/BHCharacter.cpp(12117)
+msgctxt "BrokenHorizon,WarFactionNeutralDebrief"
+msgid "NEUTRAL"
+msgstr "NEUTRAL"
+
+#. Key:	CleanRaidSignatureDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12127)
+#: Source/BrokenHorizon/BHCharacter.cpp(12127)
+msgctxt "BrokenHorizon,CleanRaidSignatureDebrief"
+msgid "CLEAN"
+msgstr "CLEAN"
+
+#. Key:	LoudRaidSignatureDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12134)
+#: Source/BrokenHorizon/BHCharacter.cpp(12134)
+msgctxt "BrokenHorizon,LoudRaidSignatureDebrief"
+msgid "LOUD"
+msgstr "LOUD"
+
+#. Key:	ContestedRaidSignatureDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12139)
+#: Source/BrokenHorizon/BHCharacter.cpp(12139)
+msgctxt "BrokenHorizon,ContestedRaidSignatureDebrief"
+msgid "CONTESTED"
+msgstr "CONTESTED"
+
+#. Key:	WarSectorHeldDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12147)
+#: Source/BrokenHorizon/BHCharacter.cpp(12147)
+msgctxt "BrokenHorizon,WarSectorHeldDebrief"
+msgid "SECTOR HELD"
+msgstr "SECTOR HELD"
+
+#. Key:	WarLogisticsDisruptedDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12155)
+#: Source/BrokenHorizon/BHCharacter.cpp(12155)
+msgctxt "BrokenHorizon,WarLogisticsDisruptedDebrief"
+msgid "LOGISTICS DISRUPTED // {0} SIGNATURE"
+msgstr "LOGISTICS DISRUPTED // {0} SIGNATURE"
+
+#. Key:	WarSupplyLineRestoredDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12164)
+#: Source/BrokenHorizon/BHCharacter.cpp(12164)
+msgctxt "BrokenHorizon,WarSupplyLineRestoredDebrief"
+msgid "SUPPLY LINE RESTORED"
+msgstr "SUPPLY LINE RESTORED"
+
+#. Key:	WarConvoySecuredDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12171)
+#: Source/BrokenHorizon/BHCharacter.cpp(12171)
+msgctxt "BrokenHorizon,WarConvoySecuredDebrief"
+msgid "PROTECTED CONVOY SECURED"
+msgstr "PROTECTED CONVOY SECURED"
+
+#. Key:	WarCasualtyEvacuatedDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12178)
+#: Source/BrokenHorizon/BHCharacter.cpp(12178)
+msgctxt "BrokenHorizon,WarCasualtyEvacuatedDebrief"
+msgid "CASUALTY EVACUATED"
+msgstr "CASUALTY EVACUATED"
+
+#. Key:	WarReconConfirmedDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12185)
+#: Source/BrokenHorizon/BHCharacter.cpp(12185)
+msgctxt "BrokenHorizon,WarReconConfirmedDebrief"
+msgid "INTELLIGENCE CONFIRMED"
+msgstr "INTELLIGENCE CONFIRMED"
+
+#. Key:	WarSectorCapturedDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12194)
+#: Source/BrokenHorizon/BHCharacter.cpp(12194)
+msgctxt "BrokenHorizon,WarSectorCapturedDebrief"
+msgid "SECTOR CAPTURED"
+msgstr "SECTOR CAPTURED"
+
+#. Key:	WarSectorSecuredDebrief
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12199)
+#: Source/BrokenHorizon/BHCharacter.cpp(12199)
+msgctxt "BrokenHorizon,WarSectorSecuredDebrief"
+msgid "SECTOR SECURED"
+msgstr "SECTOR SECURED"
+
+#. Key:	SectorSupplyStockpiled
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(122)
+#: Source/BrokenHorizon/BHCharacter.cpp(122)
+msgctxt "BrokenHorizon,SectorSupplyStockpiled"
+msgid "STOCKPILED"
+msgstr "STOCKPILED"
+
+#. Key:	WarMissionCompleteMessage
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12385)
+#: Source/BrokenHorizon/BHCharacter.cpp(12385)
+msgctxt "BrokenHorizon,WarMissionCompleteMessage"
+msgid "MISSION COMPLETE\n\n{OperationType} SUCCESS // {SectorName} // {Outcome}\nCONTROL {PreviousOwner} -> {CurrentOwner}\nOPERATION IMPACT // FRIENDLY {FriendlyDelta} // ENEMY {EnemyDelta} // SUPPLY {SupplyDelta}\nSECTOR FORCE // FRIENDLY {FriendlyStrength} // ENEMY {EnemyStrength} // SUPPLY {SectorSupply}%\n{EnemyResponse}\nSTAGING {StagingSector} // SUPPLY {StagingSupply}% // SUPPORT LOSSES {SupportLosses} // HOSTILE LOSSES {HostileLosses} // ROUTED {HostileRouted}\nBATTLEFIELD RECOVERY +{RecoveredMateriel} SUPPLY\nAFTER ACTION // {AfterActionGrade} // SCORE +{AfterActionScore} // MERIT {CampaignMerit}\nTACTICAL PLAN // {TacticalPlan} // COST {TacticalCost} // EFFECT +{TacticalScore}\nWAR TURN {WarTurn} // FRIENDLY CONTROL {FriendlyControl}%"
+msgstr "MISSION COMPLETE\n\n{OperationType} SUCCESS // {SectorName} // {Outcome}\nCONTROL {PreviousOwner} -> {CurrentOwner}\nOPERATION IMPACT // FRIENDLY {FriendlyDelta} // ENEMY {EnemyDelta} // SUPPLY {SupplyDelta}\nSECTOR FORCE // FRIENDLY {FriendlyStrength} // ENEMY {EnemyStrength} // SUPPLY {SectorSupply}%\n{EnemyResponse}\nSTAGING {StagingSector} // SUPPLY {StagingSupply}% // SUPPORT LOSSES {SupportLosses} // HOSTILE LOSSES {HostileLosses} // ROUTED {HostileRouted}\nBATTLEFIELD RECOVERY +{RecoveredMateriel} SUPPLY\nAFTER ACTION // {AfterActionGrade} // SCORE +{AfterActionScore} // MERIT {CampaignMerit}\nTACTICAL PLAN // {TacticalPlan} // COST {TacticalCost} // EFFECT +{TacticalScore}\nWAR TURN {WarTurn} // FRIENDLY CONTROL {FriendlyControl}%"
+
+#. Key:	MissionCompleteCheckpointPending
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(12590)
+#: Source/BrokenHorizon/BHCharacter.cpp(12590)
+msgctxt "BrokenHorizon,MissionCompleteCheckpointPending"
+msgid "{0}\n\nCHECKPOINT PENDING // Press CONTINUE to retry before returning to strategic command."
+msgstr "{0}\n\nCHECKPOINT PENDING // Press CONTINUE to retry before returning to strategic command."
+
+#. Key:	MultiplayerFieldRespawnComplete
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(13451)
+#: Source/BrokenHorizon/BHCharacter.cpp(13451)
+msgctxt "BrokenHorizon,MultiplayerFieldRespawnComplete"
+msgid "FIELD REDEPLOYMENT COMPLETE\n\nA replacement operator has arrived at {0}.\nCampaign casualty recorded. {1}"
+msgstr "FIELD REDEPLOYMENT COMPLETE\n\nA replacement operator has arrived at {0}.\nCampaign casualty recorded. {1}"
+
+#. Key:	MultiplayerRespawnFallback
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(13460)
+#: Source/BrokenHorizon/BHCharacter.cpp(13460)
+msgctxt "BrokenHorizon,MultiplayerRespawnFallback"
+msgid "the nearest safe position"
+msgstr "the nearest safe position"
+
+#. Key:	MultiplayerRespawnSaved
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(13466)
+#: Source/BrokenHorizon/BHCharacter.cpp(13466)
+msgctxt "BrokenHorizon,MultiplayerRespawnSaved"
+msgid "CAMPAIGN UPDATED"
+msgstr "CAMPAIGN UPDATED"
+
+#. Key:	MultiplayerRespawnSavePending
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(13471)
+#: Source/BrokenHorizon/BHCharacter.cpp(13471)
+msgctxt "BrokenHorizon,MultiplayerRespawnSavePending"
+msgid "CAMPAIGN SAVE PENDING"
+msgstr "CAMPAIGN SAVE PENDING"
+
+#. Key:	MissionCompleteMessage
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(259)
+#: Source/BrokenHorizon/BHCharacter.cpp(259)
+msgctxt "BrokenHorizon,MissionCompleteMessage"
+msgid "MISSION COMPLETE"
+msgstr "MISSION COMPLETE"
+
+#. Key:	FireModeAutomatic
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(2650)
+#: Source/BrokenHorizon/BHCharacter.cpp(2650)
+msgctxt "BrokenHorizon,FireModeAutomatic"
+msgid "FIRE MODE // AUTO"
+msgstr "FIRE MODE // AUTO"
+
+#. Key:	FireModeSemiAutomatic
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(2655)
+#: Source/BrokenHorizon/BHCharacter.cpp(2655)
+msgctxt "BrokenHorizon,FireModeSemiAutomatic"
+msgid "FIRE MODE // SEMI"
+msgstr "FIRE MODE // SEMI"
+
+#. Key:	ReplicatedOperationDebriefSuccess
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3261)
+#: Source/BrokenHorizon/BHCharacter.cpp(3261)
+msgctxt "BrokenHorizon,ReplicatedOperationDebriefSuccess"
+msgid "SHARED OPERATION COMPLETE\n\nCampaign command is processing the outcome."
+msgstr "SHARED OPERATION COMPLETE\n\nCampaign command is processing the outcome."
+
+#. Key:	ReplicatedOperationDebriefFailure
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3275)
+#: Source/BrokenHorizon/BHCharacter.cpp(3275)
+msgctxt "BrokenHorizon,ReplicatedOperationDebriefFailure"
+msgid "SHARED OPERATION FAILED\n\nCampaign command is assessing the losses."
+msgstr "SHARED OPERATION FAILED\n\nCampaign command is assessing the losses."
+
+#. Key:	ReplicatedOperationJoinedApproach
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3336)
+#: Source/BrokenHorizon/BHCharacter.cpp(3336)
+msgctxt "BrokenHorizon,ReplicatedOperationJoinedApproach"
+msgid "SHARED OPERATION ASSIGNED\n\nMove to {0}. Follow the operation waypoint."
+msgstr "SHARED OPERATION ASSIGNED\n\nMove to {0}. Follow the operation waypoint."
+
+#. Key:	ReplicatedOperationJoinedActive
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3342)
+#: Source/BrokenHorizon/BHCharacter.cpp(3342)
+msgctxt "BrokenHorizon,ReplicatedOperationJoinedActive"
+msgid "SHARED OPERATION ACTIVE\n\nSupport friendly forces in {0}."
+msgstr "SHARED OPERATION ACTIVE\n\nSupport friendly forces in {0}."
+
+#. Key:	ReplicatedOperationApproach
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3475)
+#: Source/BrokenHorizon/BHCharacter.cpp(3475)
+msgctxt "BrokenHorizon,ReplicatedOperationApproach"
+msgid "Travel to the operation area"
+msgstr "Travel to the operation area"
+
+#. Key:	ReplicatedOperationAwaitingWave
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3482)
+#: Source/BrokenHorizon/BHCharacter.cpp(3482)
+msgctxt "BrokenHorizon,ReplicatedOperationAwaitingWave"
+msgid "Prepare for the next enemy wave"
+msgstr "Prepare for the next enemy wave"
+
+#. Key:	ReplicatedOperationSecuring
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3489)
+#: Source/BrokenHorizon/BHCharacter.cpp(3489)
+msgctxt "BrokenHorizon,ReplicatedOperationSecuring"
+msgid "Secure and hold the objective"
+msgstr "Secure and hold the objective"
+
+#. Key:	ReplicatedOperationRaidExfiltration
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3496)
+#: Source/BrokenHorizon/BHCharacter.cpp(3496)
+msgctxt "BrokenHorizon,ReplicatedOperationRaidExfiltration"
+msgid "Break contact and leave the raid area"
+msgstr "Break contact and leave the raid area"
+
+#. Key:	ReplicatedOperationCombat
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3503)
+#: Source/BrokenHorizon/BHCharacter.cpp(3503)
+msgctxt "BrokenHorizon,ReplicatedOperationCombat"
+msgid "Operation active"
+msgstr "Operation active"
+
+#. Key:	ResupplyOperationDeliveryWaypoint
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3834)
+#: Source/BrokenHorizon/BHCharacter.cpp(3834)
+msgctxt "BrokenHorizon,ResupplyOperationDeliveryWaypoint"
+msgid "DELIVER // {0}"
+msgstr "DELIVER // {0}"
+
+#. Key:	ResupplyOperationPickupWaypoint
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(3839)
+#: Source/BrokenHorizon/BHCharacter.cpp(3839)
+msgctxt "BrokenHorizon,ResupplyOperationPickupWaypoint"
+msgid "LOAD CARGO // {0}"
+msgstr "LOAD CARGO // {0}"
+
+#. Key:	CivilianAidWaypointSector
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(4540)
+#: Source/BrokenHorizon/BHCharacter.cpp(4540)
+msgctxt "BrokenHorizon,CivilianAidWaypointSector"
+msgid "AID // {0}"
+msgstr "AID // {0}"
+
+#. Key:	FieldResponseCrackdownAdvice
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(4820)
+#: Source/BrokenHorizon/BHCharacter.cpp(4820)
+msgctxt "BrokenHorizon,FieldResponseCrackdownAdvice"
+msgid "Expect reinforced patrols and rapid reaction forces."
+msgstr "Expect reinforced patrols and rapid reaction forces."
+
+#. Key:	FieldResponseHuntingAdvice
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(4826)
+#: Source/BrokenHorizon/BHCharacter.cpp(4826)
+msgctxt "BrokenHorizon,FieldResponseHuntingAdvice"
+msgid "Enemy patrols are actively searching this area."
+msgstr "Enemy patrols are actively searching this area."
+
+#. Key:	FieldResponseWatchfulAdvice
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(4831)
+#: Source/BrokenHorizon/BHCharacter.cpp(4831)
+msgctxt "BrokenHorizon,FieldResponseWatchfulAdvice"
+msgid "Enemy security is alert. Avoid unnecessary contact."
+msgstr "Enemy security is alert. Avoid unnecessary contact."
+
+#. Key:	FieldResponseSectorEntry
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(4838)
+#: Source/BrokenHorizon/BHCharacter.cpp(4838)
+msgctxt "BrokenHorizon,FieldResponseSectorEntry"
+msgid "{0}\n\n{1}\n{2}"
+msgstr "{0}\n\n{1}\n{2}"
+
+#. Key:	StabilizeFieldOperativePrompt
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5157)
+#: Source/BrokenHorizon/BHCharacter.cpp(5157)
+msgctxt "BrokenHorizon,StabilizeFieldOperativePrompt"
+msgid "Press [F] to stabilize operative (1 field dressing // {0}s)"
+msgstr "Press [F] to stabilize operative (1 field dressing // {0}s)"
+
+#. Key:	FieldSquadContextNoTarget
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5296)
+#: Source/BrokenHorizon/BHCharacter.cpp(5296)
+msgctxt "BrokenHorizon,FieldSquadContextNoTarget"
+msgid "SQUAD CONTEXT // NO SUPPORTED TARGET\n\nAim at a downed friendly operative or active raid target, or the assigned attack/defense sector marker, and press X."
+msgstr "SQUAD CONTEXT // NO SUPPORTED TARGET\n\nAim at a downed friendly operative or active raid target, or the assigned attack/defense sector marker, and press X."
+
+#. Key:	FieldSquadContextUnsupportedTarget
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5354)
+#: Source/BrokenHorizon/BHCharacter.cpp(5354)
+msgctxt "BrokenHorizon,FieldSquadContextUnsupportedTarget"
+msgid "SQUAD CONTEXT // ACTION UNSUPPORTED\n\nAim at a downed friendly operative, active raid target, or assigned attack/defense sector marker."
+msgstr "SQUAD CONTEXT // ACTION UNSUPPORTED\n\nAim at a downed friendly operative, active raid target, or assigned attack/defense sector marker."
+
+#. Key:	FieldSquadContextEmbarked
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5368)
+#: Source/BrokenHorizon/BHCharacter.cpp(5368)
+msgctxt "BrokenHorizon,FieldSquadContextEmbarked"
+msgid "SQUAD CONTEXT // DISEMBARK REQUIRED\n\nYour operatives cannot perform Context actions while embarked."
+msgstr "SQUAD CONTEXT // DISEMBARK REQUIRED\n\nYour operatives cannot perform Context actions while embarked."
+
+#. Key:	FieldSquadContextNoDressing
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5383)
+#: Source/BrokenHorizon/BHCharacter.cpp(5383)
+msgctxt "BrokenHorizon,FieldSquadContextNoDressing"
+msgid "SQUAD CONTEXT // NO FIELD DRESSING\n\nResupply before assigning casualty aid."
+msgstr "SQUAD CONTEXT // NO FIELD DRESSING\n\nResupply before assigning casualty aid."
+
+#. Key:	FieldSquadContextNoResponder
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5453)
+#: Source/BrokenHorizon/BHCharacter.cpp(5453)
+msgctxt "BrokenHorizon,FieldSquadContextNoResponder"
+msgid "SQUAD CONTEXT // NO AVAILABLE OPERATIVE\n\nOnly a living operative under your command can receive this order. Another player's order was not changed."
+msgstr "SQUAD CONTEXT // NO AVAILABLE OPERATIVE\n\nOnly a living operative under your command can receive this order. Another player's order was not changed."
+
+#. Key:	FieldSquadContextNoController
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5515)
+#: Source/BrokenHorizon/BHCharacter.cpp(5515)
+msgctxt "BrokenHorizon,FieldSquadContextNoController"
+msgid "The selected operative cannot currently navigate to the target."
+msgstr "The selected operative cannot currently navigate to the target."
+
+#. Key:	FieldSquadContextAidAssigned
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5527)
+#: Source/BrokenHorizon/BHCharacter.cpp(5527)
+msgctxt "BrokenHorizon,FieldSquadContextAidAssigned"
+msgid "SQUAD CONTEXT // CASUALTY AID ASSIGNED\n\nYour operative {0} is moving to stabilize {1}. Press C to cancel and restore the formation order."
+msgstr "SQUAD CONTEXT // CASUALTY AID ASSIGNED\n\nYour operative {0} is moving to stabilize {1}. Press C to cancel and restore the formation order."
+
+#. Key:	FieldSquadContextSabotageAssigned
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5535)
+#: Source/BrokenHorizon/BHCharacter.cpp(5535)
+msgctxt "BrokenHorizon,FieldSquadContextSabotageAssigned"
+msgid "SQUAD CONTEXT // SABOTAGE ASSIGNED\n\nYour operative {0} is moving to arm charges at {1}. Press C to cancel and restore the formation order."
+msgstr "SQUAD CONTEXT // SABOTAGE ASSIGNED\n\nYour operative {0} is moving to arm charges at {1}. Press C to cancel and restore the formation order."
+
+#. Key:	FieldSquadContextObjectiveAssigned
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5542)
+#: Source/BrokenHorizon/BHCharacter.cpp(5542)
+msgctxt "BrokenHorizon,FieldSquadContextObjectiveAssigned"
+msgid "SQUAD CONTEXT // OBJECTIVE ASSIGNED\n\nYour operative {0} is moving to secure or defend {1}. Press C to cancel."
+msgstr "SQUAD CONTEXT // OBJECTIVE ASSIGNED\n\nYour operative {0} is moving to secure or defend {1}. Press C to cancel."
+
+#. Key:	FieldSquadContextEnded
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5618)
+#: Source/BrokenHorizon/BHCharacter.cpp(5618)
+msgctxt "BrokenHorizon,FieldSquadContextEnded"
+msgid "The Context assignment ended because its responder or target is no longer eligible."
+msgstr "The Context assignment ended because its responder or target is no longer eligible."
+
+#. Key:	FieldSquadContextTimedOut
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5633)
+#: Source/BrokenHorizon/BHCharacter.cpp(5633)
+msgctxt "BrokenHorizon,FieldSquadContextTimedOut"
+msgid "The assigned operative could not reach the target and has returned to the formation order."
+msgstr "The assigned operative could not reach the target and has returned to the formation order."
+
+#. Key:	FieldSquadContextDefenseEstablished
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5668)
+#: Source/BrokenHorizon/BHCharacter.cpp(5668)
+msgctxt "BrokenHorizon,FieldSquadContextDefenseEstablished"
+msgid "SQUAD CONTEXT // DEFENSIVE LINE ESTABLISHED\n\nYour operative is holding {0} and now counts as a living defender."
+msgstr "SQUAD CONTEXT // DEFENSIVE LINE ESTABLISHED\n\nYour operative is holding {0} and now counts as a living defender."
+
+#. Key:	FieldSquadContextSecureEstablished
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5675)
+#: Source/BrokenHorizon/BHCharacter.cpp(5675)
+msgctxt "BrokenHorizon,FieldSquadContextSecureEstablished"
+msgid "SQUAD CONTEXT // SECURE PRESENCE ESTABLISHED\n\nYour operative is holding {0} and now contributes to objective security."
+msgstr "SQUAD CONTEXT // SECURE PRESENCE ESTABLISHED\n\nYour operative is holding {0} and now contributes to objective security."
+
+#. Key:	FieldSquadContextSabotageFailed
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5713)
+#: Source/BrokenHorizon/BHCharacter.cpp(5713)
+msgctxt "BrokenHorizon,FieldSquadContextSabotageFailed"
+msgid "The operative reached the target, but the sabotage contract was no longer valid."
+msgstr "The operative reached the target, but the sabotage contract was no longer valid."
+
+#. Key:	FieldSquadContextAidFailed
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5751)
+#: Source/BrokenHorizon/BHCharacter.cpp(5751)
+msgctxt "BrokenHorizon,FieldSquadContextAidFailed"
+msgid "Casualty aid could not be completed. Check medical supplies and target condition."
+msgstr "Casualty aid could not be completed. Check medical supplies and target condition."
+
+#. Key:	FieldSquadContextAidComplete
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5770)
+#: Source/BrokenHorizon/BHCharacter.cpp(5770)
+msgctxt "BrokenHorizon,FieldSquadContextAidComplete"
+msgid "SQUAD CONTEXT // CASUALTY STABILIZED\n\nThe operative completed aid. {0} field dressing(s) remain."
+msgstr "SQUAD CONTEXT // CASUALTY STABILIZED\n\nThe operative completed aid. {0} field dressing(s) remain."
+
+#. Key:	FieldSquadContextCancelled
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5824)
+#: Source/BrokenHorizon/BHCharacter.cpp(5824)
+msgctxt "BrokenHorizon,FieldSquadContextCancelled"
+msgid "SQUAD CONTEXT // ASSIGNMENT ENDED\n\n{0}"
+msgstr "SQUAD CONTEXT // ASSIGNMENT ENDED\n\n{0}"
+
+#. Key:	FieldSquadContextTargetLost
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(5847)
+#: Source/BrokenHorizon/BHCharacter.cpp(5847)
+msgctxt "BrokenHorizon,FieldSquadContextTargetLost"
+msgid "SQUAD CONTEXT // TARGET LOST\n\nKeep the supported ally or objective in view and press X again."
+msgstr "SQUAD CONTEXT // TARGET LOST\n\nKeep the supported ally or objective in view and press X again."
+
+#. Key:	FieldSquadContextCancelledByOrder
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6480)
+#: Source/BrokenHorizon/BHCharacter.cpp(6480)
+msgctxt "BrokenHorizon,FieldSquadContextCancelledByOrder"
+msgid "The assigned operative is returning to the current formation order. Press C again to change that order."
+msgstr "The assigned operative is returning to the current formation order. Press C again to change that order."
+
+#. Key:	SquadOrderNoLivingSupport
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6506)
+#: Source/BrokenHorizon/BHCharacter.cpp(6506)
+msgctxt "BrokenHorizon,SquadOrderNoLivingSupport"
+msgid "SQUAD COMMAND UNAVAILABLE\n\nNo friendly support remains to receive the order."
+msgstr "SQUAD COMMAND UNAVAILABLE\n\nNo friendly support remains to receive the order."
+
+#. Key:	UnifiedSquadOrderFollow
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6565)
+#: Source/BrokenHorizon/BHCharacter.cpp(6565)
+msgctxt "BrokenHorizon,UnifiedSquadOrderFollow"
+msgid "ALL ELEMENTS // FOLLOW\n\n{0} friendly element(s) are reforming on you. Aim at terrain and press C to order MOVE AND HOLD."
+msgstr "ALL ELEMENTS // FOLLOW\n\n{0} friendly element(s) are reforming on you. Aim at terrain and press C to order MOVE AND HOLD."
+
+#. Key:	UnifiedSquadOrderMoveHold
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6677)
+#: Source/BrokenHorizon/BHCharacter.cpp(6677)
+msgctxt "BrokenHorizon,UnifiedSquadOrderMoveHold"
+msgid "ALL ELEMENTS // MOVE AND HOLD\n\n{0} friendly element(s) are moving to designated ground {1} m away. Press C to resume formation."
+msgstr "ALL ELEMENTS // MOVE AND HOLD\n\n{0} friendly element(s) are moving to designated ground {1} m away. Press C to resume formation."
+
+#. Key:	UnifiedSquadOrderHoldFallback
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6694)
+#: Source/BrokenHorizon/BHCharacter.cpp(6694)
+msgctxt "BrokenHorizon,UnifiedSquadOrderHoldFallback"
+msgid "ALL ELEMENTS // HOLD\n\nNo reachable terrain was designated. {0} friendly element(s) will defend their current ground. Press C to resume formation."
+msgstr "ALL ELEMENTS // HOLD\n\nNo reachable terrain was designated. {0} friendly element(s) will defend their current ground. Press C to resume formation."
+
+#. Key:	FieldSquadUnavailable
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6750)
+#: Source/BrokenHorizon/BHCharacter.cpp(6750)
+msgctxt "BrokenHorizon,FieldSquadUnavailable"
+msgid "FIELD FIRETEAM UNAVAILABLE\n\nVisit a friendly resupply point and press C to recruit an operative."
+msgstr "FIELD FIRETEAM UNAVAILABLE\n\nVisit a friendly resupply point and press C to recruit an operative."
+
+#. Key:	FieldSquadOrderFollow
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6769)
+#: Source/BrokenHorizon/BHCharacter.cpp(6769)
+msgctxt "BrokenHorizon,FieldSquadOrderFollow"
+msgid "FIELD FIRETEAM // FOLLOW\n\nYour operatives are reforming on you. Press C while aiming at terrain to issue a move-and-hold order."
+msgstr "FIELD FIRETEAM // FOLLOW\n\nYour operatives are reforming on you. Press C while aiming at terrain to issue a move-and-hold order."
+
+#. Key:	FieldSquadOrderMoveHoldQueued
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6837)
+#: Source/BrokenHorizon/BHCharacter.cpp(6837)
+msgctxt "BrokenHorizon,FieldSquadOrderMoveHoldQueued"
+msgid "FIELD FIRETEAM // MOVE AND HOLD QUEUED\n\nDesignated ground is {0} m away. Operatives will move there after disembarking. Press C to resume formation."
+msgstr "FIELD FIRETEAM // MOVE AND HOLD QUEUED\n\nDesignated ground is {0} m away. Operatives will move there after disembarking. Press C to resume formation."
+
+#. Key:	FieldSquadOrderMoveHold
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6846)
+#: Source/BrokenHorizon/BHCharacter.cpp(6846)
+msgctxt "BrokenHorizon,FieldSquadOrderMoveHold"
+msgid "FIELD FIRETEAM // MOVE AND HOLD\n\nOperatives are moving to designated ground {0} m away. Press C to resume formation."
+msgstr "FIELD FIRETEAM // MOVE AND HOLD\n\nOperatives are moving to designated ground {0} m away. Press C to resume formation."
+
+#. Key:	FieldSquadOrderHoldFallback
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(6861)
+#: Source/BrokenHorizon/BHCharacter.cpp(6861)
+msgctxt "BrokenHorizon,FieldSquadOrderHoldFallback"
+msgid "FIELD FIRETEAM // HOLD\n\nNo reachable terrain was designated. Operatives will defend their current ground. Press C to resume formation."
+msgstr "FIELD FIRETEAM // HOLD\n\nNo reachable terrain was designated. Operatives will defend their current ground. Press C to resume formation."
+
+#. Key:	FieldSquadAtCapacity
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(7020)
+#: Source/BrokenHorizon/BHCharacter.cpp(7020)
+msgctxt "BrokenHorizon,FieldSquadAtCapacity"
+msgid "FIELD FIRETEAM FULL\n\n{0}/{1} operatives ready. Move away from the station and press C to issue orders."
+msgstr "FIELD FIRETEAM FULL\n\n{0}/{1} operatives ready. Move away from the station and press C to issue orders."
+
+#. Key:	FieldSquadRecruitmentUnavailable
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(7040)
+#: Source/BrokenHorizon/BHCharacter.cpp(7040)
+msgctxt "BrokenHorizon,FieldSquadRecruitmentUnavailable"
+msgid "RECRUITMENT UNAVAILABLE\n\nRequires 1 manpower and {0}% connected sector supply."
+msgstr "RECRUITMENT UNAVAILABLE\n\nRequires 1 manpower and {0}% connected sector supply."
+
+#. Key:	FieldSquadSpawnBlocked
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(7058)
+#: Source/BrokenHorizon/BHCharacter.cpp(7058)
+msgctxt "BrokenHorizon,FieldSquadSpawnBlocked"
+msgid "RECRUITMENT DELAYED\n\nNo safe deployment position is available nearby."
+msgstr "RECRUITMENT DELAYED\n\nNo safe deployment position is available nearby."
+
+#. Key:	FieldSquadRecruited
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(7091)
+#: Source/BrokenHorizon/BHCharacter.cpp(7091)
+msgctxt "BrokenHorizon,FieldSquadRecruited"
+msgid "FIELD OPERATIVE RECRUITED\n\nFireteam strength {0}/{1}. Away from this station, aim at terrain and press C to order MOVE AND HOLD."
+msgstr "FIELD OPERATIVE RECRUITED\n\nFireteam strength {0}/{1}. Away from this station, aim at terrain and press C to order MOVE AND HOLD."
+
+#. Key:	SquadMoveHoldNavigationFailed
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(7355)
+#: Source/BrokenHorizon/BHCharacter.cpp(7355)
+msgctxt "BrokenHorizon,SquadMoveHoldNavigationFailed"
+msgid "SQUAD // ROUTE BLOCKED\n\n{0} could not reach the designated position ({1} m away) and is holding safely in place. Aim at reachable ground and press C to redirect."
+msgstr "SQUAD // ROUTE BLOCKED\n\n{0} could not reach the designated position ({1} m away) and is holding safely in place. Aim at reachable ground and press C to redirect."
+
+#. Key:	FieldSquadOperativeDown
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8170)
+#: Source/BrokenHorizon/BHCharacter.cpp(8170)
+msgctxt "BrokenHorizon,FieldSquadOperativeDown"
+msgid "FIELD OPERATIVE DOWN\n\n{0} combat effective. {1} awaiting stabilization.\n\nAim at the casualty and press F. Requires one field dressing."
+msgstr "FIELD OPERATIVE DOWN\n\n{0} combat effective. {1} awaiting stabilization.\n\nAim at the casualty and press F. Requires one field dressing."
+
+#. Key:	FieldSquadCasualty
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8182)
+#: Source/BrokenHorizon/BHCharacter.cpp(8182)
+msgctxt "BrokenHorizon,FieldSquadCasualty"
+msgid "FIELD FIRETEAM CASUALTY\n\n{0} operative(s) remain combat effective."
+msgstr "FIELD FIRETEAM CASUALTY\n\n{0} operative(s) remain combat effective."
+
+#. Key:	RescueCasualtyExpiredFailureReason
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8242)
+#: Source/BrokenHorizon/BHCharacter.cpp(8242)
+msgctxt "BrokenHorizon,RescueCasualtyExpiredFailureReason"
+msgid "The assigned casualty died before reaching a friendly treatment point."
+msgstr "The assigned casualty died before reaching a friendly treatment point."
+
+#. Key:	FieldSquadOperativeLost
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8274)
+#: Source/BrokenHorizon/BHCharacter.cpp(8274)
+msgctxt "BrokenHorizon,FieldSquadOperativeLost"
+msgid "OPERATIVE LOST\n\nThe stabilization window expired. {0} operative(s) remain."
+msgstr "OPERATIVE LOST\n\nThe stabilization window expired. {0} operative(s) remain."
+
+#. Key:	FieldSquadNoDressing
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8327)
+#: Source/BrokenHorizon/BHCharacter.cpp(8327)
+msgctxt "BrokenHorizon,FieldSquadNoDressing"
+msgid "NO FIELD DRESSING\n\nResupply before stabilizing this operative."
+msgstr "NO FIELD DRESSING\n\nResupply before stabilizing this operative."
+
+#. Key:	FieldSquadStabilized
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8353)
+#: Source/BrokenHorizon/BHCharacter.cpp(8353)
+msgctxt "BrokenHorizon,FieldSquadStabilized"
+msgid "OPERATIVE STABILIZED\n\n{0} field dressing(s) remain.\n\nCombat readiness is degraded. Evacuate the operative to a friendly support point for full treatment."
+msgstr "OPERATIVE STABILIZED\n\n{0} field dressing(s) remain.\n\nCombat readiness is degraded. Evacuate the operative to a friendly support point for full treatment."
+
+#. Key:	OperationResultCheckpointRetryFailed
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8653)
+#: Source/BrokenHorizon/BHCharacter.cpp(8653)
+msgctxt "BrokenHorizon,OperationResultCheckpointRetryFailed"
+msgid "CHECKPOINT NOT SAVED\n\nStrategic command remains locked while the game retries the operation-result checkpoint. Press CONTINUE again."
+msgstr "CHECKPOINT NOT SAVED\n\nStrategic command remains locked while the game retries the operation-result checkpoint. Press CONTINUE again."
+
+#. Key:	OperationResultCheckpointRetryClient
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8664)
+#: Source/BrokenHorizon/BHCharacter.cpp(8664)
+msgctxt "BrokenHorizon,OperationResultCheckpointRetryClient"
+msgid "{0}\n\nCHECKPOINT NOT SAVED // Press CONTINUE to retry."
+msgstr "{0}\n\nCHECKPOINT NOT SAVED // Press CONTINUE to retry."
+
+#. Key:	DeployRequestRejected
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8827)
+#: Source/BrokenHorizon/BHCharacter.cpp(8827)
+msgctxt "BrokenHorizon,DeployRequestRejected"
+msgid "DEPLOYMENT BLOCKED\n\nCommand could not authorize this operation."
+msgstr "DEPLOYMENT BLOCKED\n\nCommand could not authorize this operation."
+
+#. Key:	DeployNextOperationFailed
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8849)
+#: Source/BrokenHorizon/BHCharacter.cpp(8849)
+msgctxt "BrokenHorizon,DeployNextOperationFailed"
+msgid "DEPLOYMENT FAILED\n\nUnable to prepare the next operation."
+msgstr "DEPLOYMENT FAILED\n\nUnable to prepare the next operation."
+
+#. Key:	OperationWithdrawalRejected
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8876)
+#: Source/BrokenHorizon/BHCharacter.cpp(8876)
+msgctxt "BrokenHorizon,OperationWithdrawalRejected"
+msgid "WITHDRAWAL BLOCKED\n\nThere is no active operation to release."
+msgstr "WITHDRAWAL BLOCKED\n\nThere is no active operation to release."
+
+#. Key:	DefenseWithdrawalFailureReason
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8890)
+#: Source/BrokenHorizon/BHCharacter.cpp(8890)
+msgctxt "BrokenHorizon,DefenseWithdrawalFailureReason"
+msgid "Friendly forces withdrew before the defensive position was secured."
+msgstr "Friendly forces withdrew before the defensive position was secured."
+
+#. Key:	RaidWithdrawalFailureReason
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8897)
+#: Source/BrokenHorizon/BHCharacter.cpp(8897)
+msgctxt "BrokenHorizon,RaidWithdrawalFailureReason"
+msgid "The raid withdrew before enemy logistics were disrupted."
+msgstr "The raid withdrew before enemy logistics were disrupted."
+
+#. Key:	ResupplyWithdrawalFailureReason
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8905)
+#: Source/BrokenHorizon/BHCharacter.cpp(8905)
+msgctxt "BrokenHorizon,ResupplyWithdrawalFailureReason"
+msgid "The logistics team withdrew before the assigned supply load reached its destination."
+msgstr "The logistics team withdrew before the assigned supply load reached its destination."
+
+#. Key:	EscortWithdrawalFailureReason
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8913)
+#: Source/BrokenHorizon/BHCharacter.cpp(8913)
+msgctxt "BrokenHorizon,EscortWithdrawalFailureReason"
+msgid "The escort withdrew before the protected convoy cleared the route."
+msgstr "The escort withdrew before the protected convoy cleared the route."
+
+#. Key:	RescueWithdrawalFailureReason
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8921)
+#: Source/BrokenHorizon/BHCharacter.cpp(8921)
+msgctxt "BrokenHorizon,RescueWithdrawalFailureReason"
+msgid "The rescue team withdrew before the assigned casualty reached treatment."
+msgstr "The rescue team withdrew before the assigned casualty reached treatment."
+
+#. Key:	ReconWithdrawalFailureReason
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8929)
+#: Source/BrokenHorizon/BHCharacter.cpp(8929)
+msgctxt "BrokenHorizon,ReconWithdrawalFailureReason"
+msgid "The reconnaissance team withdrew before filing a confirmed intelligence report."
+msgstr "The reconnaissance team withdrew before filing a confirmed intelligence report."
+
+#. Key:	AttackWithdrawalFailureReason
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8935)
+#: Source/BrokenHorizon/BHCharacter.cpp(8935)
+msgctxt "BrokenHorizon,AttackWithdrawalFailureReason"
+msgid "Friendly forces withdrew before the assault objective was secured."
+msgstr "Friendly forces withdrew before the assault objective was secured."
+
+#. Key:	OperationWithdrawalFailed
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8945)
+#: Source/BrokenHorizon/BHCharacter.cpp(8945)
+msgctxt "BrokenHorizon,OperationWithdrawalFailed"
+msgid "WITHDRAWAL FAILED\n\nThe active operation could not be released."
+msgstr "WITHDRAWAL FAILED\n\nThe active operation could not be released."
+
+#. Key:	MilitiaRequestRejected
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(8989)
+#: Source/BrokenHorizon/BHCharacter.cpp(8989)
+msgctxt "BrokenHorizon,MilitiaRequestRejected"
+msgid "MOBILIZATION BLOCKED\n\nSupport, supply, route, or garrison capacity requirements were not met."
+msgstr "MOBILIZATION BLOCKED\n\nSupport, supply, route, or garrison capacity requirements were not met."
+
+#. Key:	MilitiaRequestAccepted
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9001)
+#: Source/BrokenHorizon/BHCharacter.cpp(9001)
+msgctxt "BrokenHorizon,MilitiaRequestAccepted"
+msgid "MOBILIZATION AUTHORIZED\n\nLocal militia are assembling at the selected sector."
+msgstr "MOBILIZATION AUTHORIZED\n\nLocal militia are assembling at the selected sector."
+
+#. Key:	GarrisonRedeployRejected
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9026)
+#: Source/BrokenHorizon/BHCharacter.cpp(9026)
+msgctxt "BrokenHorizon,GarrisonRedeployRejected"
+msgid "REDEPLOYMENT BLOCKED\n\nNo connected reserve force can complete the move."
+msgstr "REDEPLOYMENT BLOCKED\n\nNo connected reserve force can complete the move."
+
+#. Key:	GarrisonRedeployAccepted
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9037)
+#: Source/BrokenHorizon/BHCharacter.cpp(9037)
+msgctxt "BrokenHorizon,GarrisonRedeployAccepted"
+msgid "RESERVES DISPATCHED\n\nThe transfer is now moving through the logistics network."
+msgstr "RESERVES DISPATCHED\n\nThe transfer is now moving through the logistics network."
+
+#. Key:	CivilianAidRejected
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9064)
+#: Source/BrokenHorizon/BHCharacter.cpp(9064)
+msgctxt "BrokenHorizon,CivilianAidRejected"
+msgid "AID DISPATCH BLOCKED\n\nThe route, stockpile, or convoy capacity is unavailable."
+msgstr "AID DISPATCH BLOCKED\n\nThe route, stockpile, or convoy capacity is unavailable."
+
+#. Key:	CivilianAidAccepted
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9075)
+#: Source/BrokenHorizon/BHCharacter.cpp(9075)
+msgctxt "BrokenHorizon,CivilianAidAccepted"
+msgid "AID CONVOY DISPATCHED\n\nCivilian support supplies are moving through the world."
+msgstr "AID CONVOY DISPATCHED\n\nCivilian support supplies are moving through the world."
+
+#. Key:	FieldCampaignVictory
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9210)
+#: Source/BrokenHorizon/BHCharacter.cpp(9210)
+msgctxt "BrokenHorizon,FieldCampaignVictory"
+msgid "CAMPAIGN VICTORY\n\nAll Koronan sectors are under friendly control.\nThe occupation has ended. The open world remains available for free operations."
+msgstr "CAMPAIGN VICTORY\n\nAll Koronan sectors are under friendly control.\nThe occupation has ended. The open world remains available for free operations."
+
+#. Key:	FieldCampaignDefeat
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9223)
+#: Source/BrokenHorizon/BHCharacter.cpp(9223)
+msgctxt "BrokenHorizon,FieldCampaignDefeat"
+msgid "CAMPAIGN DEFEAT\n\nWestern command has fallen.\nThe campaign is over. Start a new war from the main menu when ready."
+msgstr "CAMPAIGN DEFEAT\n\nWestern command has fallen.\nThe campaign is over. Start a new war from the main menu when ready."
+
+#. Key:	WarMapFriendlySectorOwner
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9247)
+#: Source/BrokenHorizon/BHCharacter.cpp(9247)
+msgctxt "BrokenHorizon,WarMapFriendlySectorOwner"
+msgid "FRIENDLY"
+msgstr "FRIENDLY"
+
+#. Key:	WarMapEnemySectorOwner
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9253)
+#: Source/BrokenHorizon/BHCharacter.cpp(9253)
+msgctxt "BrokenHorizon,WarMapEnemySectorOwner"
+msgid "ENEMY"
+msgstr "ENEMY"
+
+#. Key:	NeutralSectorControl
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9258)
+#: Source/BrokenHorizon/BHCharacter.cpp(9258)
+msgctxt "BrokenHorizon,NeutralSectorControl"
+msgid "CONTESTED"
+msgstr "CONTESTED"
+
+#. Key:	LogisticsHubOnline
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9277)
+#: Source/BrokenHorizon/BHCharacter.cpp(9277)
+msgctxt "BrokenHorizon,LogisticsHubOnline"
+msgid "LOGISTICS HUB ONLINE\n\n{0} is now producing +{1} supply per war turn.\nWar turn {2}."
+msgstr "LOGISTICS HUB ONLINE\n\n{0} is now producing +{1} supply per war turn.\nWar turn {2}."
+
+#. Key:	LogisticsHubSecured
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9293)
+#: Source/BrokenHorizon/BHCharacter.cpp(9293)
+msgctxt "BrokenHorizon,LogisticsHubSecured"
+msgid "LOGISTICS HUB SECURED\n\n{0} is under friendly control. Secure adjacent sectors to bring high-rate supply production online.\nWar turn {1}."
+msgstr "LOGISTICS HUB SECURED\n\n{0} is under friendly control. Secure adjacent sectors to bring high-rate supply production online.\nWar turn {1}."
+
+#. Key:	LogisticsHubLost
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9309)
+#: Source/BrokenHorizon/BHCharacter.cpp(9309)
+msgctxt "BrokenHorizon,LogisticsHubLost"
+msgid "LOGISTICS HUB LOST\n\n{0} is now under {1} control. This strategic supply source is offline.\nWar turn {2}."
+msgstr "LOGISTICS HUB LOST\n\n{0} is now under {1} control. This strategic supply source is offline.\nWar turn {2}."
+
+#. Key:	FrontlineOwnershipUpdate
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9326)
+#: Source/BrokenHorizon/BHCharacter.cpp(9326)
+msgctxt "BrokenHorizon,FrontlineOwnershipUpdate"
+msgid "FRONTLINE UPDATE\n\n{0} is now under {1} control.\nWar turn {2}."
+msgstr "FRONTLINE UPDATE\n\n{0} is now under {1} control.\nWar turn {2}."
+
+#. Key:	SectorLogisticsSevered
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9376)
+#: Source/BrokenHorizon/BHCharacter.cpp(9376)
+msgctxt "BrokenHorizon,SectorLogisticsSevered"
+msgid "LOGISTICS SEVERED\n\n{0} is cut off from a friendly logistics hub. Reinforcements are suspended and local supply is draining."
+msgstr "LOGISTICS SEVERED\n\n{0} is cut off from a friendly logistics hub. Reinforcements are suspended and local supply is draining."
+
+#. Key:	SectorLogisticsRestored
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9392)
+#: Source/BrokenHorizon/BHCharacter.cpp(9392)
+msgctxt "BrokenHorizon,SectorLogisticsRestored"
+msgid "LOGISTICS RESTORED\n\n{0} has reconnected to the friendly logistics network. Reinforcements can resume."
+msgstr "LOGISTICS RESTORED\n\n{0} has reconnected to the friendly logistics network. Reinforcements can resume."
+
+#. Key:	SectorSupplyStarvedImpact
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9456)
+#: Source/BrokenHorizon/BHCharacter.cpp(9456)
+msgctxt "BrokenHorizon,SectorSupplyStarvedImpact"
+msgid "Reinforcements have halted."
+msgstr "Reinforcements have halted."
+
+#. Key:	SectorSupplyCriticalImpact
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9461)
+#: Source/BrokenHorizon/BHCharacter.cpp(9461)
+msgctxt "BrokenHorizon,SectorSupplyCriticalImpact"
+msgid "Reinforcement capacity is reduced."
+msgstr "Reinforcement capacity is reduced."
+
+#. Key:	SectorSupplyCrisis
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9467)
+#: Source/BrokenHorizon/BHCharacter.cpp(9467)
+msgctxt "BrokenHorizon,SectorSupplyCrisis"
+msgid "SUPPLY CRISIS\n\n{0} logistics are {1} at {2}%.\n{3}"
+msgstr "SUPPLY CRISIS\n\n{0} logistics are {1} at {2}%.\n{3}"
+
+#. Key:	SectorSupplyRecovered
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9487)
+#: Source/BrokenHorizon/BHCharacter.cpp(9487)
+msgctxt "BrokenHorizon,SectorSupplyRecovered"
+msgid "SUPPLY RECOVERED\n\n{0} logistics are {1} at {2}%.\nReinforcement capacity is recovering."
+msgstr "SUPPLY RECOVERED\n\n{0} logistics are {1} at {2}%.\nReinforcement capacity is recovering."
+
+#. Key:	SupplyRouteSevered
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9540)
+#: Source/BrokenHorizon/BHCharacter.cpp(9540)
+msgctxt "BrokenHorizon,SupplyRouteSevered"
+msgid "SUPPLY ROUTE SEVERED\n\n{0} can no longer receive operation supplies. Reconnect friendly sectors or replenish a staging area."
+msgstr "SUPPLY ROUTE SEVERED\n\n{0} can no longer receive operation supplies. Reconnect friendly sectors or replenish a staging area."
+
+#. Key:	SupplyRouteRestored
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9562)
+#: Source/BrokenHorizon/BHCharacter.cpp(9562)
+msgctxt "BrokenHorizon,SupplyRouteRestored"
+msgid "SUPPLY ROUTE RESTORED\n\n{0} can now stage the operation at {1}. Deployment requires {2} supply."
+msgstr "SUPPLY ROUTE RESTORED\n\n{0} can now stage the operation at {1}. Deployment requires {2} supply."
+
+#. Key:	SupplyRouteUpdated
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9603)
+#: Source/BrokenHorizon/BHCharacter.cpp(9603)
+msgctxt "BrokenHorizon,SupplyRouteUpdated"
+msgid "SUPPLY ROUTE UPDATED\n\nStaging for {0} has shifted from {1} to {2}."
+msgstr "SUPPLY ROUTE UPDATED\n\nStaging for {0} has shifted from {1} to {2}."
+
+#. Key:	CampaignEventFieldUpdate
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9634)
+#: Source/BrokenHorizon/BHCharacter.cpp(9634)
+msgctxt "BrokenHorizon,CampaignEventFieldUpdate"
+msgid "CAMPAIGN UPDATE\n\n{0}\nWar turn {1}."
+msgstr "CAMPAIGN UPDATE\n\n{0}\nWar turn {1}."
+
+#. Key:	StrategicPriorityUpdate
+#. SourceLocation:	Source/BrokenHorizon/BHCharacter.cpp(9649)
+#: Source/BrokenHorizon/BHCharacter.cpp(9649)
+msgctxt "BrokenHorizon,StrategicPriorityUpdate"
+msgid "COMMAND UPDATE\n\n{0}\nWar turn {1}."
+msgstr "COMMAND UPDATE\n\n{0}\nWar turn {1}."
+
+#. Key:	FieldReconReportFiled
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(1002)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(1002)
+msgctxt "BrokenHorizon,FieldReconReportFiled"
+msgid "FIELD RECON FILED // +{0} INTEL\n\n{1}\nCONFIDENCE {2}%"
+msgstr "FIELD RECON FILED // +{0} INTEL\n\n{1}\nCONFIDENCE {2}%"
+
+#. Key:	CivilianAidConvoyUnderAttack
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(1528)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(1528)
+msgctxt "BrokenHorizon,CivilianAidConvoyUnderAttack"
+msgid "CIVILIAN AID CONVOY UNDER ATTACK\n\n{0} -> {1}\n{2} supply committed to relief cargo.\n{3} hostile raiders.\n{4} friendly guards on station.\nDefend the marked convoy until it clears the sector or the local network will receive nothing."
+msgstr "CIVILIAN AID CONVOY UNDER ATTACK\n\n{0} -> {1}\n{2} supply committed to relief cargo.\n{3} hostile raiders.\n{4} friendly guards on station.\nDefend the marked convoy until it clears the sector or the local network will receive nothing."
+
+#. Key:	FriendlySupplyConvoyUnderAttack
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(1541)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(1541)
+msgctxt "BrokenHorizon,FriendlySupplyConvoyUnderAttack"
+msgid "FRIENDLY SUPPLY CONVOY UNDER ATTACK\n\n{0} -> {1}\n{2} supply in transit.\n{3} hostile raiders.\n{4} friendly guards on station.\nDefend the marked cargo until it clears the sector."
+msgstr "FRIENDLY SUPPLY CONVOY UNDER ATTACK\n\n{0} -> {1}\n{2} supply in transit.\n{3} hostile raiders.\n{4} friendly guards on station.\nDefend the marked cargo until it clears the sector."
+
+#. Key:	EnemySupplyConvoyDetected
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(1552)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(1552)
+msgctxt "BrokenHorizon,EnemySupplyConvoyDetected"
+msgid "ENEMY SUPPLY CONVOY DETECTED\n\n{0} -> {1}\n{2} supply in transit.\n{3} armed escorts.\nDestroy the marked cargo before it clears the sector."
+msgstr "ENEMY SUPPLY CONVOY DETECTED\n\n{0} -> {1}\n{2} supply in transit.\n{3} armed escorts.\nDestroy the marked cargo before it clears the sector."
+
+#. Key:	AmbientContactAlert
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3344)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3344)
+msgctxt "BrokenHorizon,AmbientContactAlert"
+msgid "CONTACT // {0}\nFRIENDLY {1} FROM {2}\nENEMY {3} FROM {4}"
+msgstr "CONTACT // {0}\nFRIENDLY {1} FROM {2}\nENEMY {3} FROM {4}"
+
+#. Key:	AmbientEnemyPatrolAlert
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3361)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3361)
+msgctxt "BrokenHorizon,AmbientEnemyPatrolAlert"
+msgid "ENEMY PATROL // {0}\n{1} HOSTILES FROM {2}"
+msgstr "ENEMY PATROL // {0}\n{1} HOSTILES FROM {2}"
+
+#. Key:	AmbientFriendlyPatrolAlert
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3375)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3375)
+msgctxt "BrokenHorizon,AmbientFriendlyPatrolAlert"
+msgid "FRIENDLY PATROL // {0}\n{1} TROOPS FROM {2}"
+msgstr "FRIENDLY PATROL // {0}\n{1} TROOPS FROM {2}"
+
+#. Key:	AmbientFriendlyPatrolVictory
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3790)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3790)
+msgctxt "BrokenHorizon,AmbientFriendlyPatrolVictory"
+msgid "FRIENDLY PATROL PREVAILS"
+msgstr "FRIENDLY PATROL PREVAILS"
+
+#. Key:	AmbientFriendlyPatrolDefeat
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3795)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3795)
+msgctxt "BrokenHorizon,AmbientFriendlyPatrolDefeat"
+msgid "FRIENDLY PATROL DEFEATED"
+msgstr "FRIENDLY PATROL DEFEATED"
+
+#. Key:	AmbientEnemyForceRouted
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3802)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3802)
+msgctxt "BrokenHorizon,AmbientEnemyForceRouted"
+msgid "ENEMY FORCE ROUTED"
+msgstr "ENEMY FORCE ROUTED"
+
+#. Key:	AmbientFriendlyForceRouted
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3808)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3808)
+msgctxt "BrokenHorizon,AmbientFriendlyForceRouted"
+msgid "FRIENDLY FORCE ROUTED"
+msgstr "FRIENDLY FORCE ROUTED"
+
+#. Key:	AmbientEnemyForceEliminated
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3814)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3814)
+msgctxt "BrokenHorizon,AmbientEnemyForceEliminated"
+msgid "ENEMY FORCE ELIMINATED"
+msgstr "ENEMY FORCE ELIMINATED"
+
+#. Key:	AmbientFriendlyForceEliminated
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3819)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3819)
+msgctxt "BrokenHorizon,AmbientFriendlyForceEliminated"
+msgid "FRIENDLY FORCE ELIMINATED"
+msgstr "FRIENDLY FORCE ELIMINATED"
+
+#. Key:	AmbientSkirmishContactReport
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3830)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(3830)
+msgctxt "BrokenHorizon,AmbientSkirmishContactReport"
+msgid "CONTACT REPORT // {0}\n{1}\n{2}\n\nFRIENDLY {3} // ENEMY {4}\nLOCAL SUPPORT {5}%"
+msgstr "CONTACT REPORT // {0}\n{1}\n{2}\n\nFRIENDLY {3} // ENEMY {4}\nLOCAL SUPPORT {5}%"
+
+#. Key:	AmbientBattlefieldRecovery
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(4003)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(4003)
+msgctxt "BrokenHorizon,AmbientBattlefieldRecovery"
+msgid "BATTLEFIELD SALVAGE SECURED\n\n+{0} supply recovered for {1}."
+msgstr "BATTLEFIELD SALVAGE SECURED\n\n+{0} supply recovered for {1}."
+
+#. Key:	FriendlySectorControl
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(780)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(780)
+msgctxt "BrokenHorizon,FriendlySectorControl"
+msgid "FRIENDLY CONTROL"
+msgstr "FRIENDLY CONTROL"
+
+#. Key:	EnemySectorControl
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(786)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(786)
+msgctxt "BrokenHorizon,EnemySectorControl"
+msgid "ENEMY CONTROL"
+msgstr "ENEMY CONTROL"
+
+#. Key:	ContestedSectorControl
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(791)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(791)
+msgctxt "BrokenHorizon,ContestedSectorControl"
+msgid "CONTESTED TERRITORY"
+msgstr "CONTESTED TERRITORY"
+
+#. Key:	LogisticsHubSectorRole
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(824)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(824)
+msgctxt "BrokenHorizon,LogisticsHubSectorRole"
+msgid "LOGISTICS HUB"
+msgstr "LOGISTICS HUB"
+
+#. Key:	FrontlineSectorRole
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(830)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(830)
+msgctxt "BrokenHorizon,FrontlineSectorRole"
+msgid "FRONTLINE"
+msgstr "FRONTLINE"
+
+#. Key:	RearAreaSectorRole
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(835)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(835)
+msgctxt "BrokenHorizon,RearAreaSectorRole"
+msgid "REAR AREA"
+msgstr "REAR AREA"
+
+#. Key:	SectorEntryNotification
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(848)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(848)
+msgctxt "BrokenHorizon,SectorEntryNotification"
+msgid "SECTOR // {0}\n{1} // {2}\n\nFRIENDLY {3} // SUPPLY {4}\n{5}\nGARRISON F {6} // CAP {7}\nSUPPLY FLOW {8} / TURN{9}"
+msgstr "SECTOR // {0}\n{1} // {2}\n\nFRIENDLY {3} // SUPPLY {4}\n{5}\nGARRISON F {6} // CAP {7}\nSUPPLY FLOW {8} / TURN{9}"
+
+#. Key:	SectorIntelUnavailable
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(870)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(870)
+msgctxt "BrokenHorizon,SectorIntelUnavailable"
+msgid "INTEL UNAVAILABLE"
+msgstr "INTEL UNAVAILABLE"
+
+#. Key:	SectorReconRequired
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(885)
+#: Source/BrokenHorizon/Private/BHAmbientWarDirector.cpp(885)
+msgctxt "BrokenHorizon,SectorReconRequired"
+msgid "\nRECON // MOVE AND OBSERVE TO CONFIRM HOSTILES"
+msgstr "\nRECON // MOVE AND OBSERVE TO CONFIRM HOSTILES"
+
+#. Key:	AmmoDisplay
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmmoHUDWidget.cpp(25)
+#: Source/BrokenHorizon/Private/BHAmmoHUDWidget.cpp(25)
+msgctxt "BrokenHorizon,AmmoDisplay"
+msgid "{0} / {1}"
+msgstr "{0} / {1}"
+
+#. Key:	AmmoSupplyInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmmoSupply.cpp(11)
+#: Source/BrokenHorizon/Private/BHAmmoSupply.cpp(11)
+msgctxt "BrokenHorizon,AmmoSupplyInteraction"
+msgid "Take Ammunition"
+msgstr "Take Ammunition"
+
+#. Key:	AmmoResupplyNotification
+#. SourceLocation:	Source/BrokenHorizon/Private/BHAmmoSupply.cpp(71)
+#: Source/BrokenHorizon/Private/BHAmmoSupply.cpp(71)
+msgctxt "BrokenHorizon,AmmoResupplyNotification"
+msgid "AMMUNITION ACQUIRED\n+{0} ROUNDS"
+msgstr "AMMUNITION ACQUIRED\n+{0} ROUNDS"
+
+#. Key:	ArmorSupplyInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHArmorSupply.cpp(8)
+#: Source/BrokenHorizon/Private/BHArmorSupply.cpp(8)
+msgctxt "BrokenHorizon,ArmorSupplyInteraction"
+msgid "Install Armor Plate"
+msgstr "Install Armor Plate"
+
+#. Key:	CheckpointInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHCheckpoint.cpp(27)
+#: Source/BrokenHorizon/Private/BHCheckpoint.cpp(27)
+msgctxt "BrokenHorizon,CheckpointInteraction"
+msgid "Save at Checkpoint"
+msgstr "Save at Checkpoint"
+
+#. Key:	CombatHealthFormat
+#. SourceLocation:	Source/BrokenHorizon/Private/BHCombatStatusWidget.cpp(619)
+#: Source/BrokenHorizon/Private/BHCombatStatusWidget.cpp(619)
+msgctxt "BrokenHorizon,CombatHealthFormat"
+msgid "{0} / {1}"
+msgstr "{0} / {1}"
+
+#. Key:	CombatStaminaFormat
+#. SourceLocation:	Source/BrokenHorizon/Private/BHCombatStatusWidget.cpp(655)
+#: Source/BrokenHorizon/Private/BHCombatStatusWidget.cpp(655)
+msgctxt "BrokenHorizon,CombatStaminaFormat"
+msgid "{0} / {1}"
+msgstr "{0} / {1}"
+
+#. Key:	PlayerDeathMessage
+#. SourceLocation:	Source/BrokenHorizon/Private/BHDeathWidget.cpp(12)
+#: Source/BrokenHorizon/Private/BHDeathWidget.cpp(12)
+msgctxt "BrokenHorizon,PlayerDeathMessage"
+msgid "YOU DIED"
+msgstr "YOU DIED"
+
+#. Key:	DefenseWaveActive
+#. SourceLocation:	Source/BrokenHorizon/Private/BHDefenseMissionDirector.cpp(150)
+#: Source/BrokenHorizon/Private/BHDefenseMissionDirector.cpp(150)
+msgctxt "BrokenHorizon,DefenseWaveActive"
+msgid "DEFENSE ACTIVE // WAVE {0}/{1}\n\nHold the sector and eliminate the assault force."
+msgstr "DEFENSE ACTIVE // WAVE {0}/{1}\n\nHold the sector and eliminate the assault force."
+
+#. Key:	DefenseWaveIncoming
+#. SourceLocation:	Source/BrokenHorizon/Private/BHDefenseMissionDirector.cpp(180)
+#: Source/BrokenHorizon/Private/BHDefenseMissionDirector.cpp(180)
+msgctxt "BrokenHorizon,DefenseWaveIncoming"
+msgid "WAVE {0} CLEARED\n\nEnemy reinforcements inbound."
+msgstr "WAVE {0} CLEARED\n\nEnemy reinforcements inbound."
+
+#. Key:	DefenseReinforcementWave
+#. SourceLocation:	Source/BrokenHorizon/Private/BHDefenseMissionDirector.cpp(232)
+#: Source/BrokenHorizon/Private/BHDefenseMissionDirector.cpp(232)
+msgctxt "BrokenHorizon,DefenseReinforcementWave"
+msgid "DEFENSE ACTIVE // WAVE {0}/{1}\n\nEnemy reinforcements have entered the sector."
+msgstr "DEFENSE ACTIVE // WAVE {0}/{1}\n\nEnemy reinforcements have entered the sector."
+
+#. Key:	DefenseSectorHeld
+#. SourceLocation:	Source/BrokenHorizon/Private/BHDefenseMissionDirector.cpp(249)
+#: Source/BrokenHorizon/Private/BHDefenseMissionDirector.cpp(249)
+msgctxt "BrokenHorizon,DefenseSectorHeld"
+msgid "SECTOR HELD\n\nAll enemy waves have been repelled."
+msgstr "SECTOR HELD\n\nAll enemy waves have been repelled."
+
+#. Key:	RenderedSessionReady
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuGameMode.cpp(120)
+#: Source/BrokenHorizon/Private/BHMainMenuGameMode.cpp(120)
+msgctxt "BrokenHorizon,RenderedSessionReady"
+msgid "Host a new campaign, continue the persistent war, or join a LAN campaign."
+msgstr "Host a new campaign, continue the persistent war, or join a LAN campaign."
+
+#. Key:	RenderedSessionSearching
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuGameMode.cpp(128)
+#: Source/BrokenHorizon/Private/BHMainMenuGameMode.cpp(128)
+msgctxt "BrokenHorizon,RenderedSessionSearching"
+msgid "Scanning the local network for a compatible Broken Horizon campaign..."
+msgstr "Scanning the local network for a compatible Broken Horizon campaign..."
+
+#. Key:	RenderedSessionConnected
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuGameMode.cpp(136)
+#: Source/BrokenHorizon/Private/BHMainMenuGameMode.cpp(136)
+msgctxt "BrokenHorizon,RenderedSessionConnected"
+msgid "Campaign connection established. Preparing synchronized travel."
+msgstr "Campaign connection established. Preparing synchronized travel."
+
+#. Key:	RenderedSessionError
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuGameMode.cpp(144)
+#: Source/BrokenHorizon/Private/BHMainMenuGameMode.cpp(144)
+msgctxt "BrokenHorizon,RenderedSessionError"
+msgid "No compatible campaign was found. Check the game version and network, then retry."
+msgstr "No compatible campaign was found. Check the game version and network, then retry."
+
+#. Key:	SessionHeadingConnecting
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(100)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(100)
+msgctxt "BrokenHorizon,SessionHeadingConnecting"
+msgid "MULTIPLAYER // CONNECTING"
+msgstr "MULTIPLAYER // CONNECTING"
+
+#. Key:	SessionHeadingConnected
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(105)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(105)
+msgctxt "BrokenHorizon,SessionHeadingConnected"
+msgid "MULTIPLAYER // CONNECTED"
+msgstr "MULTIPLAYER // CONNECTED"
+
+#. Key:	SessionHeadingLeaving
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(110)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(110)
+msgctxt "BrokenHorizon,SessionHeadingLeaving"
+msgid "MULTIPLAYER // LEAVING"
+msgstr "MULTIPLAYER // LEAVING"
+
+#. Key:	SessionHeadingError
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(115)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(115)
+msgctxt "BrokenHorizon,SessionHeadingError"
+msgid "MULTIPLAYER // ACTION FAILED"
+msgstr "MULTIPLAYER // ACTION FAILED"
+
+#. Key:	SessionHeadingReady
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(121)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(121)
+msgctxt "BrokenHorizon,SessionHeadingReady"
+msgid "MULTIPLAYER // READY"
+msgstr "MULTIPLAYER // READY"
+
+#. Key:	SessionStatusFormat
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(131)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(131)
+msgctxt "BrokenHorizon,SessionStatusFormat"
+msgid "{0}\n{1}"
+msgstr "{0}\n{1}"
+
+#. Key:	MenuHostNewCampaign
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(180)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(180)
+msgctxt "BrokenHorizon,MenuHostNewCampaign"
+msgid "HOST NEW CAMPAIGN"
+msgstr "HOST NEW CAMPAIGN"
+
+#. Key:	MenuHostContinue
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(190)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(190)
+msgctxt "BrokenHorizon,MenuHostContinue"
+msgid "HOST CONTINUE"
+msgstr "HOST CONTINUE"
+
+#. Key:	MenuJoinCampaign
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(200)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(200)
+msgctxt "BrokenHorizon,MenuJoinCampaign"
+msgid "JOIN CAMPAIGN"
+msgstr "JOIN CAMPAIGN"
+
+#. Key:	MenuSettings
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(210)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(210)
+msgctxt "BrokenHorizon,MenuSettings"
+msgid "SETTINGS"
+msgstr "SETTINGS"
+
+#. Key:	MenuQuit
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(216)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(216)
+msgctxt "BrokenHorizon,MenuQuit"
+msgid "QUIT TO DESKTOP"
+msgstr "QUIT TO DESKTOP"
+
+#. Key:	SessionReadyHelp
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(272)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(272)
+msgctxt "BrokenHorizon,SessionReadyHelp"
+msgid "Host a campaign or join a LAN campaign."
+msgstr "Host a campaign or join a LAN campaign."
+
+#. Key:	NewGameDeleteFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(371)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(371)
+msgctxt "BrokenHorizon,NewGameDeleteFailed"
+msgid "The existing checkpoint could not be cleared."
+msgstr "The existing checkpoint could not be cleared."
+
+#. Key:	HostNewCampaignFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(388)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(388)
+msgctxt "BrokenHorizon,HostNewCampaignFailed"
+msgid "The multiplayer campaign could not be hosted."
+msgstr "The multiplayer campaign could not be hosted."
+
+#. Key:	ContinueFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(415)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(415)
+msgctxt "BrokenHorizon,ContinueFailed"
+msgid "No valid shared campaign could be hosted."
+msgstr "No valid shared campaign could be hosted."
+
+#. Key:	JoinCampaignFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(434)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(434)
+msgctxt "BrokenHorizon,JoinCampaignFailed"
+msgid "No shared campaign could be joined."
+msgstr "No shared campaign could be joined."
+
+#. Key:	SettingsWidgetMissing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(453)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(453)
+msgctxt "BrokenHorizon,SettingsWidgetMissing"
+msgid "No settings widget is configured."
+msgstr "No settings widget is configured."
+
+#. Key:	SessionReady
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(627)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(627)
+msgctxt "BrokenHorizon,SessionReady"
+msgid "MULTIPLAYER // READY"
+msgstr "MULTIPLAYER // READY"
+
+#. Key:	SessionHeadingHosting
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(85)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(85)
+msgctxt "BrokenHorizon,SessionHeadingHosting"
+msgid "MULTIPLAYER // HOSTING"
+msgstr "MULTIPLAYER // HOSTING"
+
+#. Key:	SessionHeadingSearching
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(90)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(90)
+msgctxt "BrokenHorizon,SessionHeadingSearching"
+msgid "MULTIPLAYER // SEARCHING"
+msgstr "MULTIPLAYER // SEARCHING"
+
+#. Key:	SessionHeadingJoining
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(95)
+#: Source/BrokenHorizon/Private/BHMainMenuWidget.cpp(95)
+msgctxt "BrokenHorizon,SessionHeadingJoining"
+msgid "MULTIPLAYER // JOINING"
+msgstr "MULTIPLAYER // JOINING"
+
+#. Key:	MedicalSupplyInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMedicalSupply.cpp(9)
+#: Source/BrokenHorizon/Private/BHMedicalSupply.cpp(9)
+msgctxt "BrokenHorizon,MedicalSupplyInteraction"
+msgid "Restock Medical Supplies"
+msgstr "Restock Medical Supplies"
+
+#. Key:	MissionCompleteContinuePrompt
+#. SourceLocation:	Source/BrokenHorizon/Private/BHMissionCompleteWidget.cpp(151)
+#: Source/BrokenHorizon/Private/BHMissionCompleteWidget.cpp(151)
+msgctxt "BrokenHorizon,MissionCompleteContinuePrompt"
+msgid "{0}\n\n[ENTER / M] OPEN STRATEGIC COMMAND"
+msgstr "{0}\n\n[ENTER / M] OPEN STRATEGIC COMMAND"
+
+#. Key:	OpenWorldOperationResumed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1091)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1091)
+msgctxt "BrokenHorizon,OpenWorldOperationResumed"
+msgid "OPERATION RESUMED // {0}\n\nWave {1}/{2} // Hostiles {3} // Support {4}."
+msgstr "OPERATION RESUMED // {0}\n\nWave {1}/{2} // Hostiles {3} // Support {4}."
+
+#. Key:	OpenWorldDefenseApproachExpired
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1226)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1226)
+msgctxt "BrokenHorizon,OpenWorldDefenseApproachExpired"
+msgid "Friendly defenses collapsed before you reached the sector."
+msgstr "Friendly defenses collapsed before you reached the sector."
+
+#. Key:	OpenWorldOffensiveApproachExpired
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1232)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1232)
+msgctxt "BrokenHorizon,OpenWorldOffensiveApproachExpired"
+msgid "The operation was abandoned after the mobilization window expired."
+msgstr "The operation was abandoned after the mobilization window expired."
+
+#. Key:	OpenWorldDefenseWaveCleared
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1337)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1337)
+msgctxt "BrokenHorizon,OpenWorldDefenseWaveCleared"
+msgid "DEFENSE LINE HOLDING\n\nWave {0}/{2} defeated. Next assault in {1} seconds."
+msgstr "DEFENSE LINE HOLDING\n\nWave {0}/{2} defeated. Next assault in {1} seconds."
+
+#. Key:	OpenWorldAttackReactionDetected
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1344)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1344)
+msgctxt "BrokenHorizon,OpenWorldAttackReactionDetected"
+msgid "REACTION FORCE DETECTED\n\nInitial force broken; {3} hostiles routed. Enemy response arrives in {1} seconds."
+msgstr "REACTION FORCE DETECTED\n\nInitial force broken; {3} hostiles routed. Enemy response arrives in {1} seconds."
+
+#. Key:	OpenWorldDefenseWaveArrived
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1375)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1375)
+msgctxt "BrokenHorizon,OpenWorldDefenseWaveArrived"
+msgid "ENEMY ASSAULT // WAVE {0}/{1}\n\n{2} hostile contacts entering the sector."
+msgstr "ENEMY ASSAULT // WAVE {0}/{1}\n\n{2} hostile contacts entering the sector."
+
+#. Key:	OpenWorldAttackReactionArrived
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1381)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1381)
+msgctxt "BrokenHorizon,OpenWorldAttackReactionArrived"
+msgid "REACTION FORCE // WAVE {0}/{1}\n\n{2} hostile contacts entering the objective."
+msgstr "REACTION FORCE // WAVE {0}/{1}\n\n{2} hostile contacts entering the objective."
+
+#. Key:	OpenWorldDefenseStarted
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1617)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1617)
+msgctxt "BrokenHorizon,OpenWorldDefenseStarted"
+msgid "OPEN-WORLD OPERATION ACTIVE\n\nHold sector {0}. Enemy wave 1/{2} inbound.\nFriendly support: {1}."
+msgstr "OPEN-WORLD OPERATION ACTIVE\n\nHold sector {0}. Enemy wave 1/{2} inbound.\nFriendly support: {1}."
+
+#. Key:	OpenWorldRaidStarted
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1625)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1625)
+msgctxt "BrokenHorizon,OpenWorldRaidStarted"
+msgid "OPEN-WORLD RAID ACTIVE\n\nDisrupt enemy logistics in sector {0}.\nAvoid detection and unnecessary casualties to preserve a clean signature.\nExpected enemy waves: {2}.\nFriendly support: {1}."
+msgstr "OPEN-WORLD RAID ACTIVE\n\nDisrupt enemy logistics in sector {0}.\nAvoid detection and unnecessary casualties to preserve a clean signature.\nExpected enemy waves: {2}.\nFriendly support: {1}."
+
+#. Key:	OpenWorldAttackStarted
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1635)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(1635)
+msgctxt "BrokenHorizon,OpenWorldAttackStarted"
+msgid "OPEN-WORLD OPERATION ACTIVE\n\nClear hostile forces from sector {0}.\nExpected enemy waves: {2}.\nFriendly support: {1}."
+msgstr "OPEN-WORLD OPERATION ACTIVE\n\nClear hostile forces from sector {0}.\nExpected enemy waves: {2}.\nFriendly support: {1}."
+
+#. Key:	OpenWorldOperationDefendLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(180)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(180)
+msgctxt "BrokenHorizon,OpenWorldOperationDefendLabel"
+msgid "DEFEND"
+msgstr "DEFEND"
+
+#. Key:	OpenWorldOperationRaidLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(186)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(186)
+msgctxt "BrokenHorizon,OpenWorldOperationRaidLabel"
+msgid "RAID"
+msgstr "RAID"
+
+#. Key:	OpenWorldOperationAttackLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(191)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(191)
+msgctxt "BrokenHorizon,OpenWorldOperationAttackLabel"
+msgid "ATTACK"
+msgstr "ATTACK"
+
+#. Key:	OpenWorldOperationHeavyThreatLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(198)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(198)
+msgctxt "BrokenHorizon,OpenWorldOperationHeavyThreatLabel"
+msgid "HEAVY"
+msgstr "HEAVY"
+
+#. Key:	OpenWorldOperationModerateThreatLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(204)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(204)
+msgctxt "BrokenHorizon,OpenWorldOperationModerateThreatLabel"
+msgid "MODERATE"
+msgstr "MODERATE"
+
+#. Key:	OpenWorldOperationLightThreatLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(209)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(209)
+msgctxt "BrokenHorizon,OpenWorldOperationLightThreatLabel"
+msgid "LIGHT"
+msgstr "LIGHT"
+
+#. Key:	OpenWorldRaidCleanSignatureLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(222)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(222)
+msgctxt "BrokenHorizon,OpenWorldRaidCleanSignatureLabel"
+msgid "CLEAN"
+msgstr "CLEAN"
+
+#. Key:	OpenWorldRaidLoudSignatureLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(229)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(229)
+msgctxt "BrokenHorizon,OpenWorldRaidLoudSignatureLabel"
+msgid "LOUD"
+msgstr "LOUD"
+
+#. Key:	OpenWorldRaidContestedSignatureLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(234)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(234)
+msgctxt "BrokenHorizon,OpenWorldRaidContestedSignatureLabel"
+msgid "CONTESTED"
+msgstr "CONTESTED"
+
+#. Key:	OpenWorldRaidExfiltrationStarted
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2578)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2578)
+msgctxt "BrokenHorizon,OpenWorldRaidExfiltrationStarted"
+msgid "CHARGES ARMED // {0}\n\nEnemy reaction force: {2}. Break contact and move {1} meters away from the cache."
+msgstr "CHARGES ARMED // {0}\n\nEnemy reaction force: {2}. Break contact and move {1} meters away from the cache."
+
+#. Key:	OpenWorldDefenseApproachHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(262)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(262)
+msgctxt "BrokenHorizon,OpenWorldDefenseApproachHUDStatus"
+msgid "{0} // MOBILIZE {5} // {1} THREAT\nFORCE {2} WAVES x {3} // SUPPORT {4}"
+msgstr "{0} // MOBILIZE {5} // {1} THREAT\nFORCE {2} WAVES x {3} // SUPPORT {4}"
+
+#. Key:	OpenWorldRaidCompromised
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2712)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2712)
+msgctxt "BrokenHorizon,OpenWorldRaidCompromised"
+msgid "RAID COMPROMISED // ENEMY ALERTED\n\nClean signature lost. Complete sabotage and exfiltrate."
+msgstr "RAID COMPROMISED // ENEMY ALERTED\n\nClean signature lost. Complete sabotage and exfiltrate."
+
+#. Key:	OpenWorldAttackApproachHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(278)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(278)
+msgctxt "BrokenHorizon,OpenWorldAttackApproachHUDStatus"
+msgid "{0} // MOBILIZE {6} // {1} THREAT\nFORCE {2} + {3}x{4} REACTION // SUPPORT {5}"
+msgstr "{0} // MOBILIZE {6} // {1} THREAT\nFORCE {2} + {3}x{4} REACTION // SUPPORT {5}"
+
+#. Key:	OpenWorldEnemyRouted
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2863)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2863)
+msgctxt "BrokenHorizon,OpenWorldEnemyRouted"
+msgid "ENEMY WITHDRAWAL // {0} ROUTED\n\nBroken hostiles have abandoned the engagement."
+msgstr "ENEMY WITHDRAWAL // {0} ROUTED\n\nBroken hostiles have abandoned the engagement."
+
+#. Key:	OpenWorldRaidDisruptObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2930)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2930)
+msgctxt "BrokenHorizon,OpenWorldRaidDisruptObjective"
+msgid "REACTION FORCE DEFEATED\n\nEnter the objective and finish disrupting enemy logistics at {0}."
+msgstr "REACTION FORCE DEFEATED\n\nEnter the objective and finish disrupting enemy logistics at {0}."
+
+#. Key:	OpenWorldAttackSecureObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2937)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(2937)
+msgctxt "BrokenHorizon,OpenWorldAttackSecureObjective"
+msgid "HOSTILE FORCE BROKEN\n\n{1} hostiles routed. Enter and secure the objective at {0}."
+msgstr "HOSTILE FORCE BROKEN\n\n{1} hostiles routed. Enter and secure the objective at {0}."
+
+#. Key:	OpenWorldDefenseConfirmHold
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(3029)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(3029)
+msgctxt "BrokenHorizon,OpenWorldDefenseConfirmHold"
+msgid "FINAL ASSAULT REPELLED\n\nReturn to the defensive line at {0} and hold the sector."
+msgstr "FINAL ASSAULT REPELLED\n\nReturn to the defensive line at {0} and hold the sector."
+
+#. Key:	OpenWorldRaidExfilHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(313)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(313)
+msgctxt "BrokenHorizon,OpenWorldRaidExfilHUDStatus"
+msgid "{0} // CHARGES ARMED // BREAK CONTACT\nSIGNATURE {1} // EXFIL {2} M // HOSTILES {3} // SUPPORT {4}/{5}"
+msgstr "{0} // CHARGES ARMED // BREAK CONTACT\nSIGNATURE {1} // EXFIL {2} M // HOSTILES {3} // SUPPORT {4}/{5}"
+
+#. Key:	OpenWorldDefenseBreachWarning
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(3165)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(3165)
+msgctxt "BrokenHorizon,OpenWorldDefenseBreachWarning"
+msgid "DEFENSIVE LINE BREACHED // {0}\n\nHostiles control the objective. Retake it within {1} seconds or the sector will fall."
+msgstr "DEFENSIVE LINE BREACHED // {0}\n\nHostiles control the objective. Retake it within {1} seconds or the sector will fall."
+
+#. Key:	OpenWorldDefenseBreachRecovered
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(3198)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(3198)
+msgctxt "BrokenHorizon,OpenWorldDefenseBreachRecovered"
+msgid "DEFENSIVE LINE STABILIZED // {0}\n\nFriendly forces have regained the objective."
+msgstr "DEFENSIVE LINE STABILIZED // {0}\n\nFriendly forces have regained the objective."
+
+#. Key:	OpenWorldDefenseBreachFailureReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(3227)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(3227)
+msgctxt "BrokenHorizon,OpenWorldDefenseBreachFailureReason"
+msgid "Hostile forces overran the defensive objective."
+msgstr "Hostile forces overran the defensive objective."
+
+#. Key:	OpenWorldRaidSabotageHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(331)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(331)
+msgctxt "BrokenHorizon,OpenWorldRaidSabotageHUDStatus"
+msgid "{0} // SABOTAGE LOGISTICS CACHE\nSIGNATURE {1} // HOSTILES {2} // SUPPORT {3}/{4}"
+msgstr "{0} // SABOTAGE LOGISTICS CACHE\nSIGNATURE {1} // HOSTILES {2} // SUPPORT {3}/{4}"
+
+#. Key:	OpenWorldDefenseBreachHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(359)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(359)
+msgctxt "BrokenHorizon,OpenWorldDefenseBreachHUDStatus"
+msgid "{0} // OBJECTIVE OVERRUN // {1}s\nRETAKE DEFENSIVE LINE // SUPPORT {2}/{3}"
+msgstr "{0} // OBJECTIVE OVERRUN // {1}s\nRETAKE DEFENSIVE LINE // SUPPORT {2}/{3}"
+
+#. Key:	OpenWorldDefenseBreachRecoveringHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(365)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(365)
+msgctxt "BrokenHorizon,OpenWorldDefenseBreachRecoveringHUDStatus"
+msgid "{0} // LINE STABILIZING // {1}s\nHOLD DEFENSIVE LINE // SUPPORT {2}/{3}"
+msgstr "{0} // LINE STABILIZING // {1}s\nHOLD DEFENSIVE LINE // SUPPORT {2}/{3}"
+
+#. Key:	OpenWorldDefenseHoldHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(395)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(395)
+msgctxt "BrokenHorizon,OpenWorldDefenseHoldHUDStatus"
+msgid "{0} // CONFIRM HOLD // {1}%\n{2} // RADIUS {3} M // SUPPORT {4}/{5}"
+msgstr "{0} // CONFIRM HOLD // {1}%\n{2} // RADIUS {3} M // SUPPORT {4}/{5}"
+
+#. Key:	OpenWorldDefenseHoldAreaContested
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(404)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(404)
+msgctxt "BrokenHorizon,OpenWorldDefenseHoldAreaContested"
+msgid "CONTESTED // CLEAR HOSTILES"
+msgstr "CONTESTED // CLEAR HOSTILES"
+
+#. Key:	OpenWorldDefenseInsideHoldArea
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(411)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(411)
+msgctxt "BrokenHorizon,OpenWorldDefenseInsideHoldArea"
+msgid "HOLDING DEFENSIVE LINE"
+msgstr "HOLDING DEFENSIVE LINE"
+
+#. Key:	OpenWorldDefenseOutsideHoldArea
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(416)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(416)
+msgctxt "BrokenHorizon,OpenWorldDefenseOutsideHoldArea"
+msgid "RETURN TO DEFENSIVE LINE"
+msgstr "RETURN TO DEFENSIVE LINE"
+
+#. Key:	OpenWorldRaidDisruptHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(451)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(451)
+msgctxt "BrokenHorizon,OpenWorldRaidDisruptHUDStatus"
+msgid "{0} // DISRUPT LOGISTICS // {1}%\n{2} // RADIUS {3} M // SUPPORT {4}/{5}"
+msgstr "{0} // DISRUPT LOGISTICS // {1}%\n{2} // RADIUS {3} M // SUPPORT {4}/{5}"
+
+#. Key:	OpenWorldAttackSecureHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(457)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(457)
+msgctxt "BrokenHorizon,OpenWorldAttackSecureHUDStatus"
+msgid "{0} // SECURE OBJECTIVE // {1}%\n{2} // RADIUS {3} M // SUPPORT {4}/{5}"
+msgstr "{0} // SECURE OBJECTIVE // {1}%\n{2} // RADIUS {3} M // SUPPORT {4}/{5}"
+
+#. Key:	OpenWorldAttackSecureAreaContested
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(466)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(466)
+msgctxt "BrokenHorizon,OpenWorldAttackSecureAreaContested"
+msgid "CONTESTED // CLEAR HOSTILES"
+msgstr "CONTESTED // CLEAR HOSTILES"
+
+#. Key:	OpenWorldAttackInsideSecureArea
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(473)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(473)
+msgctxt "BrokenHorizon,OpenWorldAttackInsideSecureArea"
+msgid "SECURING"
+msgstr "SECURING"
+
+#. Key:	OpenWorldAttackOutsideSecureArea
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(478)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(478)
+msgctxt "BrokenHorizon,OpenWorldAttackOutsideSecureArea"
+msgid "ENTER OBJECTIVE AREA"
+msgstr "ENTER OBJECTIVE AREA"
+
+#. Key:	OpenWorldOperationWaveCountdownHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(497)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(497)
+msgctxt "BrokenHorizon,OpenWorldOperationWaveCountdownHUDStatus"
+msgid "{0} // {1} THREAT // WAVE {2}/{3} CLEAR\nREINFORCEMENTS {4}s // SUPPORT {5}/{6}"
+msgstr "{0} // {1} THREAT // WAVE {2}/{3} CLEAR\nREINFORCEMENTS {4}s // SUPPORT {5}/{6}"
+
+#. Key:	OpenWorldOperationHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(515)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(515)
+msgctxt "BrokenHorizon,OpenWorldOperationHUDStatus"
+msgid "{0} // {1} THREAT // WAVE {2}/{3}\nHOSTILES {4} // ROUTED {5} // SUPPORT {6}/{7}"
+msgstr "{0} // {1} THREAT // WAVE {2}/{3}\nHOSTILES {4} // ROUTED {5} // SUPPORT {6}/{7}"
+
+#. Key:	OpenWorldOperationLogisticsHUDStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(547)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(547)
+msgctxt "BrokenHorizon,OpenWorldOperationLogisticsHUDStatus"
+msgid "{0}\nSTAGING {1} // SUPPLY {2}%\nLOSSES // SUPPORT {3} // HOSTILES {4}"
+msgstr "{0}\nSTAGING {1} // SUPPLY {2}%\nLOSSES // SUPPORT {3} // HOSTILES {4}"
+
+#. Key:	OpenWorldOperationAssigned
+#. SourceLocation:	Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(97)
+#: Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp(97)
+msgctxt "BrokenHorizon,OpenWorldOperationAssigned"
+msgid "OPERATION ASSIGNED // {0}\n\nTravel to the marked sector. Distance: {1} km.\nMobilization window: {2} minutes."
+msgstr "OPERATION ASSIGNED // {0}\n\nTravel to the marked sector. Distance: {1} km.\nMobilization window: {2} minutes."
+
+#. Key:	PauseResume
+#. SourceLocation:	Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(103)
+#: Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(103)
+msgctxt "BrokenHorizon,PauseResume"
+msgid "RESUME OPERATION"
+msgstr "RESUME OPERATION"
+
+#. Key:	PauseRestart
+#. SourceLocation:	Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(109)
+#: Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(109)
+msgctxt "BrokenHorizon,PauseRestart"
+msgid "RESTART CHECKPOINT"
+msgstr "RESTART CHECKPOINT"
+
+#. Key:	PauseSettings
+#. SourceLocation:	Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(119)
+#: Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(119)
+msgctxt "BrokenHorizon,PauseSettings"
+msgid "SETTINGS"
+msgstr "SETTINGS"
+
+#. Key:	PauseMainMenu
+#. SourceLocation:	Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(125)
+#: Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(125)
+msgctxt "BrokenHorizon,PauseMainMenu"
+msgid "RETURN TO COMMAND"
+msgstr "RETURN TO COMMAND"
+
+#. Key:	RestartCheckpointFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(210)
+#: Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(210)
+msgctxt "BrokenHorizon,RestartCheckpointFailed"
+msgid "The checkpoint could not be restarted."
+msgstr "The checkpoint could not be restarted."
+
+#. Key:	PauseSettingsMissing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(226)
+#: Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(226)
+msgctxt "BrokenHorizon,PauseSettingsMissing"
+msgid "No settings widget is configured."
+msgstr "No settings widget is configured."
+
+#. Key:	MainMenuFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(259)
+#: Source/BrokenHorizon/Private/BHPauseMenuWidget.cpp(259)
+msgctxt "BrokenHorizon,MainMenuFailed"
+msgid "Progress could not be saved or the command menu is unavailable."
+msgstr "Progress could not be saved or the command menu is unavailable."
+
+#. Key:	RaidSabotageTargetArmedWorldLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(177)
+#: Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(177)
+msgctxt "BrokenHorizon,RaidSabotageTargetArmedWorldLabel"
+msgid "DEMOLITION CHARGES ARMED"
+msgstr "DEMOLITION CHARGES ARMED"
+
+#. Key:	RaidSabotageTargetArmed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(187)
+#: Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(187)
+msgctxt "BrokenHorizon,RaidSabotageTargetArmed"
+msgid "LOGISTICS TARGET SABOTAGED // {0}\n\nDemolition charges armed. Break contact."
+msgstr "LOGISTICS TARGET SABOTAGED // {0}\n\nDemolition charges armed. Break contact."
+
+#. Key:	RaidSabotageTargetAlreadyArmedPrompt
+#. SourceLocation:	Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(223)
+#: Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(223)
+msgctxt "BrokenHorizon,RaidSabotageTargetAlreadyArmedPrompt"
+msgid "Demolition Charges Armed"
+msgstr "Demolition Charges Armed"
+
+#. Key:	RaidSabotageTargetPrompt
+#. SourceLocation:	Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(228)
+#: Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(228)
+msgctxt "BrokenHorizon,RaidSabotageTargetPrompt"
+msgid "Plant Demolition Charges"
+msgstr "Plant Demolition Charges"
+
+#. Key:	RaidSabotageTargetWorldLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(77)
+#: Source/BrokenHorizon/Private/BHRaidSabotageTarget.cpp(77)
+msgctxt "BrokenHorizon,RaidSabotageTargetWorldLabel"
+msgid "ENEMY LOGISTICS CACHE"
+msgstr "ENEMY LOGISTICS CACHE"
+
+#. Key:	DeploymentPreCheckpointFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(1169)
+#: Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(1169)
+msgctxt "BrokenHorizon,DeploymentPreCheckpointFailed"
+msgid "DEPLOYMENT BLOCKED\n\nThe current campaign could not be checkpointed. No operation resources were committed."
+msgstr "DEPLOYMENT BLOCKED\n\nThe current campaign could not be checkpointed. No operation resources were committed."
+
+#. Key:	DeploymentPostCheckpointRetry
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(1208)
+#: Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(1208)
+msgctxt "BrokenHorizon,DeploymentPostCheckpointRetry"
+msgid "OPERATION ACTIVE\n\nThe deployment checkpoint is retrying. The previous campaign checkpoint remains safe."
+msgstr "OPERATION ACTIVE\n\nThe deployment checkpoint is retrying. The previous campaign checkpoint remains safe."
+
+#. Key:	PlayerDeathRedeploymentCost
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(2488)
+#: Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(2488)
+msgctxt "BrokenHorizon,PlayerDeathRedeploymentCost"
+msgid "REDEPLOYMENT COMPLETE\n\nA replacement was drawn from {0}.\nFriendly strength and supply were reduced.\n{1}"
+msgstr "REDEPLOYMENT COMPLETE\n\nA replacement was drawn from {0}.\nFriendly strength and supply were reduced.\n{1}"
+
+#. Key:	PlayerDeathAttritionSaved
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(2498)
+#: Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(2498)
+msgctxt "BrokenHorizon,PlayerDeathAttritionSaved"
+msgid "CAMPAIGN UPDATED"
+msgstr "CAMPAIGN UPDATED"
+
+#. Key:	PlayerDeathAttritionSaveFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(2503)
+#: Source/BrokenHorizon/Private/BHSaveSubsystem.cpp(2503)
+msgctxt "BrokenHorizon,PlayerDeathAttritionSaveFailed"
+msgid "CAMPAIGN SAVE FAILED"
+msgstr "CAMPAIGN SAVE FAILED"
+
+#. Key:	UninitializedSectorStatus
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorAnchor.cpp(71)
+#: Source/BrokenHorizon/Private/BHSectorAnchor.cpp(71)
+msgctxt "BrokenHorizon,UninitializedSectorStatus"
+msgid "SECTOR STATUS UNAVAILABLE"
+msgstr "SECTOR STATUS UNAVAILABLE"
+
+#. Key:	SectorCheckpointUpdatedLoadoutFull
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(216)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(216)
+msgctxt "BrokenHorizon,SectorCheckpointUpdatedLoadoutFull"
+msgid "CHECKPOINT UPDATED\n\nLoadout full. Respawn position secured."
+msgstr "CHECKPOINT UPDATED\n\nLoadout full. Respawn position secured."
+
+#. Key:	SectorCheckpointFailedLoadoutFull
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(222)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(222)
+msgctxt "BrokenHorizon,SectorCheckpointFailedLoadoutFull"
+msgid "LOADOUT FULL\n\nCheckpoint update failed."
+msgstr "LOADOUT FULL\n\nCheckpoint update failed."
+
+#. Key:	SectorResupplyRechargingCheckpoint
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(243)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(243)
+msgctxt "BrokenHorizon,SectorResupplyRechargingCheckpoint"
+msgid "RESUPPLY RECHARGING\n\nAvailable in {0} seconds. Checkpoint updated."
+msgstr "RESUPPLY RECHARGING\n\nAvailable in {0} seconds. Checkpoint updated."
+
+#. Key:	SectorResupplyRechargingNoCheckpoint
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(250)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(250)
+msgctxt "BrokenHorizon,SectorResupplyRechargingNoCheckpoint"
+msgid "RESUPPLY RECHARGING\n\nAvailable in {0} seconds. Checkpoint update failed."
+msgstr "RESUPPLY RECHARGING\n\nAvailable in {0} seconds. Checkpoint update failed."
+
+#. Key:	SectorEmergencyFallbackIssued
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(358)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(358)
+msgctxt "BrokenHorizon,SectorEmergencyFallbackIssued"
+msgid "EMERGENCY FALLBACK KIT ISSUED\n\n+{0} ROUNDS // +{1} MEDKIT // +{2} DRESSING\nNO ARMOR, GRENADES, FIRETEAM, OR VEHICLE SERVICE // {3}"
+msgstr "EMERGENCY FALLBACK KIT ISSUED\n\n+{0} ROUNDS // +{1} MEDKIT // +{2} DRESSING\nNO ARMOR, GRENADES, FIRETEAM, OR VEHICLE SERVICE // {3}"
+
+#. Key:	SectorEmergencyFallbackCheckpointSaved
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(371)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(371)
+msgctxt "BrokenHorizon,SectorEmergencyFallbackCheckpointSaved"
+msgid "CHECKPOINT SAVED"
+msgstr "CHECKPOINT SAVED"
+
+#. Key:	SectorEmergencyFallbackCheckpointFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(376)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(376)
+msgctxt "BrokenHorizon,SectorEmergencyFallbackCheckpointFailed"
+msgid "CHECKPOINT SAVE FAILED"
+msgstr "CHECKPOINT SAVE FAILED"
+
+#. Key:	SectorResupplyInsufficientCheckpoint
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(405)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(405)
+msgctxt "BrokenHorizon,SectorResupplyInsufficientCheckpoint"
+msgid "RESUPPLY UNAVAILABLE\n\nSector supply is below the required {0}%.\nCheckpoint updated."
+msgstr "RESUPPLY UNAVAILABLE\n\nSector supply is below the required {0}%.\nCheckpoint updated."
+
+#. Key:	SectorResupplyInsufficientNoCheckpoint
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(412)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(412)
+msgctxt "BrokenHorizon,SectorResupplyInsufficientNoCheckpoint"
+msgid "RESUPPLY UNAVAILABLE\n\nSector supply is below the required {0}%.\nCheckpoint update failed."
+msgstr "RESUPPLY UNAVAILABLE\n\nSector supply is below the required {0}%.\nCheckpoint update failed."
+
+#. Key:	SectorResupplyComplete
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(523)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(523)
+msgctxt "BrokenHorizon,SectorResupplyComplete"
+msgid "SECTOR RESUPPLY COMPLETE\n\n+{0} ROUNDS // +{1} MEDKITS // +{2} DRESSINGS\n+{3} FRAGS // FIRETEAM {4} SERVICED // CASUALTIES {8} STABILIZED / {9} EVACUATED\nARMOR SERVICED // SECTOR SUPPLY {5}%\nVEHICLE {6} // {7}"
+msgstr "SECTOR RESUPPLY COMPLETE\n\n+{0} ROUNDS // +{1} MEDKITS // +{2} DRESSINGS\n+{3} FRAGS // FIRETEAM {4} SERVICED // CASUALTIES {8} STABILIZED / {9} EVACUATED\nARMOR SERVICED // SECTOR SUPPLY {5}%\nVEHICLE {6} // {7}"
+
+#. Key:	SectorVehicleRecovered
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(542)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(542)
+msgctxt "BrokenHorizon,SectorVehicleRecovered"
+msgid "RECOVERED / REFUELED / REPAIRED"
+msgstr "RECOVERED / REFUELED / REPAIRED"
+
+#. Key:	SectorVehicleServiced
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(548)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(548)
+msgctxt "BrokenHorizon,SectorVehicleServiced"
+msgid "REFUELED / REPAIRED"
+msgstr "REFUELED / REPAIRED"
+
+#. Key:	SectorVehicleNotServiced
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(553)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(553)
+msgctxt "BrokenHorizon,SectorVehicleNotServiced"
+msgid "NO SERVICE REQUIRED"
+msgstr "NO SERVICE REQUIRED"
+
+#. Key:	SectorResupplyCheckpointSaved
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(559)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(559)
+msgctxt "BrokenHorizon,SectorResupplyCheckpointSaved"
+msgid "CHECKPOINT SAVED"
+msgstr "CHECKPOINT SAVED"
+
+#. Key:	SectorResupplyCheckpointFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(564)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(564)
+msgctxt "BrokenHorizon,SectorResupplyCheckpointFailed"
+msgid "CHECKPOINT SAVE FAILED"
+msgstr "CHECKPOINT SAVE FAILED"
+
+#. Key:	SectorResupplyLockedInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(654)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(654)
+msgctxt "BrokenHorizon,SectorResupplyLockedInteraction"
+msgid "Sector Resupply Locked"
+msgstr "Sector Resupply Locked"
+
+#. Key:	SectorResupplyCooldownInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(663)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(663)
+msgctxt "BrokenHorizon,SectorResupplyCooldownInteraction"
+msgid "Sector Resupply Recharging"
+msgstr "Sector Resupply Recharging"
+
+#. Key:	SectorEmergencyFallbackInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(673)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(673)
+msgctxt "BrokenHorizon,SectorEmergencyFallbackInteraction"
+msgid "[F] Emergency Fallback Kit"
+msgstr "[F] Emergency Fallback Kit"
+
+#. Key:	SectorResupplyInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(680)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(680)
+msgctxt "BrokenHorizon,SectorResupplyInteraction"
+msgid "[F] Resupply / Vehicle Support // [C] Recruit Fireteam"
+msgstr "[F] Resupply / Vehicle Support // [C] Recruit Fireteam"
+
+#. Key:	SectorResupplyNotFriendly
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(88)
+#: Source/BrokenHorizon/Private/BHSectorResupplyStation.cpp(88)
+msgctxt "BrokenHorizon,SectorResupplyNotFriendly"
+msgid "RESUPPLY UNAVAILABLE\n\nThis sector is not under friendly control."
+msgstr "RESUPPLY UNAVAILABLE\n\nThis sector is not under friendly control."
+
+#. Key:	SessionSearching
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(129)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(129)
+msgctxt "BrokenHorizon,SessionSearching"
+msgid "Searching for campaign sessions..."
+msgstr "Searching for campaign sessions..."
+
+#. Key:	SessionSearchStartFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(144)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(144)
+msgctxt "BrokenHorizon,SessionSearchStartFailed"
+msgid "Campaign search could not be started."
+msgstr "Campaign search could not be started."
+
+#. Key:	SessionLeaving
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(172)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(172)
+msgctxt "BrokenHorizon,SessionLeaving"
+msgid "Leaving campaign session..."
+msgstr "Leaving campaign session..."
+
+#. Key:	SessionLeaveFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(195)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(195)
+msgctxt "BrokenHorizon,SessionLeaveFailed"
+msgid "The campaign session could not be closed."
+msgstr "The campaign session could not be closed."
+
+#. Key:	OnlineSubsystemMissing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(234)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(234)
+msgctxt "BrokenHorizon,OnlineSubsystemMissing"
+msgid "No online service is available."
+msgstr "No online service is available."
+
+#. Key:	SessionInterfaceMissing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(248)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(248)
+msgctxt "BrokenHorizon,SessionInterfaceMissing"
+msgid "The online service does not support sessions."
+msgstr "The online service does not support sessions."
+
+#. Key:	SessionInterfaceLost
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(265)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(265)
+msgctxt "BrokenHorizon,SessionInterfaceLost"
+msgid "The online session service became unavailable."
+msgstr "The online session service became unavailable."
+
+#. Key:	SessionCreateStartFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(313)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(313)
+msgctxt "BrokenHorizon,SessionCreateStartFailed"
+msgid "The campaign session could not be created."
+msgstr "The campaign session could not be created."
+
+#. Key:	SessionLoadingCampaign
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(352)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(352)
+msgctxt "BrokenHorizon,SessionLoadingCampaign"
+msgid "Loading shared campaign..."
+msgstr "Loading shared campaign..."
+
+#. Key:	SessionStartingCampaign
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(357)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(357)
+msgctxt "BrokenHorizon,SessionStartingCampaign"
+msgid "Starting shared campaign..."
+msgstr "Starting shared campaign..."
+
+#. Key:	SessionIdle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(390)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(390)
+msgctxt "BrokenHorizon,SessionIdle"
+msgid "Ready."
+msgstr "Ready."
+
+#. Key:	SessionCreateFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(477)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(477)
+msgctxt "BrokenHorizon,SessionCreateFailed"
+msgid "The campaign session could not be created."
+msgstr "The campaign session could not be created."
+
+#. Key:	SessionTravelFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(491)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(491)
+msgctxt "BrokenHorizon,SessionTravelFailed"
+msgid "The shared campaign could not be opened."
+msgstr "The shared campaign could not be opened."
+
+#. Key:	SessionSearchFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(517)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(517)
+msgctxt "BrokenHorizon,SessionSearchFailed"
+msgid "Campaign search failed."
+msgstr "Campaign search failed."
+
+#. Key:	SessionNoneFound
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(548)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(548)
+msgctxt "BrokenHorizon,SessionNoneFound"
+msgid "No joinable Broken Horizon campaign was found."
+msgstr "No joinable Broken Horizon campaign was found."
+
+#. Key:	SessionJoining
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(567)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(567)
+msgctxt "BrokenHorizon,SessionJoining"
+msgid "Joining shared campaign..."
+msgstr "Joining shared campaign..."
+
+#. Key:	SessionJoinStartFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(586)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(586)
+msgctxt "BrokenHorizon,SessionJoinStartFailed"
+msgid "The selected campaign could not be joined."
+msgstr "The selected campaign could not be joined."
+
+#. Key:	SessionJoinFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(616)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(616)
+msgctxt "BrokenHorizon,SessionJoinFailed"
+msgid "The selected campaign could not be joined."
+msgstr "The selected campaign could not be joined."
+
+#. Key:	SessionAddressMissing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(634)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(634)
+msgctxt "BrokenHorizon,SessionAddressMissing"
+msgid "The campaign server address could not be resolved."
+msgstr "The campaign server address could not be resolved."
+
+#. Key:	SessionHosting
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(65)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(65)
+msgctxt "BrokenHorizon,SessionHosting"
+msgid "Creating campaign session..."
+msgstr "Creating campaign session..."
+
+#. Key:	SessionPlayerMissing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(651)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(651)
+msgctxt "BrokenHorizon,SessionPlayerMissing"
+msgid "No local player is available to join the campaign."
+msgstr "No local player is available to join the campaign."
+
+#. Key:	SessionConnecting
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(662)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(662)
+msgctxt "BrokenHorizon,SessionConnecting"
+msgid "Connecting to shared campaign..."
+msgstr "Connecting to shared campaign..."
+
+#. Key:	SessionDestroyFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(690)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(690)
+msgctxt "BrokenHorizon,SessionDestroyFailed"
+msgid "The previous campaign session could not be closed."
+msgstr "The previous campaign session could not be closed."
+
+#. Key:	SessionReturnMenuFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(713)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(713)
+msgctxt "BrokenHorizon,SessionReturnMenuFailed"
+msgid "The main menu could not be opened."
+msgstr "The main menu could not be opened."
+
+#. Key:	SessionConnected
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(760)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(760)
+msgctxt "BrokenHorizon,SessionConnected"
+msgid "Connected to shared campaign."
+msgstr "Connected to shared campaign."
+
+#. Key:	SessionDestroyBeforeHostFailed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(90)
+#: Source/BrokenHorizon/Private/BHSessionSubsystem.cpp(90)
+msgctxt "BrokenHorizon,SessionDestroyBeforeHostFailed"
+msgid "The previous campaign session could not be closed."
+msgstr "The previous campaign session could not be closed."
+
+#. Key:	OpenRemapping
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1024)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1024)
+msgctxt "BrokenHorizon,OpenRemapping"
+msgid "REMAP CONTROLS"
+msgstr "REMAP CONTROLS"
+
+#. Key:	InputRemappingHeading
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1054)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1054)
+msgctxt "BrokenHorizon,InputRemappingHeading"
+msgid "KEYBOARD + CONTROLLER REMAPPING"
+msgstr "KEYBOARD + CONTROLLER REMAPPING"
+
+#. Key:	InputRemappingInstructions
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1064)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1064)
+msgctxt "BrokenHorizon,InputRemappingInstructions"
+msgid "Select a field, then press the replacement input. Conflicts are rejected until every action has a unique input."
+msgstr "Select a field, then press the replacement input. Conflicts are rejected until every action has a unique input."
+
+#. Key:	InputModeSettingsHeading
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1097)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1097)
+msgctxt "BrokenHorizon,InputModeSettingsHeading"
+msgid "TOGGLE + HOLD MODES"
+msgstr "TOGGLE + HOLD MODES"
+
+#. Key:	ToggleAim
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1101)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1101)
+msgctxt "BrokenHorizon,ToggleAim"
+msgid "TOGGLE AIM"
+msgstr "TOGGLE AIM"
+
+#. Key:	ToggleSprint
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1105)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1105)
+msgctxt "BrokenHorizon,ToggleSprint"
+msgid "TOGGLE SPRINT"
+msgstr "TOGGLE SPRINT"
+
+#. Key:	ToggleCrouch
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1109)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1109)
+msgctxt "BrokenHorizon,ToggleCrouch"
+msgid "TOGGLE CROUCH"
+msgstr "TOGGLE CROUCH"
+
+#. Key:	ToggleProne
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1113)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1113)
+msgctxt "BrokenHorizon,ToggleProne"
+msgid "TOGGLE PRONE"
+msgstr "TOGGLE PRONE"
+
+#. Key:	ToggleLean
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1117)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1117)
+msgctxt "BrokenHorizon,ToggleLean"
+msgid "TOGGLE LEAN"
+msgstr "TOGGLE LEAN"
+
+#. Key:	HoldInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1121)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1121)
+msgctxt "BrokenHorizon,HoldInteraction"
+msgid "HOLD TO INTERACT"
+msgstr "HOLD TO INTERACT"
+
+#. Key:	VisualComfortSettingsHeading
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1130)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1130)
+msgctxt "BrokenHorizon,VisualComfortSettingsHeading"
+msgid "CAMERA + VISUAL COMFORT"
+msgstr "CAMERA + VISUAL COMFORT"
+
+#. Key:	CameraShakeScale
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1150)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1150)
+msgctxt "BrokenHorizon,CameraShakeScale"
+msgid "CAMERA SHAKE"
+msgstr "CAMERA SHAKE"
+
+#. Key:	RecoilAnimationScale
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1154)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1154)
+msgctxt "BrokenHorizon,RecoilAnimationScale"
+msgid "RECOIL MOTION"
+msgstr "RECOIL MOTION"
+
+#. Key:	HeadBobScale
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1158)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1158)
+msgctxt "BrokenHorizon,HeadBobScale"
+msgid "HEAD BOB"
+msgstr "HEAD BOB"
+
+#. Key:	HitFlashScale
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1162)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1162)
+msgctxt "BrokenHorizon,HitFlashScale"
+msgid "DAMAGE FLASH"
+msgstr "DAMAGE FLASH"
+
+#. Key:	MotionBlur
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1166)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1166)
+msgctxt "BrokenHorizon,MotionBlur"
+msgid "MOTION BLUR"
+msgstr "MOTION BLUR"
+
+#. Key:	DepthOfField
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1170)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1170)
+msgctxt "BrokenHorizon,DepthOfField"
+msgid "DEPTH OF FIELD"
+msgstr "DEPTH OF FIELD"
+
+#. Key:	ChromaticAberration
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1174)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1174)
+msgctxt "BrokenHorizon,ChromaticAberration"
+msgid "CHROMATIC ABERRATION"
+msgstr "CHROMATIC ABERRATION"
+
+#. Key:	SubtitleSettingsHeading
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1179)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1179)
+msgctxt "BrokenHorizon,SubtitleSettingsHeading"
+msgid "SUBTITLES + SAFE AREA"
+msgstr "SUBTITLES + SAFE AREA"
+
+#. Key:	SubtitlesEnabled
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1183)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1183)
+msgctxt "BrokenHorizon,SubtitlesEnabled"
+msgid "SUBTITLES"
+msgstr "SUBTITLES"
+
+#. Key:	SubtitleSpeakerLabels
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1187)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1187)
+msgctxt "BrokenHorizon,SubtitleSpeakerLabels"
+msgid "SPEAKER LABELS"
+msgstr "SPEAKER LABELS"
+
+#. Key:	SubtitleDirectionalIndicators
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1191)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1191)
+msgctxt "BrokenHorizon,SubtitleDirectionalIndicators"
+msgid "DIRECTION INDICATORS"
+msgstr "DIRECTION INDICATORS"
+
+#. Key:	SubtitleTextScale
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1195)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1195)
+msgctxt "BrokenHorizon,SubtitleTextScale"
+msgid "SUBTITLE SIZE"
+msgstr "SUBTITLE SIZE"
+
+#. Key:	SubtitleBackgroundOpacity
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1201)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1201)
+msgctxt "BrokenHorizon,SubtitleBackgroundOpacity"
+msgid "SUBTITLE BACKGROUND"
+msgstr "SUBTITLE BACKGROUND"
+
+#. Key:	UISafeAreaScale
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1205)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1205)
+msgctxt "BrokenHorizon,UISafeAreaScale"
+msgid "UI SAFE AREA"
+msgstr "UI SAFE AREA"
+
+#. Key:	ResetRemapping
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1282)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1282)
+msgctxt "BrokenHorizon,ResetRemapping"
+msgid "RESET BINDINGS"
+msgstr "RESET BINDINGS"
+
+#. Key:	CloseRemapping
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1289)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1289)
+msgctxt "BrokenHorizon,CloseRemapping"
+msgid "BACK TO SETTINGS"
+msgstr "BACK TO SETTINGS"
+
+#. Key:	ResponsiveSettingsHeading
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1331)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1331)
+msgctxt "BrokenHorizon,ResponsiveSettingsHeading"
+msgid "SETTINGS"
+msgstr "SETTINGS"
+
+#. Key:	ResponsiveLookHeading
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1358)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1358)
+msgctxt "BrokenHorizon,ResponsiveLookHeading"
+msgid "LOOK CONTROLS"
+msgstr "LOOK CONTROLS"
+
+#. Key:	ResponsiveMouseSensitivity
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1363)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1363)
+msgctxt "BrokenHorizon,ResponsiveMouseSensitivity"
+msgid "MOUSE SENSITIVITY"
+msgstr "MOUSE SENSITIVITY"
+
+#. Key:	ResponsiveHorizontalSensitivity
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1368)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1368)
+msgctxt "BrokenHorizon,ResponsiveHorizontalSensitivity"
+msgid "HORIZONTAL SENSITIVITY"
+msgstr "HORIZONTAL SENSITIVITY"
+
+#. Key:	ResponsiveVerticalSensitivity
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1373)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1373)
+msgctxt "BrokenHorizon,ResponsiveVerticalSensitivity"
+msgid "VERTICAL SENSITIVITY"
+msgstr "VERTICAL SENSITIVITY"
+
+#. Key:	ResponsiveADSSensitivity
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1378)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1378)
+msgctxt "BrokenHorizon,ResponsiveADSSensitivity"
+msgid "ADS SENSITIVITY"
+msgstr "ADS SENSITIVITY"
+
+#. Key:	ResponsiveInvertVerticalLook
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1383)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1383)
+msgctxt "BrokenHorizon,ResponsiveInvertVerticalLook"
+msgid "INVERT VERTICAL LOOK"
+msgstr "INVERT VERTICAL LOOK"
+
+#. Key:	ResponsiveDisplayHeading
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1390)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1390)
+msgctxt "BrokenHorizon,ResponsiveDisplayHeading"
+msgid "AUDIO, DISPLAY + ACCESSIBILITY"
+msgstr "AUDIO, DISPLAY + ACCESSIBILITY"
+
+#. Key:	ResponsiveMasterVolume
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1395)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1395)
+msgctxt "BrokenHorizon,ResponsiveMasterVolume"
+msgid "MASTER VOLUME"
+msgstr "MASTER VOLUME"
+
+#. Key:	ResponsiveWindowMode
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1400)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1400)
+msgctxt "BrokenHorizon,ResponsiveWindowMode"
+msgid "WINDOW MODE"
+msgstr "WINDOW MODE"
+
+#. Key:	ResponsiveGraphicsQuality
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1405)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1405)
+msgctxt "BrokenHorizon,ResponsiveGraphicsQuality"
+msgid "GRAPHICS QUALITY"
+msgstr "GRAPHICS QUALITY"
+
+#. Key:	ResponsiveInputPromptMode
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1410)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1410)
+msgctxt "BrokenHorizon,ResponsiveInputPromptMode"
+msgid "INPUT PROMPTS"
+msgstr "INPUT PROMPTS"
+
+#. Key:	ResponsiveHUDScale
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1419)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1419)
+msgctxt "BrokenHorizon,ResponsiveHUDScale"
+msgid "HUD SCALE"
+msgstr "HUD SCALE"
+
+#. Key:	ResponsiveColorVision
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1424)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1424)
+msgctxt "BrokenHorizon,ResponsiveColorVision"
+msgid "COLOR VISION MODE"
+msgstr "COLOR VISION MODE"
+
+#. Key:	ResponsiveHighContrast
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1429)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1429)
+msgctxt "BrokenHorizon,ResponsiveHighContrast"
+msgid "HIGH-CONTRAST HUD"
+msgstr "HIGH-CONTRAST HUD"
+
+#. Key:	ResponsiveReducedMotion
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1434)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1434)
+msgctxt "BrokenHorizon,ResponsiveReducedMotion"
+msgid "REDUCED MOTION"
+msgstr "REDUCED MOTION"
+
+#. Key:	ResponsiveApply
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1453)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1453)
+msgctxt "BrokenHorizon,ResponsiveApply"
+msgid "APPLY"
+msgstr "APPLY"
+
+#. Key:	ResponsiveDefaults
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1460)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1460)
+msgctxt "BrokenHorizon,ResponsiveDefaults"
+msgid "RESTORE DEFAULTS"
+msgstr "RESTORE DEFAULTS"
+
+#. Key:	ResponsiveBack
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1467)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(1467)
+msgctxt "BrokenHorizon,ResponsiveBack"
+msgid "BACK"
+msgstr "BACK"
+
+#. Key:	WindowModeWindowed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(652)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(652)
+msgctxt "BrokenHorizon,WindowModeWindowed"
+msgid "Windowed"
+msgstr "Windowed"
+
+#. Key:	WindowModeBorderless
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(653)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(653)
+msgctxt "BrokenHorizon,WindowModeBorderless"
+msgid "Windowed Fullscreen"
+msgstr "Windowed Fullscreen"
+
+#. Key:	WindowModeFullscreen
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(654)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(654)
+msgctxt "BrokenHorizon,WindowModeFullscreen"
+msgid "Fullscreen"
+msgstr "Fullscreen"
+
+#. Key:	GraphicsQualityLow
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(660)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(660)
+msgctxt "BrokenHorizon,GraphicsQualityLow"
+msgid "Low"
+msgstr "Low"
+
+#. Key:	GraphicsQualityMedium
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(661)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(661)
+msgctxt "BrokenHorizon,GraphicsQualityMedium"
+msgid "Medium"
+msgstr "Medium"
+
+#. Key:	GraphicsQualityHigh
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(662)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(662)
+msgctxt "BrokenHorizon,GraphicsQualityHigh"
+msgid "High"
+msgstr "High"
+
+#. Key:	GraphicsQualityEpic
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(663)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(663)
+msgctxt "BrokenHorizon,GraphicsQualityEpic"
+msgid "Epic"
+msgstr "Epic"
+
+#. Key:	ColorVisionStandard
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(668)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(668)
+msgctxt "BrokenHorizon,ColorVisionStandard"
+msgid "Standard"
+msgstr "Standard"
+
+#. Key:	ColorVisionDeuteranopia
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(669)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(669)
+msgctxt "BrokenHorizon,ColorVisionDeuteranopia"
+msgid "Deuteranopia"
+msgstr "Deuteranopia"
+
+#. Key:	ColorVisionProtanopia
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(670)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(670)
+msgctxt "BrokenHorizon,ColorVisionProtanopia"
+msgid "Protanopia"
+msgstr "Protanopia"
+
+#. Key:	ColorVisionTritanopia
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(671)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(671)
+msgctxt "BrokenHorizon,ColorVisionTritanopia"
+msgid "Tritanopia"
+msgstr "Tritanopia"
+
+#. Key:	InputPromptAuto
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(677)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(677)
+msgctxt "BrokenHorizon,InputPromptAuto"
+msgid "Auto (Last Input)"
+msgstr "Auto (Last Input)"
+
+#. Key:	InputPromptKeyboardMouse
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(678)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(678)
+msgctxt "BrokenHorizon,InputPromptKeyboardMouse"
+msgid "Keyboard + Mouse"
+msgstr "Keyboard + Mouse"
+
+#. Key:	InputPromptController
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(679)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(679)
+msgctxt "BrokenHorizon,InputPromptController"
+msgid "Controller"
+msgstr "Controller"
+
+#. Key:	InputPromptBoth
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(680)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(680)
+msgctxt "BrokenHorizon,InputPromptBoth"
+msgid "Show Both"
+msgstr "Show Both"
+
+#. Key:	LookSettingsHeading
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(909)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(909)
+msgctxt "BrokenHorizon,LookSettingsHeading"
+msgid "LOOK CONTROLS"
+msgstr "LOOK CONTROLS"
+
+#. Key:	HorizontalSensitivity
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(941)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(941)
+msgctxt "BrokenHorizon,HorizontalSensitivity"
+msgid "HORIZONTAL SENSITIVITY"
+msgstr "HORIZONTAL SENSITIVITY"
+
+#. Key:	VerticalSensitivity
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(952)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(952)
+msgctxt "BrokenHorizon,VerticalSensitivity"
+msgid "VERTICAL SENSITIVITY"
+msgstr "VERTICAL SENSITIVITY"
+
+#. Key:	ADSSensitivity
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(963)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(963)
+msgctxt "BrokenHorizon,ADSSensitivity"
+msgid "ADS SENSITIVITY"
+msgstr "ADS SENSITIVITY"
+
+#. Key:	InvertVerticalLook
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSettingsWidget.cpp(974)
+#: Source/BrokenHorizon/Private/BHSettingsWidget.cpp(974)
+msgctxt "BrokenHorizon,InvertVerticalLook"
+msgid "INVERT VERTICAL LOOK"
+msgstr "INVERT VERTICAL LOOK"
+
+#. Key:	FriendlySupplyConvoyTargetLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1001)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1001)
+msgctxt "BrokenHorizon,FriendlySupplyConvoyTargetLabel"
+msgid "FRIENDLY SUPPLY CONVOY\n{0} SUPPLY"
+msgstr "FRIENDLY SUPPLY CONVOY\n{0} SUPPLY"
+
+#. Key:	SupplyConvoyTargetLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1006)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1006)
+msgctxt "BrokenHorizon,SupplyConvoyTargetLabel"
+msgid "ENEMY SUPPLY CONVOY\n{0} SUPPLY"
+msgstr "ENEMY SUPPLY CONVOY\n{0} SUPPLY"
+
+#. Key:	UnassignedSupplyConvoyLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(109)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(109)
+msgctxt "BrokenHorizon,UnassignedSupplyConvoyLabel"
+msgid "ENEMY SUPPLY CONVOY"
+msgstr "ENEMY SUPPLY CONVOY"
+
+#. Key:	CivilianAidConvoyCleared
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1192)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1192)
+msgctxt "BrokenHorizon,CivilianAidConvoyCleared"
+msgid "AID CONVOY SECURED\n\n{0} supply of relief cargo cleared the local area."
+msgstr "AID CONVOY SECURED\n\n{0} supply of relief cargo cleared the local area."
+
+#. Key:	FriendlySupplyConvoyCleared
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1200)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1200)
+msgctxt "BrokenHorizon,FriendlySupplyConvoyCleared"
+msgid "FRIENDLY CONVOY SECURED\n\n{0} friendly supply cleared the local area."
+msgstr "FRIENDLY CONVOY SECURED\n\n{0} friendly supply cleared the local area."
+
+#. Key:	SupplyConvoyEscaped
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1207)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1207)
+msgctxt "BrokenHorizon,SupplyConvoyEscaped"
+msgid "CONVOY ESCAPED\n\n{0} enemy supply left the local area."
+msgstr "CONVOY ESCAPED\n\n{0} enemy supply left the local area."
+
+#. Key:	EscortConvoyDestroyedFailureReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1273)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(1273)
+msgctxt "BrokenHorizon,EscortConvoyDestroyedFailureReason"
+msgid "The protected convoy was destroyed before it cleared the route."
+msgstr "The protected convoy was destroyed before it cleared the route."
+
+#. Key:	FriendlySupplyConvoyDelivered
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(194)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(194)
+msgctxt "BrokenHorizon,FriendlySupplyConvoyDelivered"
+msgid "FRIENDLY CONVOY DELIVERED\n\nThe protected shipment reached its strategic destination."
+msgstr "FRIENDLY CONVOY DELIVERED\n\nThe protected shipment reached its strategic destination."
+
+#. Key:	SupplyConvoyContactEnded
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(201)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(201)
+msgctxt "BrokenHorizon,SupplyConvoyContactEnded"
+msgid "CONVOY CONTACT ENDED\n\nThe strategic shipment is no longer in transit."
+msgstr "CONVOY CONTACT ENDED\n\nThe strategic shipment is no longer in transit."
+
+#. Key:	ConvoySalvageSecurityActive
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(516)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(516)
+msgctxt "BrokenHorizon,ConvoySalvageSecurityActive"
+msgid "RECOVERY AREA CONTESTED\n\nClear or drive off nearby enemy security before recovering the cargo."
+msgstr "RECOVERY AREA CONTESTED\n\nClear or drive off nearby enemy security before recovering the cargo."
+
+#. Key:	ConvoySalvageNeedsTransport
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(558)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(558)
+msgctxt "BrokenHorizon,ConvoySalvageNeedsTransport"
+msgid "RECOVERY VEHICLE REQUIRED\n\nBring the field transport within 20 meters to recover this supply."
+msgstr "RECOVERY VEHICLE REQUIRED\n\nBring the field transport within 20 meters to recover this supply."
+
+#. Key:	ConvoySalvageCargoBlocked
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(578)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(578)
+msgctxt "BrokenHorizon,ConvoySalvageCargoBlocked"
+msgid "RECOVERY BLOCKED\n\nThe nearby field transport is full or carrying civilian aid."
+msgstr "RECOVERY BLOCKED\n\nThe nearby field transport is full or carrying civilian aid."
+
+#. Key:	ConvoySalvageRecovered
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(595)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(595)
+msgctxt "BrokenHorizon,ConvoySalvageRecovered"
+msgid "SUPPLY RECOVERED\n\n{0} captured supply loaded into the field transport. Deliver it to friendly territory."
+msgstr "SUPPLY RECOVERED\n\n{0} captured supply loaded into the field transport. Deliver it to friendly territory."
+
+#. Key:	ConvoyRouteChoiceInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(642)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(642)
+msgctxt "BrokenHorizon,ConvoyRouteChoiceInteraction"
+msgid "Press [F] to choose alternate convoy route"
+msgstr "Press [F] to choose alternate convoy route"
+
+#. Key:	ConvoySalvageSecurityInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(653)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(653)
+msgctxt "BrokenHorizon,ConvoySalvageSecurityInteraction"
+msgid "Recovery blocked: enemy security nearby"
+msgstr "Recovery blocked: enemy security nearby"
+
+#. Key:	ConvoySalvageInteraction
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(663)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(663)
+msgctxt "BrokenHorizon,ConvoySalvageInteraction"
+msgid "Press [F] to recover {0} supply"
+msgstr "Press [F] to recover {0} supply"
+
+#. Key:	ConvoyRouteChanged
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(713)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(713)
+msgctxt "BrokenHorizon,ConvoyRouteChanged"
+msgid "CONVOY REROUTED\n\nRoute: {0}\nThe convoy is now committed to the selected corridor."
+msgstr "CONVOY REROUTED\n\nRoute: {0}\nThe convoy is now committed to the selected corridor."
+
+#. Key:	EscortDeadlineExpiredFailureReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(745)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(745)
+msgctxt "BrokenHorizon,EscortDeadlineExpiredFailureReason"
+msgid "The convoy missed its operational window before clearing the route."
+msgstr "The convoy missed its operational window before clearing the route."
+
+#. Key:	CivilianAidConvoyLost
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(840)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(840)
+msgctxt "BrokenHorizon,CivilianAidConvoyLost"
+msgid "AID CONVOY LOST\n\n{0} -> {1}\nThe relief shipment was destroyed."
+msgstr "AID CONVOY LOST\n\n{0} -> {1}\nThe relief shipment was destroyed."
+
+#. Key:	FriendlySupplyConvoyLost
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(848)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(848)
+msgctxt "BrokenHorizon,FriendlySupplyConvoyLost"
+msgid "FRIENDLY CONVOY LOST\n\n{0} -> {1}\n{2} friendly supply destroyed."
+msgstr "FRIENDLY CONVOY LOST\n\n{0} -> {1}\n{2} friendly supply destroyed."
+
+#. Key:	SupplyConvoyInterdicted
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(855)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(855)
+msgctxt "BrokenHorizon,SupplyConvoyInterdicted"
+msgid "CONVOY INTERDICTED\n\n{0} -> {1}\n{2} enemy supply destroyed."
+msgstr "CONVOY INTERDICTED\n\n{0} -> {1}\n{2} enemy supply destroyed."
+
+#. Key:	SupplyConvoySalvageLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(889)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(889)
+msgctxt "BrokenHorizon,SupplyConvoySalvageLabel"
+msgid "RECOVERABLE SUPPLY\n{0} AVAILABLE"
+msgstr "RECOVERABLE SUPPLY\n{0} AVAILABLE"
+
+#. Key:	CivilianAidConvoyDestroyedLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(902)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(902)
+msgctxt "BrokenHorizon,CivilianAidConvoyDestroyedLabel"
+msgid "AID CONVOY DESTROYED"
+msgstr "AID CONVOY DESTROYED"
+
+#. Key:	SupplyConvoyDestroyedLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(907)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(907)
+msgctxt "BrokenHorizon,SupplyConvoyDestroyedLabel"
+msgid "SUPPLY CONVOY DESTROYED"
+msgstr "SUPPLY CONVOY DESTROYED"
+
+#. Key:	CivilianAidConvoyTargetLabel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(995)
+#: Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp(995)
+msgctxt "BrokenHorizon,CivilianAidConvoyTargetLabel"
+msgid "CIVILIAN AID CONVOY\n{0} SUPPLY"
+msgstr "CIVILIAN AID CONVOY\n{0} SUPPLY"
+
+#. Key:	RenderedUIReviewStrategicBriefing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarGameState.cpp(1853)
+#: Source/BrokenHorizon/Private/BHWarGameState.cpp(1853)
+msgctxt "BrokenHorizon,RenderedUIReviewStrategicBriefing"
+msgid "STRATEGIC BRIEFING\n\nOPERATION BREAKTHROUGH // North Pass\n\nEnemy forces control North Pass. Infiltrate the sector, breach the security line, eliminate the guard force, and reach extraction."
+msgstr "STRATEGIC BRIEFING\n\nOPERATION BREAKTHROUGH // North Pass\n\nEnemy forces control North Pass. Infiltrate the sector, breach the security line, eliminate the guard force, and reach extraction."
+
+#. Key:	RenderedHUDStrategicSector
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarGameState.cpp(1934)
+#: Source/BrokenHorizon/Private/BHWarGameState.cpp(1934)
+msgctxt "BrokenHorizon,RenderedHUDStrategicSector"
+msgid "Western Forward Base"
+msgstr "Western Forward Base"
+
+#. Key:	WarMapLogisticsLocked
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(106)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(106)
+msgctxt "BrokenHorizon,WarMapLogisticsLocked"
+msgid "LOCKED"
+msgstr "LOCKED"
+
+#. Key:	WarMapLogisticsOnline
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(110)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(110)
+msgctxt "BrokenHorizon,WarMapLogisticsOnline"
+msgid "ONLINE"
+msgstr "ONLINE"
+
+#. Key:	WarMapLogisticsCheckpointOnly
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(111)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(111)
+msgctxt "BrokenHorizon,WarMapLogisticsCheckpointOnly"
+msgid "CHECKPOINT ONLY"
+msgstr "CHECKPOINT ONLY"
+
+#. Key:	WarMapSupplyCutOff
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(139)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(139)
+msgctxt "BrokenHorizon,WarMapSupplyCutOff"
+msgid "CUT OFF"
+msgstr "CUT OFF"
+
+#. Key:	WarMapSupplyStarved
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(144)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(144)
+msgctxt "BrokenHorizon,WarMapSupplyStarved"
+msgid "STARVED"
+msgstr "STARVED"
+
+#. Key:	WarMapSupplyCritical
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(149)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(149)
+msgctxt "BrokenHorizon,WarMapSupplyCritical"
+msgid "CRITICAL"
+msgstr "CRITICAL"
+
+#. Key:	WarMapSupplyStable
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(154)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(154)
+msgctxt "BrokenHorizon,WarMapSupplyStable"
+msgid "STABLE"
+msgstr "STABLE"
+
+#. Key:	WarMapSupplyStockpiled
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(157)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(157)
+msgctxt "BrokenHorizon,WarMapSupplyStockpiled"
+msgid "STOCKPILED"
+msgstr "STOCKPILED"
+
+#. Key:	WarMapDifficultyRecruit
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1634)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1634)
+msgctxt "BrokenHorizon,WarMapDifficultyRecruit"
+msgid "RECRUIT"
+msgstr "RECRUIT"
+
+#. Key:	WarMapDifficultyVeteran
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1636)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1636)
+msgctxt "BrokenHorizon,WarMapDifficultyVeteran"
+msgid "VETERAN"
+msgstr "VETERAN"
+
+#. Key:	WarMapDifficultyCustom
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1638)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1638)
+msgctxt "BrokenHorizon,WarMapDifficultyCustom"
+msgid "CUSTOM"
+msgstr "CUSTOM"
+
+#. Key:	WarMapDifficultyOperator
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1639)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1639)
+msgctxt "BrokenHorizon,WarMapDifficultyOperator"
+msgid "OPERATOR"
+msgstr "OPERATOR"
+
+#. Key:	WarMapPlanRecon
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1647)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1647)
+msgctxt "BrokenHorizon,WarMapPlanRecon"
+msgid "RECON"
+msgstr "RECON"
+
+#. Key:	WarMapPlanReinforce
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1650)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1650)
+msgctxt "BrokenHorizon,WarMapPlanReinforce"
+msgid "REINFORCE"
+msgstr "REINFORCE"
+
+#. Key:	WarMapPlanMedical
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1653)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1653)
+msgctxt "BrokenHorizon,WarMapPlanMedical"
+msgid "MEDICAL"
+msgstr "MEDICAL"
+
+#. Key:	WarMapPlanStandard
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1654)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1654)
+msgctxt "BrokenHorizon,WarMapPlanStandard"
+msgid "STANDARD"
+msgstr "STANDARD"
+
+#. Key:	WarMapCampaignHeaderWide
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1661)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1661)
+msgctxt "BrokenHorizon,WarMapCampaignHeaderWide"
+msgid "TURN {0} // CONTROL {1}% // RESERVE {2} // UPDATE {3} // {4} // MERIT {5}"
+msgstr "TURN {0} // CONTROL {1}% // RESERVE {2} // UPDATE {3} // {4} // MERIT {5}"
+
+#. Key:	WarMapCampaignHeaderCompact
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1674)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1674)
+msgctxt "BrokenHorizon,WarMapCampaignHeaderCompact"
+msgid "WAR TURN {0} // CONTROL {1}% // RESERVE {2} // RECRUIT {3}/T // NEXT UPDATE {4} // {5} TEMPO // {6} // MERIT {7} // SUPPORT {8}/3 // PLAN {9}"
+msgstr "WAR TURN {0} // CONTROL {1}% // RESERVE {2} // RECRUIT {3}/T // NEXT UPDATE {4} // {5} TEMPO // {6} // MERIT {7} // SUPPORT {8}/3 // PLAN {9}"
+
+#. Key:	WarMapTempoEngaged
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1685)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1685)
+msgctxt "BrokenHorizon,WarMapTempoEngaged"
+msgid "ENGAGED"
+msgstr "ENGAGED"
+
+#. Key:	WarMapTempoField
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1686)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1686)
+msgctxt "BrokenHorizon,WarMapTempoField"
+msgid "FIELD"
+msgstr "FIELD"
+
+#. Key:	WarMapCampaignOutcomeHeader
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1693)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1693)
+msgctxt "BrokenHorizon,WarMapCampaignOutcomeHeader"
+msgid "{0}     WAR TURN {1}"
+msgstr "{0}     WAR TURN {1}"
+
+#. Key:	WarMapStrategicCommandTitle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1742)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1742)
+msgctxt "BrokenHorizon,WarMapStrategicCommandTitle"
+msgid "BROKEN HORIZON // STRATEGIC COMMAND"
+msgstr "BROKEN HORIZON // STRATEGIC COMMAND"
+
+#. Key:	WarMapLogisticsSummary
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1831)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1831)
+msgctxt "BrokenHorizon,WarMapLogisticsSummary"
+msgid "LOGISTICS {0}/{1} // CUT OFF {2} // HUBS {3} // SUPPLY {4} // CONVOYS F{5} E{6} // THREATS {7}"
+msgstr "LOGISTICS {0}/{1} // CUT OFF {2} // HUBS {3} // SUPPLY {4} // CONVOYS F{5} E{6} // THREATS {7}"
+
+#. Key:	WarMapRecentCampaignLog
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1881)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1881)
+msgctxt "BrokenHorizon,WarMapRecentCampaignLog"
+msgid "CAMPAIGN LOG // RECENT"
+msgstr "CAMPAIGN LOG // RECENT"
+
+#. Key:	WarMapNoActiveFront
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1926)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1926)
+msgctxt "BrokenHorizon,WarMapNoActiveFront"
+msgid "NO ACTIVE FRONT"
+msgstr "NO ACTIVE FRONT"
+
+#. Key:	WarMapPriorityCompact
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1929)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1929)
+msgctxt "BrokenHorizon,WarMapPriorityCompact"
+msgid "PRIORITY // {0}"
+msgstr "PRIORITY // {0}"
+
+#. Key:	WarMapPriorityFull
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1933)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1933)
+msgctxt "BrokenHorizon,WarMapPriorityFull"
+msgid "CURRENT PRIORITY // {0} // {1}"
+msgstr "CURRENT PRIORITY // {0} // {1}"
+
+#. Key:	WarMapRouteLegend
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1967)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1967)
+msgctxt "BrokenHorizon,WarMapRouteLegend"
+msgid "ROUTES // GREEN FRIENDLY // RED HOSTILE // AMBER FRONT // ORANGE CUT OFF // BRIGHT TRANSIT"
+msgstr "ROUTES // GREEN FRIENDLY // RED HOSTILE // AMBER FRONT // ORANGE CUT OFF // BRIGHT TRANSIT"
+
+#. Key:	WarMapNoSectorData
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1983)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(1983)
+msgctxt "BrokenHorizon,WarMapNoSectorData"
+msgid "NO SECTOR DATA AVAILABLE"
+msgstr "NO SECTOR DATA AVAILABLE"
+
+#. Key:	WarMapLastContactNone
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2278)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2278)
+msgctxt "BrokenHorizon,WarMapLastContactNone"
+msgid "LAST CONTACT // NONE"
+msgstr "LAST CONTACT // NONE"
+
+#. Key:	WarMapLastContactTurn
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2280)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2280)
+msgctxt "BrokenHorizon,WarMapLastContactTurn"
+msgid "LAST CONTACT // TURN {0}"
+msgstr "LAST CONTACT // TURN {0}"
+
+#. Key:	WarMapRouteSuffix
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2284)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2284)
+msgctxt "BrokenHorizon,WarMapRouteSuffix"
+msgid " // ROUTE {0}"
+msgstr " // ROUTE {0}"
+
+#. Key:	WarMapRoleSupplyActive
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2323)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2323)
+msgctxt "BrokenHorizon,WarMapRoleSupplyActive"
+msgid "SUPPLY SOURCE // ACTIVE OPERATION"
+msgstr "SUPPLY SOURCE // ACTIVE OPERATION"
+
+#. Key:	WarMapRoleActiveOperation
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2328)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2328)
+msgctxt "BrokenHorizon,WarMapRoleActiveOperation"
+msgid "ACTIVE OPERATION"
+msgstr "ACTIVE OPERATION"
+
+#. Key:	WarMapRoleSupplyPriority
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2333)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2333)
+msgctxt "BrokenHorizon,WarMapRoleSupplyPriority"
+msgid "SUPPLY SOURCE // PRIORITY TARGET"
+msgstr "SUPPLY SOURCE // PRIORITY TARGET"
+
+#. Key:	WarMapRoleHubSupply
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2339)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2339)
+msgctxt "BrokenHorizon,WarMapRoleHubSupply"
+msgid "LOGISTICS HUB // SUPPLY SOURCE"
+msgstr "LOGISTICS HUB // SUPPLY SOURCE"
+
+#. Key:	WarMapRoleSupplySource
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2340)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2340)
+msgctxt "BrokenHorizon,WarMapRoleSupplySource"
+msgid "SUPPLY SOURCE"
+msgstr "SUPPLY SOURCE"
+
+#. Key:	WarMapRoleSelectedPriority
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2346)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2346)
+msgctxt "BrokenHorizon,WarMapRoleSelectedPriority"
+msgid "SELECTED // COMMAND PRIORITY"
+msgstr "SELECTED // COMMAND PRIORITY"
+
+#. Key:	WarMapRouteThreatHigh
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(235)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(235)
+msgctxt "BrokenHorizon,WarMapRouteThreatHigh"
+msgid "HIGH"
+msgstr "HIGH"
+
+#. Key:	WarMapRoleSelectedOperation
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2351)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2351)
+msgctxt "BrokenHorizon,WarMapRoleSelectedOperation"
+msgid "SELECTED OPERATION"
+msgstr "SELECTED OPERATION"
+
+#. Key:	WarMapRolePriorityTarget
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2357)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2357)
+msgctxt "BrokenHorizon,WarMapRolePriorityTarget"
+msgid "PRIORITY TARGET"
+msgstr "PRIORITY TARGET"
+
+#. Key:	WarMapRoleLogisticsHub
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2362)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2362)
+msgctxt "BrokenHorizon,WarMapRoleLogisticsHub"
+msgid "LOGISTICS HUB"
+msgstr "LOGISTICS HUB"
+
+#. Key:	WarMapRouteThreatElevated
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(239)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(239)
+msgctxt "BrokenHorizon,WarMapRouteThreatElevated"
+msgid "ELEVATED"
+msgstr "ELEVATED"
+
+#. Key:	WarMapRouteThreatClear
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(240)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(240)
+msgctxt "BrokenHorizon,WarMapRouteThreatClear"
+msgid "CLEAR"
+msgstr "CLEAR"
+
+#. Key:	WarMapFactionSite
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2419)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2419)
+msgctxt "BrokenHorizon,WarMapFactionSite"
+msgid "{0} // {1}"
+msgstr "{0} // {1}"
+
+#. Key:	WarMapCompactForce
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2437)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2437)
+msgctxt "BrokenHorizon,WarMapCompactForce"
+msgid "FORCE {0} // GAR {1}/{2} // LOCALS {3}%"
+msgstr "FORCE {0} // GAR {1}/{2} // LOCALS {3}%"
+
+#. Key:	WarMapCompactSupply
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2468)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2468)
+msgctxt "BrokenHorizon,WarMapCompactSupply"
+msgid "SUPPLY {0}% // {1}/T // {2}"
+msgstr "SUPPLY {0}% // {1}/T // {2}"
+
+#. Key:	WarMapCompactBaseResponseRoute
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2511)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2511)
+msgctxt "BrokenHorizon,WarMapCompactBaseResponseRoute"
+msgid "BASE {0} // {1} // ROUTE {2}"
+msgstr "BASE {0} // {1} // ROUTE {2}"
+
+#. Key:	WarMapResponseUnknown
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2519)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2519)
+msgctxt "BrokenHorizon,WarMapResponseUnknown"
+msgid "RESPONSE UNKNOWN"
+msgstr "RESPONSE UNKNOWN"
+
+#. Key:	WarMapFriendlyForce
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2549)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2549)
+msgctxt "BrokenHorizon,WarMapFriendlyForce"
+msgid "FRIENDLY FORCE {0} // GARRISON {1} // LOCAL SUPPORT {2}%"
+msgstr "FRIENDLY FORCE {0} // GARRISON {1} // LOCAL SUPPORT {2}%"
+
+#. Key:	WarMapSupplyFlow
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2603)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2603)
+msgctxt "BrokenHorizon,WarMapSupplyFlow"
+msgid "SUPPLY {0}% // FLOW {1} / TURN // {2}"
+msgstr "SUPPLY {0}% // FLOW {1} / TURN // {2}"
+
+#. Key:	WarMapFieldResupply
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2665)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2665)
+msgctxt "BrokenHorizon,WarMapFieldResupply"
+msgid "FIELD RESUPPLY     {0}"
+msgstr "FIELD RESUPPLY     {0}"
+
+#. Key:	WarMapReinforcements
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2678)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2678)
+msgctxt "BrokenHorizon,WarMapReinforcements"
+msgid "REINFORCEMENTS     {0} / TURN"
+msgstr "REINFORCEMENTS     {0} / TURN"
+
+#. Key:	WarMapLinkedSectors
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2695)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2695)
+msgctxt "BrokenHorizon,WarMapLinkedSectors"
+msgid "LINKED // {0}"
+msgstr "LINKED // {0}"
+
+#. Key:	WarMapFooterOffline
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2730)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2730)
+msgctxt "BrokenHorizon,WarMapFooterOffline"
+msgid "[M] CLOSE STRATEGIC MAP     [ESC] RETURN TO FIELD"
+msgstr "[M] CLOSE STRATEGIC MAP     [ESC] RETURN TO FIELD"
+
+#. Key:	WarMapFooterCustom
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2738)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2738)
+msgctxt "BrokenHorizon,WarMapFooterCustom"
+msgid "[F6] PRESET  [F8/LB] AXIS  [-/= OR DPAD] ADJUST  [F7] PLAN  [M] CLOSE"
+msgstr "[F6] PRESET  [F8/LB] AXIS  [-/= OR DPAD] ADJUST  [F7] PLAN  [M] CLOSE"
+
+#. Key:	WarMapFooterPlanning
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2741)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2741)
+msgctxt "BrokenHorizon,WarMapFooterPlanning"
+msgid "[F6] DIFFICULTY     [F7] TACTICAL OPTION     [M] CLOSE MAP     [ESC] RETURN TO FIELD"
+msgstr "[F6] DIFFICULTY     [F7] TACTICAL OPTION     [M] CLOSE MAP     [ESC] RETURN TO FIELD"
+
+#. Key:	WarMapFooterHostControls
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2744)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2744)
+msgctxt "BrokenHorizon,WarMapFooterHostControls"
+msgid "[F6/F7/F8] HOST CONTROLS     [M] CLOSE MAP     [ESC] RETURN TO FIELD"
+msgstr "[F6/F7/F8] HOST CONTROLS     [M] CLOSE MAP     [ESC] RETURN TO FIELD"
+
+#. Key:	WarMapFooterOperationLocked
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2750)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2750)
+msgctxt "BrokenHorizon,WarMapFooterOperationLocked"
+msgid "[F6/F7] LOCKED DURING OPERATION     [M] CLOSE STRATEGIC MAP     [ESC] RETURN TO FIELD"
+msgstr "[F6/F7] LOCKED DURING OPERATION     [M] CLOSE STRATEGIC MAP     [ESC] RETURN TO FIELD"
+
+#. Key:	WarMapDeploymentCommandOffline
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2766)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2766)
+msgctxt "BrokenHorizon,WarMapDeploymentCommandOffline"
+msgid "DEPLOYMENT BLOCKED // COMMAND LINK OFFLINE"
+msgstr "DEPLOYMENT BLOCKED // COMMAND LINK OFFLINE"
+
+#. Key:	WarMapDeploymentNoFront
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2771)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2771)
+msgctxt "BrokenHorizon,WarMapDeploymentNoFront"
+msgid "DEPLOYMENT BLOCKED // NO VIABLE FRONT"
+msgstr "DEPLOYMENT BLOCKED // NO VIABLE FRONT"
+
+#. Key:	WarMapDeploymentNoStagingRoute
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2996)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(2996)
+msgctxt "BrokenHorizon,WarMapDeploymentNoStagingRoute"
+msgid "DEPLOYMENT BLOCKED // NO FRIENDLY STAGING ROUTE"
+msgstr "DEPLOYMENT BLOCKED // NO FRIENDLY STAGING ROUTE"
+
+#. Key:	WarMapConfirmWithdrawal
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(3019)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(3019)
+msgctxt "BrokenHorizon,WarMapConfirmWithdrawal"
+msgid "[BACKSPACE] CONFIRM WITHDRAWAL // OPERATION WILL BE LOST"
+msgstr "[BACKSPACE] CONFIRM WITHDRAWAL // OPERATION WILL BE LOST"
+
+#. Key:	WarMapWithdrawOperation
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(3022)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(3022)
+msgctxt "BrokenHorizon,WarMapWithdrawOperation"
+msgid "[BACKSPACE] WITHDRAW OPERATION     [M / ESC] RETURN TO FIELD"
+msgstr "[BACKSPACE] WITHDRAW OPERATION     [M / ESC] RETURN TO FIELD"
+
+#. Key:	WarMapReconForcePreview
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(347)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(347)
+msgctxt "BrokenHorizon,WarMapReconForcePreview"
+msgid "RECON // INTEL {0}% > 100% // MOVE AND OBSERVE // AVOID MAJOR CONTACT"
+msgstr "RECON // INTEL {0}% > 100% // MOVE AND OBSERVE // AVOID MAJOR CONTACT"
+
+#. Key:	WarMapLogisticsForcePreview
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(368)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(368)
+msgctxt "BrokenHorizon,WarMapLogisticsForcePreview"
+msgid "LOGISTICS // LOAD {0} AT {1} // TARGET {2}% // CAPACITY {3}"
+msgstr "LOGISTICS // LOAD {0} AT {1} // TARGET {2}% // CAPACITY {3}"
+
+#. Key:	WarMapNoStagingSector
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(375)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(375)
+msgctxt "BrokenHorizon,WarMapNoStagingSector"
+msgid "NO STAGING SECTOR"
+msgstr "NO STAGING SECTOR"
+
+#. Key:	WarMapEscortForcePreview
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(391)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(391)
+msgctxt "BrokenHorizon,WarMapEscortForcePreview"
+msgid "ESCORT // {0} // PAYLOAD {1} // ETA {2} TURN // ROUTE {3} > {4}"
+msgstr "ESCORT // {0} // PAYLOAD {1} // ETA {2} TURN // ROUTE {3} > {4}"
+
+#. Key:	WarMapCargoCivilianAid
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(397)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(397)
+msgctxt "BrokenHorizon,WarMapCargoCivilianAid"
+msgid "CIVILIAN AID"
+msgstr "CIVILIAN AID"
+
+#. Key:	WarMapCargoMilitarySupply
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(398)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(398)
+msgctxt "BrokenHorizon,WarMapCargoMilitarySupply"
+msgid "MILITARY SUPPLY"
+msgstr "MILITARY SUPPLY"
+
+#. Key:	WarMapMedevacForcePreview
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(409)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(409)
+msgctxt "BrokenHorizon,WarMapMedevacForcePreview"
+msgid "MEDEVAC // ASSIGNED CASUALTY // TREATMENT {0} // FOOT OR VEHICLE EXTRACTION"
+msgstr "MEDEVAC // ASSIGNED CASUALTY // TREATMENT {0} // FOOT OR VEHICLE EXTRACTION"
+
+#. Key:	WarMapUnknownIntelForcePreview
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(428)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(428)
+msgctxt "BrokenHorizon,WarMapUnknownIntelForcePreview"
+msgid "INTEL {0}% // HOSTILES UNKNOWN // RECON REQUIRED // {1}"
+msgstr "INTEL {0}% // HOSTILES UNKNOWN // RECON REQUIRED // {1}"
+
+#. Key:	WarMapIntelConfirmed
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(462)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(462)
+msgctxt "BrokenHorizon,WarMapIntelConfirmed"
+msgid "CONFIRMED"
+msgstr "CONFIRMED"
+
+#. Key:	WarMapIntelEstimated
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(463)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(463)
+msgctxt "BrokenHorizon,WarMapIntelEstimated"
+msgid "ESTIMATED"
+msgstr "ESTIMATED"
+
+#. Key:	WarMapCounterSuffix
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(467)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(467)
+msgctxt "BrokenHorizon,WarMapCounterSuffix"
+msgid " // COUNTER +{0}"
+msgstr " // COUNTER +{0}"
+
+#. Key:	WarMapDefenseForcePreview
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(476)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(476)
+msgctxt "BrokenHorizon,WarMapDefenseForcePreview"
+msgid "{0} // HOSTILES {1}x{2} // SUPPORT {3} // GARRISON {4}{5}"
+msgstr "{0} // HOSTILES {1}x{2} // SUPPORT {3} // GARRISON {4}{5}"
+
+#. Key:	WarMapAttackForcePreview
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(491)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(491)
+msgctxt "BrokenHorizon,WarMapAttackForcePreview"
+msgid "{0} // HOSTILES {1} + {2}x{3} // SUPPORT {4} // GARRISON {5}{6}"
+msgstr "{0} // HOSTILES {1} + {2}x{3} // SUPPORT {4} // GARRISON {5}{6}"
+
+#. Key:	WarMapReconReadiness
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(520)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(520)
+msgctxt "BrokenHorizon,WarMapReconReadiness"
+msgid "{0} // INTEL {1}% // FIELD REPORT KIT {2} SUPPLY"
+msgstr "{0} // INTEL {1}% // FIELD REPORT KIT {2} SUPPLY"
+
+#. Key:	WarMapReady
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(526)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(526)
+msgctxt "BrokenHorizon,WarMapReady"
+msgid "READY"
+msgstr "READY"
+
+#. Key:	WarMapBlockedNoRoute
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(528)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(528)
+msgctxt "BrokenHorizon,WarMapBlockedNoRoute"
+msgid "BLOCKED // NO ROUTE"
+msgstr "BLOCKED // NO ROUTE"
+
+#. Key:	WarMapBlockedSupply
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(529)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(529)
+msgctxt "BrokenHorizon,WarMapBlockedSupply"
+msgid "BLOCKED // SUPPLY SHORTFALL"
+msgstr "BLOCKED // SUPPLY SHORTFALL"
+
+#. Key:	WarMapResupplyReadiness
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(545)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(545)
+msgctxt "BrokenHorizon,WarMapResupplyReadiness"
+msgid "{0} // CARGO {1} // SOURCE SUP {2}%"
+msgstr "{0} // CARGO {1} // SOURCE SUP {2}%"
+
+#. Key:	WarMapBlockedCargo
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(550)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(550)
+msgctxt "BrokenHorizon,WarMapBlockedCargo"
+msgid "BLOCKED // CARGO SHORTFALL"
+msgstr "BLOCKED // CARGO SHORTFALL"
+
+#. Key:	WarMapEscortReadiness
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(563)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(563)
+msgctxt "BrokenHorizon,WarMapEscortReadiness"
+msgid "{0} // CONVOY {1} // PROTECTION DETAIL READY"
+msgstr "{0} // CONVOY {1} // PROTECTION DETAIL READY"
+
+#. Key:	WarMapBlockedDeploymentSupply
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(566)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(566)
+msgctxt "BrokenHorizon,WarMapBlockedDeploymentSupply"
+msgid "BLOCKED // DEPLOYMENT SUPPLY"
+msgstr "BLOCKED // DEPLOYMENT SUPPLY"
+
+#. Key:	WarMapUnavailable
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(568)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(568)
+msgctxt "BrokenHorizon,WarMapUnavailable"
+msgid "UNAVAILABLE"
+msgstr "UNAVAILABLE"
+
+#. Key:	WarMapRescueReadiness
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(576)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(576)
+msgctxt "BrokenHorizon,WarMapRescueReadiness"
+msgid "{0} // CASUALTY ASSIGNED // MEDICAL ROUTE READY"
+msgstr "{0} // CASUALTY ASSIGNED // MEDICAL ROUTE READY"
+
+#. Key:	WarMapAttackReadiness
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(613)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(613)
+msgctxt "BrokenHorizon,WarMapAttackReadiness"
+msgid "{0} // FORCE {1} // SUP {2}% // OCC {3}/{4} // REAR GAR {5}{6}"
+msgstr "{0} // FORCE {1} // SUP {2}% // OCC {3}/{4} // REAR GAR {5}{6}"
+
+#. Key:	WarMapGeneralReadiness
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(629)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(629)
+msgctxt "BrokenHorizon,WarMapGeneralReadiness"
+msgid "{0} // FORCE {1} // SUP {2}% // GARRISON {3}"
+msgstr "{0} // FORCE {1} // SUP {2}% // GARRISON {3}"
+
+#. Key:	WarMapFactionFriendly
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(66)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(66)
+msgctxt "BrokenHorizon,WarMapFactionFriendly"
+msgid "FRIENDLY CONTROL"
+msgstr "FRIENDLY CONTROL"
+
+#. Key:	WarMapFactionEnemy
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(69)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(69)
+msgctxt "BrokenHorizon,WarMapFactionEnemy"
+msgid "ENEMY CONTROL"
+msgstr "ENEMY CONTROL"
+
+#. Key:	WarMapFieldPlanPlayerUnavailable
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(692)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(692)
+msgctxt "BrokenHorizon,WarMapFieldPlanPlayerUnavailable"
+msgid "FIELD PLAN // PLAYER POSITION UNAVAILABLE"
+msgstr "FIELD PLAN // PLAYER POSITION UNAVAILABLE"
+
+#. Key:	WarMapFieldPlanTargetUnavailable
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(711)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(711)
+msgctxt "BrokenHorizon,WarMapFieldPlanTargetUnavailable"
+msgid "FIELD PLAN // TARGET LOCATION NOT STREAMED"
+msgstr "FIELD PLAN // TARGET LOCATION NOT STREAMED"
+
+#. Key:	WarMapFactionNeutral
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(72)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(72)
+msgctxt "BrokenHorizon,WarMapFactionNeutral"
+msgid "CONTESTED / NEUTRAL"
+msgstr "CONTESTED / NEUTRAL"
+
+#. Key:	WarMapFieldPlanNoTransport
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(789)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(789)
+msgctxt "BrokenHorizon,WarMapFieldPlanNoTransport"
+msgid "FIELD PLAN // {0} KM // WINDOW {1} MIN // NO TRANSPORT AVAILABLE"
+msgstr "FIELD PLAN // {0} KM // WINDOW {1} MIN // NO TRANSPORT AVAILABLE"
+
+#. Key:	WarMapSiteHeadquarters
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(81)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(81)
+msgctxt "BrokenHorizon,WarMapSiteHeadquarters"
+msgid "HEADQUARTERS"
+msgstr "HEADQUARTERS"
+
+#. Key:	WarMapVehicleNotNearby
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(818)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(818)
+msgctxt "BrokenHorizon,WarMapVehicleNotNearby"
+msgid "VEHICLE NOT NEARBY"
+msgstr "VEHICLE NOT NEARBY"
+
+#. Key:	WarMapVehicleImmobilized
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(820)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(820)
+msgctxt "BrokenHorizon,WarMapVehicleImmobilized"
+msgid "VEHICLE IMMOBILIZED"
+msgstr "VEHICLE IMMOBILIZED"
+
+#. Key:	WarMapVehicleFuelShortfall
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(822)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(822)
+msgctxt "BrokenHorizon,WarMapVehicleFuelShortfall"
+msgid "FUEL SHORTFALL"
+msgstr "FUEL SHORTFALL"
+
+#. Key:	WarMapVehicleLateRisk
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(824)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(824)
+msgctxt "BrokenHorizon,WarMapVehicleLateRisk"
+msgid "LATE ARRIVAL RISK"
+msgstr "LATE ARRIVAL RISK"
+
+#. Key:	WarMapVehicleReady
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(825)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(825)
+msgctxt "BrokenHorizon,WarMapVehicleReady"
+msgid "TRANSPORT READY"
+msgstr "TRANSPORT READY"
+
+#. Key:	WarMapFieldPlanTransport
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(828)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(828)
+msgctxt "BrokenHorizon,WarMapFieldPlanTransport"
+msgid "FIELD PLAN // {0} KM // WINDOW {1} MIN // ETA {2} MIN // RANGE {3} KM // {4}"
+msgstr "FIELD PLAN // {0} KM // WINDOW {1} MIN // ETA {2} MIN // RANGE {3} KM // {4}"
+
+#. Key:	WarMapSiteVillage
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(84)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(84)
+msgctxt "BrokenHorizon,WarMapSiteVillage"
+msgid "VILLAGE"
+msgstr "VILLAGE"
+
+#. Key:	WarMapLoadoutPlayerUnavailable
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(866)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(866)
+msgctxt "BrokenHorizon,WarMapLoadoutPlayerUnavailable"
+msgid "LOADOUT // PLAYER STATUS UNAVAILABLE"
+msgstr "LOADOUT // PLAYER STATUS UNAVAILABLE"
+
+#. Key:	WarMapSiteTown
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(87)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(87)
+msgctxt "BrokenHorizon,WarMapSiteTown"
+msgid "TOWN"
+msgstr "TOWN"
+
+#. Key:	WarMapSiteBridge
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(90)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(90)
+msgctxt "BrokenHorizon,WarMapSiteBridge"
+msgid "BRIDGE"
+msgstr "BRIDGE"
+
+#. Key:	WarMapRiskBleeding
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(921)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(921)
+msgctxt "BrokenHorizon,WarMapRiskBleeding"
+msgid "BLEEDING"
+msgstr "BLEEDING"
+
+#. Key:	WarMapRiskWounded
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(922)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(922)
+msgctxt "BrokenHorizon,WarMapRiskWounded"
+msgid "WOUNDED"
+msgstr "WOUNDED"
+
+#. Key:	WarMapRiskLowAmmo
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(928)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(928)
+msgctxt "BrokenHorizon,WarMapRiskLowAmmo"
+msgid "LOW AMMO"
+msgstr "LOW AMMO"
+
+#. Key:	WarMapSiteLogisticsDepot
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(93)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(93)
+msgctxt "BrokenHorizon,WarMapSiteLogisticsDepot"
+msgid "LOGISTICS DEPOT"
+msgstr "LOGISTICS DEPOT"
+
+#. Key:	WarMapRiskMedicalGap
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(933)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(933)
+msgctxt "BrokenHorizon,WarMapRiskMedicalGap"
+msgid "MEDICAL GAP"
+msgstr "MEDICAL GAP"
+
+#. Key:	WarMapRiskArmorLow
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(938)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(938)
+msgctxt "BrokenHorizon,WarMapRiskArmorLow"
+msgid "ARMOR LOW"
+msgstr "ARMOR LOW"
+
+#. Key:	WarMapRiskNoFrags
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(943)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(943)
+msgctxt "BrokenHorizon,WarMapRiskNoFrags"
+msgid "NO FRAGS"
+msgstr "NO FRAGS"
+
+#. Key:	WarMapRecoveryResupply
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(957)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(957)
+msgctxt "BrokenHorizon,WarMapRecoveryResupply"
+msgid "FOLLOW GREEN RESUPPLY MARKER"
+msgstr "FOLLOW GREEN RESUPPLY MARKER"
+
+#. Key:	WarMapRecoveryTreatWounds
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(959)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(959)
+msgctxt "BrokenHorizon,WarMapRecoveryTreatWounds"
+msgid "TREAT WOUNDS BEFORE DEPLOYING"
+msgstr "TREAT WOUNDS BEFORE DEPLOYING"
+
+#. Key:	WarMapSiteCheckpoint
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(96)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(96)
+msgctxt "BrokenHorizon,WarMapSiteCheckpoint"
+msgid "CHECKPOINT"
+msgstr "CHECKPOINT"
+
+#. Key:	WarMapLoadoutReady
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(966)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(966)
+msgctxt "BrokenHorizon,WarMapLoadoutReady"
+msgid "READY"
+msgstr "READY"
+
+#. Key:	WarMapLoadoutSummary
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarMapWidget.cpp(969)
+#: Source/BrokenHorizon/Private/BHWarMapWidget.cpp(969)
+msgctxt "BrokenHorizon,WarMapLoadoutSummary"
+msgid "LOADOUT // AMMO {0}/{1} // DRESS {2} // MED {3} // ARMOR {4}% // FRAG {5} // {6}"
+msgstr "LOADOUT // AMMO {0}/{1} // DRESS {2} // MED {3} // ARMOR {4}% // FRAG {5} // {6}"
+
+#. Key:	MissingSectorIntel
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5010)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5010)
+msgctxt "BrokenHorizon,MissingSectorIntel"
+msgid "INTEL UNAVAILABLE"
+msgstr "INTEL UNAVAILABLE"
+
+#. Key:	WarMapPatternUnknown
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5119)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5119)
+msgctxt "BrokenHorizon,WarMapPatternUnknown"
+msgid "PATTERN UNKNOWN"
+msgstr "PATTERN UNKNOWN"
+
+#. Key:	CounterinsurgencyDefenseOperationTitle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5909)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5909)
+msgctxt "BrokenHorizon,CounterinsurgencyDefenseOperationTitle"
+msgid "OPERATION SAFEHOUSE // {0}"
+msgstr "OPERATION SAFEHOUSE // {0}"
+
+#. Key:	DefenseOperationTitle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5915)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5915)
+msgctxt "BrokenHorizon,DefenseOperationTitle"
+msgid "OPERATION HOLDFAST // {0}"
+msgstr "OPERATION HOLDFAST // {0}"
+
+#. Key:	RaidOperationTitle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5921)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5921)
+msgctxt "BrokenHorizon,RaidOperationTitle"
+msgid "OPERATION BLACKOUT // {0}"
+msgstr "OPERATION BLACKOUT // {0}"
+
+#. Key:	ResupplyOperationTitle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5927)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5927)
+msgctxt "BrokenHorizon,ResupplyOperationTitle"
+msgid "OPERATION LIFELINE // {0}"
+msgstr "OPERATION LIFELINE // {0}"
+
+#. Key:	EscortOperationTitle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5933)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5933)
+msgctxt "BrokenHorizon,EscortOperationTitle"
+msgid "OPERATION SHEPHERD // {0}"
+msgstr "OPERATION SHEPHERD // {0}"
+
+#. Key:	RescueOperationTitle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5939)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5939)
+msgctxt "BrokenHorizon,RescueOperationTitle"
+msgid "OPERATION GUARDIAN // {0}"
+msgstr "OPERATION GUARDIAN // {0}"
+
+#. Key:	ReconOperationTitle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5945)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5945)
+msgctxt "BrokenHorizon,ReconOperationTitle"
+msgid "OPERATION WATCHTOWER // {0}"
+msgstr "OPERATION WATCHTOWER // {0}"
+
+#. Key:	AttackOperationTitle
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5950)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5950)
+msgctxt "BrokenHorizon,AttackOperationTitle"
+msgid "OPERATION BREAKTHROUGH // {0}"
+msgstr "OPERATION BREAKTHROUGH // {0}"
+
+#. Key:	CounterinsurgencyDefenseMissionBriefing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5990)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5990)
+msgctxt "BrokenHorizon,CounterinsurgencyDefenseMissionBriefing"
+msgid "Enemy security forces are sweeping {0} for militia cells and informants. Reach the resistance stronghold, hold the defensive line, and break the sweep before the local network is dismantled."
+msgstr "Enemy security forces are sweeping {0} for militia cells and informants. Reach the resistance stronghold, hold the defensive line, and break the sweep before the local network is dismantled."
+
+#. Key:	DefenseMissionBriefing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5999)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(5999)
+msgctxt "BrokenHorizon,DefenseMissionBriefing"
+msgid "Enemy forces are assaulting {0}. Recover local access, reach the defensive line, and repel the attack before the sector falls."
+msgstr "Enemy forces are assaulting {0}. Recover local access, reach the defensive line, and repel the attack before the sector falls."
+
+#. Key:	RaidMissionBriefing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6007)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6007)
+msgctxt "BrokenHorizon,RaidMissionBriefing"
+msgid "Enemy logistics are sustaining operations around {0}. Infiltrate the sector and sabotage the supply cache without committing to an occupation. Avoid unnecessary casualties: a clean raid earns local support and reduces the enemy response; a loud raid triggers the opposite."
+msgstr "Enemy logistics are sustaining operations around {0}. Infiltrate the sector and sabotage the supply cache without committing to an occupation. Avoid unnecessary casualties: a clean raid earns local support and reduces the enemy response; a loud raid triggers the opposite."
+
+#. Key:	ResupplyMissionBriefing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6018)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6018)
+msgctxt "BrokenHorizon,ResupplyMissionBriefing"
+msgid "The friendly position at {0} is running short. Take a field transport to the assigned staging sector, load military supply with X, then deliver the full mission load at {0}. Expect the route to remain exposed until the delivery is complete."
+msgstr "The friendly position at {0} is running short. Take a field transport to the assigned staging sector, load military supply with X, then deliver the full mission load at {0}. Expect the route to remain exposed until the delivery is complete."
+
+#. Key:	EscortMissionBriefing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6028)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6028)
+msgctxt "BrokenHorizon,EscortMissionBriefing"
+msgid "A friendly convoy bound for {0} is exposed on the route. Locate the marked convoy, suppress the ambush force, and keep the vehicle intact until it clears the local route."
+msgstr "A friendly convoy bound for {0} is exposed on the route. Locate the marked convoy, suppress the ambush force, and keep the vehicle intact until it clears the local route."
+
+#. Key:	RescueMissionBriefing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6037)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6037)
+msgctxt "BrokenHorizon,RescueMissionBriefing"
+msgid "A field operative requires urgent evacuation. Stabilize the casualty if necessary, move them by foot or vehicle, and deliver them to the friendly treatment point at {0}. The casualty cannot return to combat until treated."
+msgstr "A field operative requires urgent evacuation. Stabilize the casualty if necessary, move them by foot or vehicle, and deliver them to the friendly treatment point at {0}. The casualty cannot return to combat until treated."
+
+#. Key:	ReconMissionBriefing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6047)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6047)
+msgctxt "BrokenHorizon,ReconMissionBriefing"
+msgid "Enemy activity around {0} is unconfirmed. Enter the sector, vary your observation position, and remain in the field long enough to file a confirmed intelligence report. Avoid major contact where possible."
+msgstr "Enemy activity around {0} is unconfirmed. Enter the sector, vary your observation position, and remain in the field long enough to file a confirmed intelligence report. Avoid major contact where possible."
+
+#. Key:	AttackMissionBriefing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6055)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6055)
+msgctxt "BrokenHorizon,AttackMissionBriefing"
+msgid "Enemy forces control {0}. Infiltrate the sector, breach its security perimeter, eliminate the garrison, and secure the objective."
+msgstr "Enemy forces control {0}. Infiltrate the sector, breach its security perimeter, eliminate the garrison, and secure the objective."
+
+#. Key:	DeliverResupplyObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6102)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6102)
+msgctxt "BrokenHorizon,DeliverResupplyObjective"
+msgid "Deliver a full military supply load to {0}"
+msgstr "Deliver a full military supply load to {0}"
+
+#. Key:	ProtectConvoyObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6115)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6115)
+msgctxt "BrokenHorizon,ProtectConvoyObjective"
+msgid "Protect the convoy until it clears the route to {0}"
+msgstr "Protect the convoy until it clears the route to {0}"
+
+#. Key:	EvacuateCasualtyObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6128)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6128)
+msgctxt "BrokenHorizon,EvacuateCasualtyObjective"
+msgid "Evacuate the assigned casualty to {0}"
+msgstr "Evacuate the assigned casualty to {0}"
+
+#. Key:	ObserveSectorObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6141)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6141)
+msgctxt "BrokenHorizon,ObserveSectorObjective"
+msgid "Move through {0} and file a confirmed intelligence report"
+msgstr "Move through {0} and file a confirmed intelligence report"
+
+#. Key:	DefenseFindKeycardObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6154)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6154)
+msgctxt "BrokenHorizon,DefenseFindKeycardObjective"
+msgid "Recover the emergency access card at {0}"
+msgstr "Recover the emergency access card at {0}"
+
+#. Key:	AttackFindKeycardObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6159)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6159)
+msgctxt "BrokenHorizon,AttackFindKeycardObjective"
+msgid "Locate the access card for {0}"
+msgstr "Locate the access card for {0}"
+
+#. Key:	DefenseUnlockDoorObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6172)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6172)
+msgctxt "BrokenHorizon,DefenseUnlockDoorObjective"
+msgid "Open the defensive route into {0}"
+msgstr "Open the defensive route into {0}"
+
+#. Key:	AttackUnlockDoorObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6177)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6177)
+msgctxt "BrokenHorizon,AttackUnlockDoorObjective"
+msgid "Breach the security perimeter at {0}"
+msgstr "Breach the security perimeter at {0}"
+
+#. Key:	DefenseExploreObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6190)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6190)
+msgctxt "BrokenHorizon,DefenseExploreObjective"
+msgid "Move to the defensive line at {0}"
+msgstr "Move to the defensive line at {0}"
+
+#. Key:	AttackExploreObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6195)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6195)
+msgctxt "BrokenHorizon,AttackExploreObjective"
+msgid "Advance into {0}"
+msgstr "Advance into {0}"
+
+#. Key:	DefenseEliminateObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6208)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6208)
+msgctxt "BrokenHorizon,DefenseEliminateObjective"
+msgid "Repel the enemy assault on {0}"
+msgstr "Repel the enemy assault on {0}"
+
+#. Key:	RaidEliminateObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6214)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6214)
+msgctxt "BrokenHorizon,RaidEliminateObjective"
+msgid "Disrupt enemy logistics in {0}"
+msgstr "Disrupt enemy logistics in {0}"
+
+#. Key:	AttackEliminateObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6219)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6219)
+msgctxt "BrokenHorizon,AttackEliminateObjective"
+msgid "Neutralize hostile forces in {0}"
+msgstr "Neutralize hostile forces in {0}"
+
+#. Key:	DefenseExtractionObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6232)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6232)
+msgctxt "BrokenHorizon,DefenseExtractionObjective"
+msgid "Hold {0} and report to the rally point"
+msgstr "Hold {0} and report to the rally point"
+
+#. Key:	RaidExtractionObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6238)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6238)
+msgctxt "BrokenHorizon,RaidExtractionObjective"
+msgid "Break contact and report the raid on {0}"
+msgstr "Break contact and report the raid on {0}"
+
+#. Key:	AttackExtractionObjective
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6243)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6243)
+msgctxt "BrokenHorizon,AttackExtractionObjective"
+msgid "Secure {0} and reach the rally point"
+msgstr "Secure {0} and reach the rally point"
+
+#. Key:	FriendlyCampaignVictory
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6290)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6290)
+msgctxt "BrokenHorizon,FriendlyCampaignVictory"
+msgid "CAMPAIGN VICTORY // KORONA LIBERATED"
+msgstr "CAMPAIGN VICTORY // KORONA LIBERATED"
+
+#. Key:	EnemyCampaignVictory
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6300)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6300)
+msgctxt "BrokenHorizon,EnemyCampaignVictory"
+msgid "CAMPAIGN DEFEAT // WESTERN COMMAND LOST"
+msgstr "CAMPAIGN DEFEAT // WESTERN COMMAND LOST"
+
+#. Key:	CampaignOngoing
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6307)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6307)
+msgctxt "BrokenHorizon,CampaignOngoing"
+msgid "CAMPAIGN ACTIVE"
+msgstr "CAMPAIGN ACTIVE"
+
+#. Key:	NoActiveFrontPriorityReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6788)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6788)
+msgctxt "BrokenHorizon,NoActiveFrontPriorityReason"
+msgid "NO ACTIVE FRONT"
+msgstr "NO ACTIVE FRONT"
+
+#. Key:	CommittedOperationPriorityReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6812)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6812)
+msgctxt "BrokenHorizon,CommittedOperationPriorityReason"
+msgid "OPERATION IN PROGRESS"
+msgstr "OPERATION IN PROGRESS"
+
+#. Key:	CriticalDefensePriorityReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6973)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6973)
+msgctxt "BrokenHorizon,CriticalDefensePriorityReason"
+msgid "BREAKTHROUGH THREAT"
+msgstr "BREAKTHROUGH THREAT"
+
+#. Key:	CounterinsurgencyDefensePriorityReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6983)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6983)
+msgctxt "BrokenHorizon,CounterinsurgencyDefensePriorityReason"
+msgid "ENEMY SWEEP DETECTED"
+msgstr "ENEMY SWEEP DETECTED"
+
+#. Key:	ReconnectionAttackPriorityReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6993)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(6993)
+msgctxt "BrokenHorizon,ReconnectionAttackPriorityReason"
+msgid "RESTORE ISOLATED SECTORS"
+msgstr "RESTORE ISOLATED SECTORS"
+
+#. Key:	FrontlineDefensePriorityReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(7004)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(7004)
+msgctxt "BrokenHorizon,FrontlineDefensePriorityReason"
+msgid "FRONTLINE UNDER PRESSURE"
+msgstr "FRONTLINE UNDER PRESSURE"
+
+#. Key:	ExpansionAttackPriorityReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(7014)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(7014)
+msgctxt "BrokenHorizon,ExpansionAttackPriorityReason"
+msgid "EXPAND FRIENDLY CONTROL"
+msgstr "EXPAND FRIENDLY CONTROL"
+
+#. Key:	HoldFrontPriorityReason
+#. SourceLocation:	Source/BrokenHorizon/Private/BHWarSubsystem.cpp(7024)
+#: Source/BrokenHorizon/Private/BHWarSubsystem.cpp(7024)
+msgctxt "BrokenHorizon,HoldFrontPriorityReason"
+msgid "HOLD THE FRONT"
+msgstr "HOLD THE FRONT"
+

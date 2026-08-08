@@ -1,0 +1,7 @@
+{
+  "GameName": "Broken Horizon",
+  "DownloadUrl": "https://github.com/TheGoldDynomite/BrokenHorizon/releases/download/Update/BrokenHorizon-FirstLight-Development.zip",
+  "GameExecutableName": "BrokenHorizon.exe",
+  "InstallFolderName": "BrokenHorizon",
+  "LaunchAfterUpdate": true
+}

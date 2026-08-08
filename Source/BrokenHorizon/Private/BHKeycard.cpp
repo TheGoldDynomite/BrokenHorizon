@@ -3,10 +3,12 @@
 #include "BHCharacter.h"
 #include "BHMissionData.h"
 #include "Components/StaticMeshComponent.h"
+#include "EngineUtils.h"
 
 ABHKeycard::ABHKeycard()
 {
     PrimaryActorTick.bCanEverTick = false;
+    SetReplicates(true);
 
     KeycardMesh = CreateDefaultSubobject<UStaticMeshComponent>(
         TEXT("KeycardMesh")
@@ -37,6 +39,11 @@ void ABHKeycard::BeginPlay()
 
 void ABHKeycard::Interact_Implementation(AActor* InteractingActor)
 {
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     ABHCharacter* Character = Cast<ABHCharacter>(InteractingActor);
 
     if (!IsValid(Character))
@@ -44,12 +51,45 @@ void ABHKeycard::Interact_Implementation(AActor* InteractingActor)
         return;
     }
 
-    if (!Character->CollectKeycard(KeycardID, PersistenceID))
+    bool bCollectorReceivedKeycard = false;
+    int32 RecipientCount = 0;
+    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+    {
+        ABHCharacter* PlayerCharacter = *It;
+        if (!IsValid(PlayerCharacter) ||
+            !PlayerCharacter->IsPlayerControlled())
+        {
+            continue;
+        }
+
+        const bool bCollected = PlayerCharacter->CollectKeycard(
+            KeycardID,
+            PersistenceID
+        );
+        if (bCollected)
+        {
+            ++RecipientCount;
+        }
+        if (PlayerCharacter == Character)
+        {
+            bCollectorReceivedKeycard = bCollected;
+        }
+    }
+
+    if (!bCollectorReceivedKeycard)
     {
         return;
     }
 
-    Character->CompleteObjective(
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_SHARED_KEYCARD_COLLECTED id=%s players=%d"),
+        *KeycardID.ToString(),
+        RecipientCount
+    );
+
+    Character->CompleteSharedObjective(
         BHObjectiveIds::FindRedKeycard
     );
 

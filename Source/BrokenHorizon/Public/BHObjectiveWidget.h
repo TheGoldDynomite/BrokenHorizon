@@ -24,6 +24,8 @@ public:
 
 protected:
 
+    virtual void NativeConstruct() override;
+
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UTextBlock> ObjectiveText;
 };

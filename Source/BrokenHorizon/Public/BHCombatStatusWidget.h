@@ -39,6 +39,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat Status")
     void SetSuppression(float SuppressionPercentage);
 
+    UFUNCTION(BlueprintCallable, Category = "Combat Status")
+    void SetControlledBreathing(bool bHolding);
+
     void NotifyGrenadeThreat(
         AActor* SourceActor,
         FVector SourceDirection,
@@ -66,6 +69,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Combat Status")
     void SetFragGrenadeCount(int32 GrenadeCount);
+
+    UFUNCTION(BlueprintCallable, Category = "Combat Status")
+    void SetSmokeGrenadeCount(int32 GrenadeCount);
 
     UFUNCTION(BlueprintCallable, Category = "Combat Status")
     void SetEngineeringChargeState(
@@ -175,12 +181,7 @@ public:
         EBHWarFaction SectorOwner,
         float SectorSupply,
         float SupplyFlowPerTurn,
-        int32 WarTurn,
-        int32 ConstructedFortifications,
-        int32 FortificationCapacity,
-        float FortificationCoverage,
-        float FortificationDefenseMultiplier,
-        bool bFortificationsConnected
+        int32 WarTurn
     );
 
     UFUNCTION(BlueprintCallable, Category = "Combat Status")
@@ -397,6 +398,7 @@ private:
     int32 FieldDressingCount = 0;
     int32 MedkitCount = 0;
     int32 FragGrenadeCount = 0;
+    int32 SmokeGrenadeCount = 0;
     int32 EngineeringChargeCount = 0;
     int32 ActiveEngineeringChargeCount = 0;
     float CarryLoadKilograms = 0.0f;
@@ -407,6 +409,7 @@ private:
     bool bArmInjured = false;
     bool bLegInjured = false;
     bool bMedicalTreatmentActive = false;
+    bool bControlledBreathing = false;
     bool bOperationWaypointVisible = false;
     bool bOperationWaypointActive = false;
     FText OperationSectorDisplayName;
@@ -475,11 +478,6 @@ private:
     float StrategicSupplyFlowPerTurn = 0.0f;
     float StrategicEnemyResponsePressure = 0.0f;
     float StrategicCivilianSupport = 50.0f;
-    int32 StrategicFortificationConstructed = 0;
-    int32 StrategicFortificationCapacity = 0;
-    float StrategicFortificationCoverage = 0.0f;
-    float StrategicFortificationDefenseMultiplier = 1.0f;
-    bool bFortificationsConnected = true;
     float StrategicIntelConfidence = 0.0f;
     float ReconMovementProgress = 0.0f;
     float ReconMovementRequired = 1.0f;

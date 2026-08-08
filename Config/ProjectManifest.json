@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Broken Horizon",
+  "engineVersion": "5.8",
+  "engineRoot": "C:\\Program Files\\Epic Games\\UE_5.8",
+  "uproject": "BrokenHorizon.uproject",
+  "editorTarget": "BrokenHorizonEditor",
+  "platform": "Win64",
+  "configuration": "Development",
+  "modules": {
+    "runtime": "Source/BrokenHorizon",
+    "editor": "Source/BrokenHorizonEditor"
+  },
+  "maps": {
+    "mainMenu": "/Game/BrokenHorizon/Maps/L_MainMenu",
+    "openWorld": "/Game/BrokenHorizon/Maps/L_BrokenHorizon_World",
+    "firstLight": "/Game/BrokenHorizon/Maps/L_FirstLight_Graybox"
+  },
+  "gameMode": "/Game/BrokenHorizon/Core/BP_BHGameMode",
+  "automationTestFilter": "BrokenHorizon",
+  "objectiveOrder": [
+    "FindRedKeycard",
+    "UnlockSecurityDoor",
+    "EliminateGuard",
+    "ReachExtraction"
+  ],
+  "packagedBuild": {
+    "executable": "Builds\\FirstLight-Development\\Windows\\BrokenHorizon.exe",
+    "map": "/Game/BrokenHorizon/Maps/L_FirstLight_Graybox"
+  },
+  "documentation": [
+    "Docs/FirstLightGrayboxAutomation.md",
+    "Docs/CombatSupportEditorAutomation.md",
+    "Documentation/Art/ART_DIRECTION.md",
+    "Documentation/Art/LOCAL_ASSET_INTEGRATION.md"
+  ]
+}
