@@ -153,6 +153,85 @@ ABHFieldTransport::ABHFieldTransport()
     bUseControllerRotationRoll = false;
 }
 
+float ABHFieldTransport::CalculateHullMobilityMultiplier(
+    float HullFraction,
+    float CriticalHullFraction,
+    float MinimumMobilityMultiplier
+)
+{
+    const float ClampedHullFraction = FMath::Clamp(
+        HullFraction,
+        0.0f,
+        1.0f
+    );
+    const float ClampedCriticalFraction = FMath::Clamp(
+        CriticalHullFraction,
+        KINDA_SMALL_NUMBER,
+        1.0f
+    );
+    const float ClampedMinimumMultiplier = FMath::Clamp(
+        MinimumMobilityMultiplier,
+        0.0f,
+        1.0f
+    );
+
+    if (ClampedHullFraction >= ClampedCriticalFraction)
+    {
+        return 1.0f;
+    }
+
+    const float DamageAlpha = FMath::Clamp(
+        1.0f -
+            ClampedHullFraction / ClampedCriticalFraction,
+        0.0f,
+        1.0f
+    );
+    return FMath::Lerp(
+        1.0f,
+        ClampedMinimumMultiplier,
+        DamageAlpha
+    );
+}
+
+float ABHFieldTransport::CalculateHullFuelBurnMultiplier(
+    float HullFraction,
+    float CriticalHullFraction,
+    float CriticalFuelBurnMultiplier
+)
+{
+    const float ClampedHullFraction = FMath::Clamp(
+        HullFraction,
+        0.0f,
+        1.0f
+    );
+    const float ClampedCriticalFraction = FMath::Clamp(
+        CriticalHullFraction,
+        KINDA_SMALL_NUMBER,
+        1.0f
+    );
+    const float ClampedCriticalMultiplier = FMath::Max(
+        1.0f,
+        CriticalFuelBurnMultiplier
+    );
+
+    if (ClampedHullFraction >= ClampedCriticalFraction)
+    {
+        return 1.0f;
+    }
+
+    const float DamageAlpha = FMath::Clamp(
+        1.0f -
+            ClampedHullFraction / ClampedCriticalFraction,
+        0.0f,
+        1.0f
+    );
+    return FMath::Lerp(
+        1.0f,
+        ClampedCriticalMultiplier,
+        DamageAlpha
+    );
+}
+
 void ABHFieldTransport::GetLifetimeReplicatedProps(
     TArray<FLifetimeProperty>& OutLifetimeProps
 ) const
@@ -1763,7 +1842,8 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
     const float ForwardLimit =
         (bBoostInput ? BoostForwardSpeed : MaximumForwardSpeed) *
         Conditions.VehicleTractionMultiplier *
-        GetCargoSpeedMultiplier();
+        GetCargoSpeedMultiplier() *
+        GetHullMobilityMultiplier();
     float TargetSpeed = 0.0f;
 
     if (ThrottleInput > 0.0f)
@@ -1774,6 +1854,7 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
     {
         TargetSpeed = MaximumReverseSpeed *
             GetCargoSpeedMultiplier() *
+            GetHullMobilityMultiplier() *
             ThrottleInput;
     }
 
@@ -1892,6 +1973,7 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
             FMath::Max(0.01f, FuelBurnPerKilometer) *
             BoostBurnMultiplier *
             GetCargoFuelBurnMultiplier() *
+            GetHullFuelBurnMultiplier() *
             Conditions.VehicleFuelBurnMultiplier
     );
 
@@ -1930,6 +2012,24 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
         );
         CurrentSpeed = 0.0f;
     }
+}
+
+float ABHFieldTransport::GetHullMobilityMultiplier() const
+{
+    return CalculateHullMobilityMultiplier(
+        GetHullPercentage(),
+        CriticalHullFraction,
+        MinimumDamagedSpeedMultiplier
+    );
+}
+
+float ABHFieldTransport::GetHullFuelBurnMultiplier() const
+{
+    return CalculateHullFuelBurnMultiplier(
+        GetHullPercentage(),
+        CriticalHullFraction,
+        CriticalHullFuelBurnMultiplier
+    );
 }
 
 void ABHFieldTransport::UpdateGroundPosition(float DeltaTime)

@@ -42,6 +42,18 @@ public:
         float PassengerMultiplier
     );
 
+    static float CalculateHullMobilityMultiplier(
+        float HullFraction,
+        float CriticalHullFraction,
+        float MinimumMobilityMultiplier
+    );
+
+    static float CalculateHullFuelBurnMultiplier(
+        float HullFraction,
+        float CriticalHullFraction,
+        float CriticalFuelBurnMultiplier
+    );
+
     static bool ShouldRestoreFieldSquadPassengers(
         bool bRestoreDriver,
         bool bHasExplicitPassengerState,
@@ -200,6 +212,8 @@ private:
     float GetCargoLoadFraction() const;
     float GetCargoSpeedMultiplier() const;
     float GetCargoFuelBurnMultiplier() const;
+    float GetHullMobilityMultiplier() const;
+    float GetHullFuelBurnMultiplier() const;
     void UpdateGroundPosition(float DeltaTime);
     void UpdateTransportLabel();
     void TryTransferFieldLogistics();
@@ -428,6 +442,42 @@ private:
         )
     )
     float MaximumHull = 500.0f;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Readiness",
+        meta = (
+            AllowPrivateAccess = "true",
+            ClampMin = "0.05",
+            ClampMax = "0.95"
+        )
+    )
+    float CriticalHullFraction = 0.35f;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Handling",
+        meta = (
+            AllowPrivateAccess = "true",
+            ClampMin = "0.10",
+            ClampMax = "1.0"
+        )
+    )
+    float MinimumDamagedSpeedMultiplier = 0.55f;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Readiness",
+        meta = (
+            AllowPrivateAccess = "true",
+            ClampMin = "1.0",
+            ClampMax = "3.0"
+        )
+    )
+    float CriticalHullFuelBurnMultiplier = 1.30f;
 
     UPROPERTY(
         EditAnywhere,
