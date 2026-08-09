@@ -187,3 +187,11 @@ Evidence:
 - Audio-enabled packaged First Light smoke initialized WASAPI at 48 kHz and emitted the attenuation marker, with no fatal, assertion, or ensure markers.
  
 Manual review remains required for subjective event loudness, spatial positioning, occlusion audibility, and the final combat mix on physical speakers/headphones.
+
+## Extended rendered multiplayer soak attempt - 2026-08-08
+
+- The rendered-soak validator contract now accepts extended evidence through `-RequiredSoakSeconds`; the compatibility gate remains the buffered ten-minute run and the long gate requires `-SustainedSoak`.
+- Attempt `BHRenderedTwoHourRetry` launched a dedicated First Light host and two 1280x720 rendered clients with `-CaptureFrames 780000`, `-WarmupFrames 600`, and `-RequiredSoakSeconds 7080`.
+- The host reached readiness and sustained gameplay telemetry. It reported two network connections with zero packet loss, recurring autosave completion, field respawns, AI reload/retreat/ammunition events, and network budget samples.
+- ClientB then terminated at rendered frame 13,859 with an Unreal D3D12 fatal error: `Out of video memory trying to allocate a rendering resource`. Evidence: `Saved/Logs/BHRenderedTwoHourRetry-20260808-211147-ClientB.log`.
+- Result: the two-hour rendered two-client soak is **not passed**. The prior buffered ten-minute rendered multiplayer soak remains the valid sustained-render evidence; the historical non-rendered two-hour campaign/reconnect evidence remains separate. The open release gate is now specifically sustained two-client renderer memory stability, followed by the existing navigation and manual feel reviews.
