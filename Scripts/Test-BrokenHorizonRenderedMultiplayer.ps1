@@ -82,6 +82,7 @@ $clientLogs = @(
         Join-Path $logDirectory "$LogPrefix-$runId-$_.log"
     }
 )
+$failureLogPaths = @($hostLog) + $clientLogs
 $clientUserDirectories = @(
     $clientLabels | ForEach-Object {
         Join-Path $runRoot $_
@@ -141,9 +142,20 @@ function Wait-ForMarker {
     $failurePattern =
         "Fatal error:|Assertion failed:|Unhandled Exception:|" +
         "NetworkFailure|TravelFailure|PIE: Error:|" +
-        "Checkpoint save failed|BH_(WAR|FIELD)_AUTOSAVE_FAILED"
+        "Checkpoint save failed|BH_(WAR|FIELD)_AUTOSAVE_FAILED|" +
+        "Out of video memory trying to allocate"
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
+        foreach ($failureLogPath in $failureLogPaths) {
+            if ($failureLogPath -eq $LogPath -or
+                -not (Test-Path -LiteralPath $failureLogPath)) {
+                continue
+            }
+            $failureContent = Get-Content -Raw -LiteralPath $failureLogPath
+            if ($failureContent -match $failurePattern) {
+                throw "$Label encountered a failure marker in $failureLogPath. See $failureLogPath"
+            }
+        }
         if (Test-Path -LiteralPath $LogPath) {
             $content = Get-Content -Raw -LiteralPath $LogPath
             if ($content -match $failurePattern) {
