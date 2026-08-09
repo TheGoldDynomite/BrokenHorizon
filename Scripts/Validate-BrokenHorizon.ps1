@@ -530,7 +530,9 @@ if ($RenderedMultiplayer -or
         # CSV FrameTime excludes the t.MaxFPS sleep on this editor build.
         # Capture enough real rendered work to exceed ten measured minutes
         # instead of treating 36,000 capped frames as ten-minute evidence.
-        $renderedMultiplayerArguments.CaptureFrames = 62500
+        # Keep a small client-timing buffer so the slowest local client does
+        # not finish a fraction below the 570-second acceptance floor.
+        $renderedMultiplayerArguments.CaptureFrames = 63000
         $renderedMultiplayerArguments.WarmupFrames = 600
         $renderedMultiplayerArguments.SustainedSoak = $true
     }
