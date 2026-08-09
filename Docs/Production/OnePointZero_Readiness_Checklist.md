@@ -96,3 +96,9 @@ When every row is **Complete** with evidence, we are ready for 1.0 RC.
 2. Week 2: art/texture cleanup and performance compliance
 3. Week 3: accessibility and UX polish
 4. Week 4: soak, packaging, migration/rollback pass, and RC freeze
+
+## Latest realism increment (2026-08-09)
+
+- Defeated enemy combat state: integrated. Stable field-operative IDs are saved at death and restored as inert zero-health enemies across save/load and corpse expiry.
+- Evidence: focused persistence automation, editor build, source smoke, fresh package, and packaged First Light route passed. Aggregate automation remains partially blocked by the preserved unrelated DistantEventWeatherMix and SettingsContract failures.
+- Manual/release follow-up: verify multiplayer load timing and corpse presentation in the editor; continue clearing the aggregate baseline before 1.0 sign-off.

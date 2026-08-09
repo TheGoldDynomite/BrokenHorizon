@@ -736,7 +736,16 @@ bool UBHSaveSubsystem::SaveProgressForCharacter(
     SaveData->ConsumedWorldItemIDs =
         RuntimeConsumedWorldItemIDs.Array();
 
-    for (TActorIterator<ABHEnemySoldier> EnemyIt(World);
+    SaveData->DefeatedEnemyStates.Reset();
+    for (const TPair<FName, FBHPendingDefeatedEnemyState>& Pair :
+        RuntimeDefeatedEnemyStates)
+    {
+        FBHPersistentEnemyDeathSaveState DeathState;
+        DeathState.FieldOperativeID = Pair.Key;
+        DeathState.SectorID = Pair.Value.SectorID;
+        DeathState.Transform = Pair.Value.Transform;
+        SaveData->DefeatedEnemyStates.Add(DeathState);
+    }    for (TActorIterator<ABHEnemySoldier> EnemyIt(World);
         EnemyIt;
         ++EnemyIt)
     {
@@ -956,11 +965,21 @@ bool UBHSaveSubsystem::SaveProgressForCharacter(
         }
     );
 
-    const bool bSaved = SavePrimaryWithBackup(SaveData);
+    SaveData->DefeatedEnemyStates.Sort(
+        [](const FBHPersistentEnemyDeathSaveState& Left,
+            const FBHPersistentEnemyDeathSaveState& Right)
+        {
+            return FNameLexicalLess()(
+                Left.FieldOperativeID,
+                Right.FieldOperativeID
+            );
+        }
+    );    const bool bSaved = SavePrimaryWithBackup(SaveData);
 
     if (bSaved)
     {
         PendingSurrenderEnemyStates.Reset();
+        PendingDefeatedEnemyStates.Reset();
         PendingSurrenderLevelName = NAME_None;
         ClearPendingWarAutosave(World);
 
@@ -1027,7 +1046,16 @@ bool UBHSaveSubsystem::SavePlayerResources()
     CapturePlayerResourceState(SaveData, Character);
     CaptureWarState(SaveData, GetGameInstance());
 
-    const bool bSaved = SavePrimaryWithBackup(SaveData);
+    SaveData->DefeatedEnemyStates.Sort(
+        [](const FBHPersistentEnemyDeathSaveState& Left,
+            const FBHPersistentEnemyDeathSaveState& Right)
+        {
+            return FNameLexicalLess()(
+                Left.FieldOperativeID,
+                Right.FieldOperativeID
+            );
+        }
+    );    const bool bSaved = SavePrimaryWithBackup(SaveData);
 
     if (bSaved)
     {
@@ -1435,6 +1463,8 @@ bool UBHSaveSubsystem::DeleteSaveGame()
     PendingSurrenderEnemyStates.Reset();
     PendingSurrenderLevelName = NAME_None;
 
+    RuntimeDefeatedEnemyStates.Reset();
+    PendingDefeatedEnemyStates.Reset();
     if (UBHWarSubsystem* WarSubsystem =
         GetGameInstance()
             ? GetGameInstance()->GetSubsystem<UBHWarSubsystem>()
@@ -1456,7 +1486,32 @@ bool UBHSaveSubsystem::DeleteSaveGame()
     return true;
 }
 
-bool UBHSaveSubsystem::RecordConsumedWorldItem(
+void UBHSaveSubsystem::RecordDefeatedEnemy(ABHEnemySoldier* Enemy)
+{
+    if (!IsValid(Enemy) ||
+        !Enemy->HasAuthority() ||
+        Enemy->GetCombatFaction() != EBHCombatFaction::Hostile ||
+        Enemy->GetFieldOperativeID().IsNone())
+    {
+        return;
+    }
+
+    FBHPendingDefeatedEnemyState DeathState;
+    DeathState.SectorID = Enemy->GetSurrenderSectorID();
+    DeathState.Transform = Enemy->GetActorTransform();
+    RuntimeDefeatedEnemyStates.Add(
+        Enemy->GetFieldOperativeID(),
+        DeathState
+    );
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_ENEMY_DEFEAT_RECORDED id=%s sector=%s"),
+        *Enemy->GetFieldOperativeID().ToString(),
+        *DeathState.SectorID.ToString()
+    );
+}bool UBHSaveSubsystem::RecordConsumedWorldItem(
     FName PersistenceID
 )
 {
@@ -1986,6 +2041,31 @@ bool UBHSaveSubsystem::ApplySaveData(
 
     if (!SaveData->WarSectorStates.IsEmpty())
     {
+    PendingDefeatedEnemyStates.Reset();
+    RuntimeDefeatedEnemyStates.Reset();
+    for (const FBHPersistentEnemyDeathSaveState& SavedDeathState :
+        SaveData->DefeatedEnemyStates)
+    {
+        if (SavedDeathState.FieldOperativeID.IsNone())
+        {
+            continue;
+        }
+
+        FBHPendingDefeatedEnemyState PendingDeathState;
+        PendingDeathState.SectorID = SavedDeathState.SectorID;
+        PendingDeathState.Transform = SavedDeathState.Transform;
+        RuntimeDefeatedEnemyStates.Add(
+            SavedDeathState.FieldOperativeID,
+            PendingDeathState
+        );
+        if (bSurrenderLevelMatches)
+        {
+            PendingDefeatedEnemyStates.Add(
+                SavedDeathState.FieldOperativeID,
+                PendingDeathState
+            );
+        }
+    }
         UBHWarSubsystem* WarSubsystem =
             GetGameInstance()
                 ? GetGameInstance()->GetSubsystem<UBHWarSubsystem>()
@@ -2555,7 +2635,16 @@ bool UBHSaveSubsystem::ApplySaveData(
     int32 RestoredSurrenderedEnemyCount = 0;
     if (bSurrenderLevelMatches)
     {
-        for (TActorIterator<ABHEnemySoldier> EnemyIt(World);
+        SaveData->DefeatedEnemyStates.Reset();
+    for (const TPair<FName, FBHPendingDefeatedEnemyState>& Pair :
+        RuntimeDefeatedEnemyStates)
+    {
+        FBHPersistentEnemyDeathSaveState DeathState;
+        DeathState.FieldOperativeID = Pair.Key;
+        DeathState.SectorID = Pair.Value.SectorID;
+        DeathState.Transform = Pair.Value.Transform;
+        SaveData->DefeatedEnemyStates.Add(DeathState);
+    }    for (TActorIterator<ABHEnemySoldier> EnemyIt(World);
             EnemyIt;
             ++EnemyIt)
         {
@@ -2630,33 +2719,59 @@ bool UBHSaveSubsystem::ApplyPendingSurrenderState(
 
     const FBHPendingSurrenderEnemyState* PendingState =
         PendingSurrenderEnemyStates.Find(FieldOperativeID);
-    if (PendingState == nullptr ||
+    const FBHPendingDefeatedEnemyState* PendingDefeatedState =
+        PendingDefeatedEnemyStates.Find(FieldOperativeID);
+    const bool bRestoreDefeatedState =
+        PendingDefeatedState != nullptr;
+    if ((PendingState == nullptr ||
         (!PendingState->bHasCombatState &&
-            !PendingState->bSurrendered))
+            !PendingState->bSurrendered)) &&
+        !bRestoreDefeatedState)
     {
         return false;
     }
 
+    const FName SavedSectorID = PendingState != nullptr
+        ? PendingState->SectorID
+        : PendingDefeatedState->SectorID;
     const FName CurrentSectorID = Enemy->GetSurrenderSectorID();
-    if (!PendingState->SectorID.IsNone() &&
+    if (!SavedSectorID.IsNone() &&
         !CurrentSectorID.IsNone() &&
-        PendingState->SectorID != CurrentSectorID)
+        SavedSectorID != CurrentSectorID)
     {
         return false;
     }
 
-    const bool bRestoreCombatState = PendingState->bHasCombatState;
-    const bool bRestoreSurrenderState = PendingState->bSurrendered;
-    const float SavedHealth = PendingState->Health;
-    const int32 SavedMagazineAmmo = PendingState->MagazineAmmo;
-    const int32 SavedReserveAmmo = PendingState->ReserveAmmo;
-    const int32 SavedFragGrenades = PendingState->FragGrenades;
-    const float SavedCombatReadiness = PendingState->CombatReadiness;
-    const bool bCustodySecured = PendingState->bCustodySecured;
-    const float SurrenderEscapeSecondsRemaining =
-        PendingState->SurrenderEscapeSecondsRemaining;
+    const bool bRestoreCombatState =
+        PendingState != nullptr && PendingState->bHasCombatState;
+    const bool bRestoreSurrenderState =
+        PendingState != nullptr && PendingState->bSurrendered;
+    const float SavedHealth = PendingState != nullptr
+        ? PendingState->Health
+        : 0.0f;
+    const int32 SavedMagazineAmmo = PendingState != nullptr
+        ? PendingState->MagazineAmmo
+        : -1;
+    const int32 SavedReserveAmmo = PendingState != nullptr
+        ? PendingState->ReserveAmmo
+        : -1;
+    const int32 SavedFragGrenades = PendingState != nullptr
+        ? PendingState->FragGrenades
+        : -1;
+    const float SavedCombatReadiness = PendingState != nullptr
+        ? PendingState->CombatReadiness
+        : 1.0f;
+    const bool bCustodySecured = PendingState != nullptr
+        && PendingState->bCustodySecured;
+    const float SurrenderEscapeSecondsRemaining = PendingState != nullptr
+        ? PendingState->SurrenderEscapeSecondsRemaining
+        : 0.0f;
 
-    Enemy->SetActorTransform(PendingState->Transform);
+    const FTransform RestoreTransform = PendingState != nullptr
+        ? PendingState->Transform
+        : PendingDefeatedState->Transform;
+
+    Enemy->SetActorTransform(RestoreTransform);
     if (bRestoreCombatState)
     {
         Enemy->RestorePersistentCombatState(
@@ -2677,7 +2792,13 @@ bool UBHSaveSubsystem::ApplyPendingSurrenderState(
         );
     }
 
+    if (bRestoreDefeatedState)
+    {
+        Enemy->RestorePersistentDeathState();
+    }
+
     PendingSurrenderEnemyStates.Remove(FieldOperativeID);
+    PendingDefeatedEnemyStates.Remove(FieldOperativeID);
 
     UE_LOG(
         LogTemp,

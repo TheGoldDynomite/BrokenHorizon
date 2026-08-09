@@ -1746,7 +1746,47 @@ void ABHEnemySoldier::RestorePersistentCombatState(
     ReloadEndTime = -BIG_NUMBER;
 }
 
-float ABHEnemySoldier::GetCombatReadiness() const
+void ABHEnemySoldier::RestorePersistentDeathState()
+{
+    if (bDeathHandled)
+    {
+        return;
+    }
+
+    if (IsValid(HealthComponent))
+    {
+        HealthComponent->RestorePersistentDeathState();
+    }
+
+    bDeathHandled = true;
+    bReloading = false;
+    ReloadEndTime = -BIG_NUMBER;
+    SetCanBeDamaged(false);
+    GetCharacterMovement()->DisableMovement();
+    GetCapsuleComponent()->SetCollisionEnabled(
+        ECollisionEnabled::NoCollision
+    );
+
+    if (ABHEnemyAIController* EnemyController =
+        Cast<ABHEnemyAIController>(GetController()))
+    {
+        EnemyController->HandlePawnDeath();
+    }
+
+    MulticastDeathPresentation(nullptr, false);
+
+    if (CorpseLifeSpan > 0.0f)
+    {
+        SetLifeSpan(CorpseLifeSpan);
+    }
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_ENEMY_DEATH_STATE_RESTORED id=%s"),
+        *GetFieldOperativeID().ToString()
+    );
+}float ABHEnemySoldier::GetCombatReadiness() const
 {
     return FMath::Clamp(CombatReadiness, 0.0f, 1.0f);
 }
@@ -2518,6 +2558,13 @@ void ABHEnemySoldier::HandleDeath(AActor* DamageCauser)
 
     bDeathHandled = true;
     PlayBark(EBHEnemyBarkType::Casualty);
+    if (UBHSaveSubsystem* SaveSubsystem =
+        GetGameInstance()
+            ? GetGameInstance()->GetSubsystem<UBHSaveSubsystem>()
+            : nullptr)
+    {
+        SaveSubsystem->RecordDefeatedEnemy(this);
+    }
     DropRemainingAmmunition();
     SetCanBeDamaged(false);
     GetCharacterMovement()->DisableMovement();

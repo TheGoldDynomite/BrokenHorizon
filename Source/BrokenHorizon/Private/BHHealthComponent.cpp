@@ -232,7 +232,18 @@ void UBHHealthComponent::RestorePersistentHealthState(
     OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 }
 
-float UBHHealthComponent::GetCurrentHealth() const
+void UBHHealthComponent::RestorePersistentDeathState()
+{
+    if (!HasMutationAuthority())
+    {
+        return;
+    }
+
+    MaxHealth = FMath::Max(1.0f, MaxHealth);
+    CurrentHealth = 0.0f;
+    bIsDead = true;
+    OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+}float UBHHealthComponent::GetCurrentHealth() const
 {
     return CurrentHealth;
 }

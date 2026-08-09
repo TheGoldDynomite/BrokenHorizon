@@ -27,6 +27,11 @@ struct FBHPendingSurrenderEnemyState
     float SurrenderEscapeSecondsRemaining = 0.0f;
 };
 
+struct FBHPendingDefeatedEnemyState
+{
+    FName SectorID = NAME_None;
+    FTransform Transform = FTransform::Identity;
+};
 UCLASS()
 class BROKENHORIZON_API UBHSaveSubsystem
     : public UGameInstanceSubsystem
@@ -83,6 +88,7 @@ public:
     bool IsWorldItemConsumed(FName PersistenceID) const;
 
     bool ApplyPendingSurrenderState(ABHEnemySoldier* Enemy);
+    void RecordDefeatedEnemy(ABHEnemySoldier* Enemy);
 
 private:
     static const FString SaveSlotName;
@@ -133,6 +139,8 @@ private:
     TMap<FName, FBHPendingSurrenderEnemyState>
         PendingSurrenderEnemyStates;
 
+    TMap<FName, FBHPendingDefeatedEnemyState> PendingDefeatedEnemyStates;
+
     FName PendingSurrenderLevelName = NAME_None;
 
     int32 PendingSaveApplyAttempts = 0;
@@ -146,6 +154,8 @@ private:
     FDelegateHandle PostLoadMapHandle;
 
     TSet<FName> RuntimeConsumedWorldItemIDs;
+
+    TMap<FName, FBHPendingDefeatedEnemyState> RuntimeDefeatedEnemyStates;
 
     FTimerHandle WarAutosaveTimerHandle;
     FTimerHandle FieldAutosaveTimerHandle;

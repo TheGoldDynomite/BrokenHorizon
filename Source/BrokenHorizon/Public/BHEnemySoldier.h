@@ -368,6 +368,9 @@ void RestoreSurrenderPersistence(bool bNewSurrendered, bool bNewCustodySecured, 
         float SavedCombatReadiness = 1.0f
     );
 
+    UFUNCTION(BlueprintCallable, Category = "Enemy|Persistence")
+    void RestorePersistentDeathState();
+
     UFUNCTION(BlueprintPure, Category = "Enemy|Combat|Service")
     float GetCombatReadiness() const;
 

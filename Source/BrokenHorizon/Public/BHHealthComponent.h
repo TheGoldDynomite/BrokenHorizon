@@ -76,6 +76,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Health")
     void RestorePersistentHealthState(float SavedHealth);
+    UFUNCTION(BlueprintCallable, Category = "Health")
+    void RestorePersistentDeathState();
 
     UFUNCTION(BlueprintPure, Category = "Health")
     float GetCurrentHealth() const;

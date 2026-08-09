@@ -13,7 +13,7 @@ class UBHMissionData;
 namespace BHSave
 {
     inline constexpr int32 MinimumCompatibleSchemaVersion = 1;
-    inline constexpr int32 CurrentSchemaVersion = 58;
+    inline constexpr int32 CurrentSchemaVersion = 59;
 }
 
 USTRUCT(BlueprintType)
@@ -188,7 +188,20 @@ struct FBHPersistentEnemyCombatSaveState
     float SurrenderEscapeSecondsRemaining = 0.0f;
 };
 
-UCLASS()
+USTRUCT(BlueprintType)
+struct FBHPersistentEnemyDeathSaveState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+    FName FieldOperativeID = NAME_None;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+    FName SectorID = NAME_None;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+    FTransform Transform = FTransform::Identity;
+};UCLASS()
 class BROKENHORIZON_API UBHSaveGame : public USaveGame
 {
 	GENERATED_BODY()
@@ -199,6 +212,8 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "World|Combat")
 	TArray<FBHPersistentEnemyCombatSaveState> EnemyCombatStates;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "World|Combat")
+	TArray<FBHPersistentEnemyDeathSaveState> DefeatedEnemyStates;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Player|Weapon")
 	float SavedWeaponHeatNormalized = 0.0f;
