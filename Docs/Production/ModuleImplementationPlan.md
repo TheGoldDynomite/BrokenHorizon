@@ -1540,3 +1540,13 @@ The optimized typed-buffer rendered profile aggregation passed a complete buffer
 - The pass confirms the typed numeric buffers, incremental hitch/memory counters, percentile arrays, and texture-streaming tail aggregation preserve the existing rendered-soak gate behavior.
 
 The extended two-client soak remains the long-duration acceptance gate; this buffered pass closes the parser regression check.
+
+## Current rendered UI presentation acceptance - 2026-08-09
+
+The current non-pseudo rendered UI matrix passed with no failed captures.
+
+- Command: Validate-BrokenHorizon.cmd -RenderedUI -LogPrefix BHValidation-RenderedUI-Current.
+- Result: exit code 0; all 33 captures passed.
+- Coverage: HUD, briefing, pause, settings, input remapping, war map, custom difficulty, session ready/searching/connected/error, 1280x720, 1920x1080, 3840x2160, and HUD scale/safe-area extremes.
+- Authoritative summary: Saved/Reports/BHValidation-RenderedUI-Current-RenderedUI-20260809-012148-Summary.json.
+- This is automated rendered-layout evidence. Manual editor/playtest review remains required for visual quality, animation, controller feel, and navigation coverage.
