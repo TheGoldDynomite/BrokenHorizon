@@ -342,7 +342,9 @@ def _validate_source_contract():
     required_soldier_fragments = (
         "GetAllyCasualtyMoraleRadius()",
         "Ally->ApplySuppression(",
+        "AllyController->NotifyAllyAlert(",
         "BH_AI_MORALE_SHOCK",
+        "BH_AI_CASUALTY_ALERT",
         "UpdateReloadState(CurrentTime)",
         "BH_AI_RELOAD_STARTED",
         "BH_AI_RELOAD_COMPLETE",
@@ -522,6 +524,7 @@ def _validate_source_contract():
             )
 
     _log("PASS tactical withdrawal source contract.")
+    _log("PASS casualty morale propagates valid contact alerts.")
     _log("PASS AI checks weapon line of fire before shooting.")
     _log("PASS AI rounds damage the hostile actor actually hit.")
     _log("PASS AI grenade throws enforce range and friendly safety.")

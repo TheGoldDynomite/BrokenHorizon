@@ -229,6 +229,30 @@ namespace
                 AppliedSuppression,
                 DamageCauser
             );
+
+            if (IsValid(DamageCauser))
+            {
+                if (ABHEnemyAIController* AllyController =
+                        Cast<ABHEnemyAIController>(
+                            Ally->GetController()))
+                {
+                    AllyController->NotifyAllyAlert(
+                        DamageCauser
+                    );
+                    UE_LOG(
+                        LogTemp,
+                        Verbose,
+                        TEXT(
+                            "BH_AI_CASUALTY_ALERT casualty=%s "
+                            "ally=%s source=%s"
+                        ),
+                        *Casualty->GetName(),
+                        *Ally->GetName(),
+                        *DamageCauser->GetName()
+                    );
+                }
+            }
+
             TotalSuppressionApplied += AppliedSuppression;
             ++AffectedAllies;
         }

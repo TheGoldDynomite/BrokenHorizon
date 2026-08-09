@@ -1601,3 +1601,18 @@ Enemy casualty morale now uses one shared response for lethal deaths and friendl
 - Release gate: Win64 Development BuildCookRun archive completed successfully, followed by Validate-BrokenHorizon.cmd -Packaged -FirstLight -AudioFX -LogPrefix BHValidation-CasualtyMoraleFalloff-Packaged.
 - Packaged result: exit 0; packaged smoke and First Light passed. Audio/FX readiness reports required 18/18, optional 9/27, and errors 0.
 - The automated runtime recovery check exercises friendly incapacitation entry and stabilization. A manual two-ally falloff and command-conflict feel pass remains open, along with the broader casualty readability and presentation review.
+
+
+
+## Enemy casualty contact propagation - 2026-08-09
+
+Nearby living same-faction allies now receive a bounded contact alert when a casualty has a valid damage source. The alert uses the existing AI controller squad-alert contract, so an ally resolves the real hostile actor and enters the appropriate combat response without fabricating a target for source-less incapacitation or touching allies already dead, retreating, or evading explosives.
+
+- Source gate: Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight -LogPrefix BHValidation-CasualtyAlertPropagation, with the isolated automation retry recorded at BHValidation-CasualtyAlertPropagation-TestsRetry.
+- Source result: the initial automation process had an Unreal MassEntity startup access violation before project tests executed; the isolated retry passed. Startup and First Light then passed with 5/12 bounded navigation fallbacks.
+- Tactical-AI gate: validate_tactical_ai.py with BHValidation-CasualtyAlertPropagation-TacticalAI-Final.log.
+- Tactical-AI result: ALL CHECKS PASSED, including the new casualty-alert source contract, friendly incapacitation recovery, suppression/casualty contracts, finite ammunition, grenade safety, withdrawal, and persistent squad orders.
+- Packaged gate: the alert-enabled Win64 Development archive rebuilt successfully, and Validate-BrokenHorizon.cmd -Packaged -FirstLight -AudioFX -LogPrefix BHValidation-CasualtyAlertPropagation-Packaged passed.
+- Packaged result: First Light route and all four objectives completed; audio/FX readiness required 18/18, optional 9/27, errors 0.
+- Rendered soak: BHValidation-CasualtyAlertPropagation-Rendered-RenderedMultiplayerSoak-20260809-034124-Summary.json passed with dedicated authority, two connected/rendered clients, 19 observed AI, 570 seconds and 36,000 minimum measured frames, renderer/network proof, zero frames over 50 ms, desired texture recovery 100 percent, pending stream-in p95 0, and no stuck-movement warnings. Client A frame/GPU p95 was 11.558/9.05 ms; Client B was 11.628/9.06 ms. Host telemetry recorded 2,605 navigation fallbacks, 2,462 local-search recoveries, and zero stuck-movement warnings.
+- The soak contained no casualty event, so direct runtime observation of BH_AI_CASUALTY_ALERT remains open. Manual two-ally casualty, command-conflict, and casualty-readability playtesting is still required.
