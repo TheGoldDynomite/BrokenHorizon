@@ -264,3 +264,16 @@ Enemy soldiers now register bounded navigation invokers with an 8,000 cm generat
 - Packaged First Light and Audio/FX acceptance passed; required audio coverage remains 18/18 and optional coverage remains 9/27.
 - Navigation fallback coverage remains 8/12 in both editor and packaged smoke. The same fixed-coordinate failures persist, so the remaining gap is treated as map/navmesh coverage and manual navigation review, not as closed by this code increment.
 - The invoker change is retained as runtime support for streamed/open-world AI navigation once the affected map tiles and spawn routes are repaired.
+
+## Enemy navigation invoker rendered multiplayer acceptance - 2026-08-09
+
+The enemy navigation-invoker build passed the full buffered two-client rendered multiplayer gate.
+
+- Command: Validate-BrokenHorizon.cmd -RenderedMultiplayerSoak -LogPrefix BHValidation-EnemyNavInvoker-Rendered.
+- Result: exit code 0; dedicated authority, two connected players, two rendered clients, and 19 observed AI all passed.
+- Sustained proof: 570 seconds and 36,000 measured frames per client.
+- ClientA frame/GPU p95: 11.648/9.134 ms; ClientB frame/GPU p95: 11.675/9.147 ms.
+- Both clients recorded zero frames over 50 ms, GPU memory maximum 32.4 percent, desired texture data p05 100 percent, final 30-minute texture tail 100 percent, and pending stream-in p95 0.
+- Authoritative summary: Saved/Reports/BHValidation-EnemyNavInvoker-Rendered-RenderedMultiplayerSoak-20260809-014045-Summary.json.
+
+This confirms the bounded invoker does not regress the tested multiplayer rendering, memory, streaming, or network gate. It does not replace the unresolved map/navmesh coverage review; First Light navigation fallback remains 8/12.
