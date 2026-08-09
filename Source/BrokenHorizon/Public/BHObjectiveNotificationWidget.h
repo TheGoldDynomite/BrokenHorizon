@@ -31,6 +31,10 @@ class BROKENHORIZON_API UBHObjectiveNotificationWidget : public UUserWidget
     GENERATED_BODY()
 
 public:
+    explicit UBHObjectiveNotificationWidget(
+        const FObjectInitializer& ObjectInitializer
+    );
+
     UFUNCTION(BlueprintCallable, Category = "Objectives")
     void ShowNotification(const FText& Message);
 

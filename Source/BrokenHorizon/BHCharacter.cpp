@@ -72,6 +72,7 @@
 #include "Perception/AISense_Hearing.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "Sound/SoundBase.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -294,6 +295,56 @@ ABHCharacter::ABHCharacter()
         "MISSION COMPLETE"
     );
     WarMapWidgetClass = UBHWarMapWidget::StaticClass();
+
+    const ConstructorHelpers::FObjectFinder<USoundBase> DefaultFootstepAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_FootstepConcrete.SW_FirstLight_FootstepConcrete")
+    );
+    if (DefaultFootstepAsset.Succeeded())
+    {
+        DefaultFootstepSound = DefaultFootstepAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> ConcreteFootstepAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_FootstepConcrete.SW_FirstLight_FootstepConcrete")
+    );
+    if (ConcreteFootstepAsset.Succeeded())
+    {
+        ConcreteFootstepSound = ConcreteFootstepAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> DirtFootstepAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_FootstepDirt.SW_FirstLight_FootstepDirt")
+    );
+    if (DirtFootstepAsset.Succeeded())
+    {
+        DirtFootstepSound = DirtFootstepAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> GrassFootstepAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_FootstepGrass.SW_FirstLight_FootstepGrass")
+    );
+    if (GrassFootstepAsset.Succeeded())
+    {
+        GrassFootstepSound = GrassFootstepAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> MetalFootstepAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_FootstepMetal.SW_FirstLight_FootstepMetal")
+    );
+    if (MetalFootstepAsset.Succeeded())
+    {
+        MetalFootstepSound = MetalFootstepAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> WaterFootstepAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_FootstepWater.SW_FirstLight_FootstepWater")
+    );
+    if (WaterFootstepAsset.Succeeded())
+    {
+        WaterFootstepSound = WaterFootstepAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> NearMissAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_NearMiss.SW_FirstLight_NearMiss")
+    );
+    if (NearMissAsset.Succeeded())
+    {
+        NearMissSound = NearMissAsset.Object;
+    }
 }
 
 APlayerController*

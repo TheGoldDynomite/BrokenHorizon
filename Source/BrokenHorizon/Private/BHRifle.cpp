@@ -33,6 +33,7 @@
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -94,6 +95,42 @@ ABHRifle::ABHRifle()
     ImpactActorClass = ABHImpactEffect::StaticClass();
 
     SetActorEnableCollision(false);
+
+    const ConstructorHelpers::FObjectFinder<USoundBase> FireSoundAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_WeaponFire.SW_FirstLight_WeaponFire")
+    );
+    if (FireSoundAsset.Succeeded())
+    {
+        FireSound = FireSoundAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> IndoorTailAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_IndoorTail.SW_FirstLight_IndoorTail")
+    );
+    if (IndoorTailAsset.Succeeded())
+    {
+        IndoorFireTailSound = IndoorTailAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> OutdoorTailAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_OutdoorTail.SW_FirstLight_OutdoorTail")
+    );
+    if (OutdoorTailAsset.Succeeded())
+    {
+        OutdoorFireTailSound = OutdoorTailAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> DryFireAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_WeaponDry.SW_FirstLight_WeaponDry")
+    );
+    if (DryFireAsset.Succeeded())
+    {
+        DryFireSound = DryFireAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> ReloadAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_Reload.SW_FirstLight_Reload")
+    );
+    if (ReloadAsset.Succeeded())
+    {
+        ReloadSound = ReloadAsset.Object;
+    }
 }
 
 void ABHRifle::BeginPlay()

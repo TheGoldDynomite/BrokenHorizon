@@ -7,6 +7,35 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Sound/SoundBase.h"
+#include "UObject/ConstructorHelpers.h"
+
+UBHObjectiveNotificationWidget::UBHObjectiveNotificationWidget(
+    const FObjectInitializer& ObjectInitializer
+)
+    : Super(ObjectInitializer)
+{
+    const ConstructorHelpers::FObjectFinder<USoundBase> ConfirmationAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_UIConfirm.SW_FirstLight_UIConfirm")
+    );
+    if (ConfirmationAsset.Succeeded())
+    {
+        QuietConfirmationSound = ConfirmationAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> WarningAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_UIWarning.SW_FirstLight_UIWarning")
+    );
+    if (WarningAsset.Succeeded())
+    {
+        StrategicWarningSound = WarningAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> AlarmAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_UIAlarm.SW_FirstLight_UIAlarm")
+    );
+    if (AlarmAsset.Succeeded())
+    {
+        CombatAlarmSound = AlarmAsset.Object;
+    }
+}
 
 void UBHObjectiveNotificationWidget::ShowNotification(
     const FText& Message)

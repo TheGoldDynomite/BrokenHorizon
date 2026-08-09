@@ -15,7 +15,28 @@ AUDIO_ASSETS = (
     "SW_FirstLight_Rain",
     "SW_FirstLight_WindRain",
     "SW_FirstLight_DistantWar",
+    "SW_FirstLight_WeaponFire",
+    "SW_FirstLight_WeaponDry",
+    "SW_FirstLight_Reload",
+    "SW_FirstLight_IndoorTail",
+    "SW_FirstLight_OutdoorTail",
+    "SW_FirstLight_FootstepConcrete",
+    "SW_FirstLight_FootstepDirt",
+    "SW_FirstLight_FootstepGrass",
+    "SW_FirstLight_FootstepMetal",
+    "SW_FirstLight_FootstepWater",
+    "SW_FirstLight_NearMiss",
+    "SW_FirstLight_UIConfirm",
+    "SW_FirstLight_UIWarning",
+    "SW_FirstLight_UIAlarm",
 )
+
+LOOPING_ASSETS = {
+    "SW_FirstLight_Wind",
+    "SW_FirstLight_Rain",
+    "SW_FirstLight_WindRain",
+    "SW_FirstLight_DistantWar",
+}
 
 
 def main():
@@ -69,7 +90,10 @@ def main():
                 f"BH_FIRST_LIGHT_AUDIO_IMPORT load_failed={asset_path}"
             )
             raise RuntimeError(f"Unable to load imported SoundWave: {asset_path}")
-        sound_wave.set_editor_property("looping", True)
+        sound_wave.set_editor_property(
+            "looping",
+            asset_name in LOOPING_ASSETS,
+        )
         if not unreal.EditorAssetLibrary.save_asset(asset_path, only_if_is_dirty=False):
             unreal.log_error(
                 f"BH_FIRST_LIGHT_AUDIO_IMPORT save_failed={asset_path}"

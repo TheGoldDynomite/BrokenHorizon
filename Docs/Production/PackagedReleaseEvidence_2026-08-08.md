@@ -60,3 +60,20 @@ are reused, preventing packaged builds from attempting to replace loaded
 - Complete controller, networked First Light, lower-tier performance, and
   two-hour rendered soak checks.
 - Reconcile the remaining navigation fallbacks before release G1 sign-off.
+## Feedback Audio Expansion Evidence (2026-08-08)
+
+The First Light feedback-audio pass expands the required audio contract beyond ambience with native defaults for rifle and enemy weapon fire, dry fire, reload, indoor and outdoor tails, material-specific concrete/dirt/grass/metal/water footsteps, near-miss feedback, and objective confirmation/warning/alarm notifications. The importer remains idempotent and configures the four ambient SoundWaves as looping while keeping the fourteen feedback cues one-shot.
+
+- Audio import commandlet log: Saved/Logs/BHFirstLightAudioImport-feedback.log
+- Import result: 14 new one-shot SoundWaves created, four existing ambient SoundWaves skipped, zero commandlet errors; the importer reported one nonfatal source-quality note for a DC offset at the start of SW_FirstLight_UIWarning, which remains a manual polish item.
+- Focused/full gate: Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight -AudioFX
+- Full gate result: exit 0; editor build, automation, startup smoke, First Light smoke, and audio/FX audit passed.
+- Audio/FX audit result: Assignments: required=18/18, optional=6/27.
+- First Light navigation result: 8/12 fallback points remain, with no navmesh mismatch or empty-navmesh failure in the fresh packaged run.
+- Packaged archive: Builds/FirstLight-FeedbackAudio-Development/Windows
+- Package result: BuildCookRun completed successfully with exit code 0 and produced the archived Windows build.
+- Direct packaged First Light smoke log: Saved/Logs/BHFeedbackAudioPackagedFirstLight-20260808b.log
+- Audio-enabled runtime result: WASAPI initialized at 48 kHz; BH_AMBIENT_AUDIO_READY wind=1 rain=1 war=1 looping=1 appeared; the runtime recorded RequestExitWithStatus(0, 0).
+- Fresh packaged error scan: missing object 0, missing package 0, navmesh mismatch 0, empty navmesh 0, fatal error 0, unhandled exception 0, ensure failure 0.
+
+The generated feedback samples are deterministic development source cues and still need human mix/presentation review in the editor and in-game. The UI warning DC-offset note should be cleaned up when the final recorded or designed cue replaces the development sample. Remaining 1.0 gates include rendered visual review, controller/UI interaction review, networked two-client First Light, lower-tier performance, long-duration soak, and raising navigation coverage beyond the current fallback set.

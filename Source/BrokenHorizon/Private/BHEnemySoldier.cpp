@@ -37,6 +37,7 @@
 #include "TimerManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -193,6 +194,28 @@ ABHEnemySoldier::ABHEnemySoldier()
     bUseControllerRotationYaw = true;
     GetCharacterMovement()->bOrientRotationToMovement = false;
     GetCharacterMovement()->MaxWalkSpeed = 300.0f;
+
+    const ConstructorHelpers::FObjectFinder<USoundBase> FireSoundAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_WeaponFire.SW_FirstLight_WeaponFire")
+    );
+    if (FireSoundAsset.Succeeded())
+    {
+        FireSound = FireSoundAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> IndoorTailAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_IndoorTail.SW_FirstLight_IndoorTail")
+    );
+    if (IndoorTailAsset.Succeeded())
+    {
+        IndoorFireTailSound = IndoorTailAsset.Object;
+    }
+    const ConstructorHelpers::FObjectFinder<USoundBase> OutdoorTailAsset(
+        TEXT("/Game/BrokenHorizon/Audio/SW_FirstLight_OutdoorTail.SW_FirstLight_OutdoorTail")
+    );
+    if (OutdoorTailAsset.Succeeded())
+    {
+        OutdoorFireTailSound = OutdoorTailAsset.Object;
+    }
 }
 
 void ABHEnemySoldier::GetLifetimeReplicatedProps(
