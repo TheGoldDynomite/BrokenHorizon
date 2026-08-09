@@ -233,6 +233,32 @@ float ABHFieldTransport::CalculateHullFuelBurnMultiplier(
     );
 }
 
+float ABHFieldTransport::CalculateCargoControlMultiplier(
+    float CargoLoadFraction,
+    float LoadedControlMultiplierAtCapacity
+)
+{
+    const float SafeLoadFraction = FMath::Clamp(
+        CargoLoadFraction,
+        0.0f,
+        1.0f
+    );
+    const float SafeAtCapacityMultiplier = FMath::Clamp(
+        LoadedControlMultiplierAtCapacity,
+        0.25f,
+        1.0f
+    );
+    return FMath::Clamp(
+        FMath::Lerp(
+            1.0f,
+            SafeAtCapacityMultiplier,
+            SafeLoadFraction
+        ),
+        0.25f,
+        1.0f
+    );
+}
+
 float ABHFieldTransport::CalculateCollisionDamage(
     float ImpactSpeed,
     float DamageSpeedThreshold,
@@ -590,6 +616,14 @@ float ABHFieldTransport::GetCargoSpeedMultiplier() const
         ),
         0.1f,
         1.0f
+    );
+}
+
+float ABHFieldTransport::GetCargoControlMultiplier() const
+{
+    return CalculateCargoControlMultiplier(
+        GetCargoLoadFraction(),
+        LoadedControlMultiplierAtCapacity
     );
 }
 
@@ -1882,6 +1916,8 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
         0.0f,
         1.0f
     );
+    const float CargoControlMultiplier =
+        GetCargoControlMultiplier();
     const float ForwardLimit =
         (bBoostInput ? BoostForwardSpeed : MaximumForwardSpeed) *
         TractionMultiplier *
@@ -1904,8 +1940,9 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
 
     const float Response = bBrakeInput
         ? AccelerationResponse *
-            FMath::Lerp(2.5f, 4.0f, TractionResponse)
-        : AccelerationResponse;
+            FMath::Lerp(2.5f, 4.0f, TractionResponse) *
+            CargoControlMultiplier
+        : AccelerationResponse * CargoControlMultiplier;
     CurrentSpeed = FMath::FInterpTo(
         CurrentSpeed,
         bBrakeInput ? 0.0f : TargetSpeed,
@@ -1936,6 +1973,7 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
                 SteeringInput *
                     SteeringRate *
                     TractionResponse *
+                    CargoControlMultiplier *
                     DirectionSign *
                     FMath::Lerp(0.30f, 1.0f, SpeedRatio) *
                     DeltaTime,

@@ -54,6 +54,11 @@ public:
         float CriticalFuelBurnMultiplier
     );
 
+    static float CalculateCargoControlMultiplier(
+        float CargoLoadFraction,
+        float LoadedControlMultiplierAtCapacity
+    );
+
     static float CalculateCollisionDamage(
         float ImpactSpeed,
         float DamageSpeedThreshold,
@@ -224,6 +229,7 @@ private:
     void UpdateMovement(float DeltaTime);
     float GetCargoLoadFraction() const;
     float GetCargoSpeedMultiplier() const;
+    float GetCargoControlMultiplier() const;
     float GetCargoFuelBurnMultiplier() const;
     float GetHullMobilityMultiplier() const;
     float GetHullFuelBurnMultiplier() const;
@@ -560,6 +566,18 @@ private:
         )
     )
     float LoadedSpeedMultiplierAtCapacity = 0.90f;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Handling",
+        meta = (
+            AllowPrivateAccess = "true",
+            ClampMin = "0.25",
+            ClampMax = "1.0"
+        )
+    )
+    float LoadedControlMultiplierAtCapacity = 0.82f;
 
     UPROPERTY(
         EditAnywhere,
