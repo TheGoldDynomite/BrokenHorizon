@@ -14,6 +14,12 @@ class BROKENHORIZON_API ABHCoverPoint : public AActor
 public:
     ABHCoverPoint();
 
+    static bool ShouldReleaseClaimForCasualty(
+        bool bClaimantIsDead,
+        bool bClaimantIsIncapacitated,
+        bool bClaimantRequiresMedicalEvacuation
+    );
+
     UFUNCTION(BlueprintPure, Category = "Cover")
     bool IsAvailableFor(const AActor* RequestingActor) const;
 

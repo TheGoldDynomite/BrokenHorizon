@@ -14,6 +14,17 @@ ABHCoverPoint::ABHCoverPoint()
     SetRootComponent(CoverRoot);
 }
 
+bool ABHCoverPoint::ShouldReleaseClaimForCasualty(
+    bool bClaimantIsDead,
+    bool bClaimantIsIncapacitated,
+    bool bClaimantRequiresMedicalEvacuation
+)
+{
+    return bClaimantIsDead ||
+        bClaimantIsIncapacitated ||
+        bClaimantRequiresMedicalEvacuation;
+}
+
 bool ABHCoverPoint::IsAvailableFor(
     const AActor* RequestingActor
 ) const
@@ -31,7 +42,12 @@ bool ABHCoverPoint::IsAvailableFor(
 
     const UBHHealthComponent* ClaimantHealth =
         Claimant->FindComponentByClass<UBHHealthComponent>();
-    if (IsValid(ClaimantHealth) && ClaimantHealth->IsDead())
+    if (IsValid(ClaimantHealth) &&
+        ShouldReleaseClaimForCasualty(
+            ClaimantHealth->IsDead(),
+            false,
+            false
+        ))
     {
         return true;
     }
@@ -39,7 +55,11 @@ bool ABHCoverPoint::IsAvailableFor(
     const ABHEnemySoldier* EnemyClaimant =
         Cast<ABHEnemySoldier>(Claimant);
     return IsValid(EnemyClaimant) &&
-        EnemyClaimant->IsIncapacitated();
+        ShouldReleaseClaimForCasualty(
+            false,
+            EnemyClaimant->IsIncapacitated(),
+            EnemyClaimant->RequiresMedicalEvacuation()
+        );
 }
 
 bool ABHCoverPoint::TryClaim(AActor* RequestingActor)

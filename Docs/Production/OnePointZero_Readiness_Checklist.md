@@ -126,3 +126,11 @@ When every row is **Complete** with evidence, we are ready for 1.0 RC.
 - [x] Source build, First Light smoke, package cook/stage/pak, and packaged First Light route pass.
 - [ ] Manually review rendered indoor/outdoor tails during stationary fire, traversal, rotation, and multiplayer ownership/latency.
 - [ ] Measure five-ray probe cost under sustained automatic fire with the final audio mix and performance budgets.
+### Casualty-aware cover handoff (2026-08-09)
+
+- [x] Dead claimants release cover reservations.
+- [x] Incapacitated claimants release cover reservations.
+- [x] Stabilized claimants requiring medical evacuation release cover reservations.
+- [x] Healthy claimants retain cover reservations.
+- [x] Focused casualty-handoff automation, source build, smoke, package, and packaged First Light route pass.
+- [ ] Validate multi-AI handoff, replicated casualty timing, authored navigation, and rendered multiplayer casualty-reaction feel.

@@ -1744,3 +1744,18 @@ Validation evidence:
 - The packaged First Light route passed in Saved/Logs/BHPackagedWeaponAcousticRefresh-FirstLightRoute.log: navigation grenade, keycard, door, three guards, ammo drop, all four objectives, and mission completion succeeded with no fatal/assertion markers.
 
 Remaining gate: manually review indoor/outdoor fire tails while standing still, moving through a doorway, rotating in place, and firing during multiplayer ownership/latency; validate audio assignment and performance with rendered audio enabled.
+### Casualty-aware cover handoff (2026-08-09)
+
+Cover reservations now treat a dead, incapacitated, or stabilized casualty requiring medical evacuation as an unavailable claimant. This closes the post-stabilization hole where a wounded operative could remain the logical owner of a physical cover point after leaving the incapacitated state, preventing another soldier from taking the position. Healthy claimants still retain their reservations, and the existing actor-backed dead/injury checks remain authoritative.
+
+The focused BrokenHorizon.Gameplay.AI.CasualtyCoverHandoff contract covers healthy, dead, incapacitated, stabilized-evacuation, and combined casualty states through the production release policy.
+
+Validation evidence:
+- BrokenHorizonEditor Win64 Development build passed in Saved/Logs/BHCoverHandoff-Build.log.
+- BrokenHorizon.Gameplay.AI.CasualtyCoverHandoff passed in Saved/Logs/BHCoverHandoff-Tests.log.
+- Independent First Light smoke passed in Saved/Logs/BHCoverHandoffSmoke-FirstLight.log with 3/12 navigation fallbacks.
+- A fresh Windows Development cook, stage, pak, and archive passed at Builds/CurrentSource-20260809-CoverHandoff-Development.
+- The packaged First Light route passed in Saved/Logs/BHPackagedCoverHandoff-FirstLightRoute.log: navigation grenade, keycard, door, three guards, ammo drop, extraction, all four objectives, and mission completion succeeded with no fatal/assertion markers.
+- The aggregate automation wrapper remains red only for the known concurrent DistantEventWeatherMix and SettingsContract regressions; those files were not touched.
+
+Remaining gate: validate real multi-AI claim transfer with authored navigation coverage, replicated casualty state timing, and manual casualty-reaction and cover-occupancy feel in a rendered multiplayer session.
