@@ -323,8 +323,19 @@ function Get-RenderedProfile {
         $indices[$column] = $index
     }
 
-    $samples = [System.Collections.Generic.List[object]]::new()
+    $frameSamples = [System.Collections.Generic.List[double]]::new()
+    $gpuSamples = [System.Collections.Generic.List[double]]::new()
+    $renderSamples = [System.Collections.Generic.List[double]]::new()
+    $drawCallSamples = [System.Collections.Generic.List[double]]::new()
+    $desiredSamples = [System.Collections.Generic.List[double]]::new()
+    $pendingSamples = [System.Collections.Generic.List[double]]::new()
+    $lastDesiredSamples = [System.Collections.Generic.Queue[double]]::new()
     $numericRowIndex = 0
+    $frameSum = 0.0
+    $frameMaximum = [double]::NegativeInfinity
+    $framesOver50Ms = 0
+    $gpuUsedMaximum = [double]::NegativeInfinity
+    $gpuBudgetMinimumValue = [double]::PositiveInfinity
     $style = [Globalization.NumberStyles]::Float
     $culture = [Globalization.CultureInfo]::InvariantCulture
     while (-not $parser.EndOfData) {
@@ -332,39 +343,95 @@ function Get-RenderedProfile {
         if ($fields.Count -lt $headers.Count) {
             continue
         }
-        $values = @{}
-        $numeric = $true
-        foreach ($column in $requiredColumns) {
-            $parsed = 0.0
-            if (-not [double]::TryParse(
-                    $fields[$indices[$column]],
-                    $style,
-                    $culture,
-                    [ref]$parsed)) {
-                $numeric = $false
-                break
-            }
-            $values[$column] = $parsed
-        }
-        if (-not $numeric) {
+
+        $frame = 0.0
+        $gpu = 0.0
+        $renderThread = 0.0
+        $gpuUsed = 0.0
+        $gpuBudget = 0.0
+        $drawCalls = 0.0
+        $desired = 0.0
+        $pending = 0.0
+        if (
+            -not [double]::TryParse(
+                $fields[$indices["FrameTime"]],
+                $style,
+                $culture,
+                [ref]$frame
+            ) -or
+            -not [double]::TryParse(
+                $fields[$indices["GPUTime"]],
+                $style,
+                $culture,
+                [ref]$gpu
+            ) -or
+            -not [double]::TryParse(
+                $fields[$indices["RenderThreadTime"]],
+                $style,
+                $culture,
+                [ref]$renderThread
+            ) -or
+            -not [double]::TryParse(
+                $fields[$indices["GPUMem/LocalUsedMB"]],
+                $style,
+                $culture,
+                [ref]$gpuUsed
+            ) -or
+            -not [double]::TryParse(
+                $fields[$indices["GPUMem/LocalBudgetMB"]],
+                $style,
+                $culture,
+                [ref]$gpuBudget
+            ) -or
+            -not [double]::TryParse(
+                $fields[$indices["RHI/DrawCalls"]],
+                $style,
+                $culture,
+                [ref]$drawCalls
+            ) -or
+            -not [double]::TryParse(
+                $fields[$indices["TextureStreaming/DesiredDataLoadedPercent"]],
+                $style,
+                $culture,
+                [ref]$desired
+            ) -or
+            -not [double]::TryParse(
+                $fields[$indices["TextureStreaming/PendingStreamInData"]],
+                $style,
+                $culture,
+                [ref]$pending
+            )
+        ) {
             continue
         }
+
         if ($numericRowIndex -ge $WarmupFrames) {
-            $samples.Add([pscustomobject]@{
-                Frame = $values["FrameTime"]
-                Gpu = $values["GPUTime"]
-                RenderThread = $values["RenderThreadTime"]
-                GpuUsed = $values["GPUMem/LocalUsedMB"]
-                GpuBudget = $values["GPUMem/LocalBudgetMB"]
-                DrawCalls = $values["RHI/DrawCalls"]
-                Desired = $values[
-                    "TextureStreaming/DesiredDataLoadedPercent"
-                ]
-                Pending = $values[
-                    "TextureStreaming/PendingStreamInData"
-                ]
-            })
+            [void]$frameSamples.Add($frame)
+            [void]$gpuSamples.Add($gpu)
+            [void]$renderSamples.Add($renderThread)
+            [void]$drawCallSamples.Add($drawCalls)
+            [void]$desiredSamples.Add($desired)
+            [void]$pendingSamples.Add($pending)
+            if ($lastDesiredSamples.Count -ge 30) {
+                [void]$lastDesiredSamples.Dequeue()
+            }
+            [void]$lastDesiredSamples.Enqueue($desired)
+
+            $frameSum += $frame
+            if ($frame -gt $frameMaximum) {
+                $frameMaximum = $frame
+            }
+            if ($frame -gt 50.0) {
+                ++$framesOver50Ms
+            }
+            if ($gpuUsed -gt $gpuUsedMaximum) {
+                $gpuUsedMaximum = $gpuUsed
+            }
+            if ($gpuBudget -gt 0.0 -and $gpuBudget -lt $gpuBudgetMinimumValue) {
+                $gpuBudgetMinimumValue = $gpuBudget
+            }
         }
+
         ++$numericRowIndex
         if ($numericRowIndex -ge $CaptureFrames) {
             break
@@ -373,36 +440,29 @@ function Get-RenderedProfile {
     $parser.Close()
 
     $minimumSamples = $CaptureFrames - $WarmupFrames
-    if ($samples.Count -lt $minimumSamples) {
-        throw "$ClientLabel profile contained $($samples.Count) measured frames; expected $minimumSamples."
+    if ($frameSamples.Count -lt $minimumSamples) {
+        throw "$ClientLabel profile contained $($frameSamples.Count) measured frames; expected $minimumSamples."
     }
 
-    $frameValues = [double[]]@($samples | ForEach-Object { $_.Frame })
-    $gpuValues = [double[]]@($samples | ForEach-Object { $_.Gpu })
-    $renderValues = [double[]]@(
-        $samples | ForEach-Object { $_.RenderThread }
-    )
-    $desiredValues = [double[]]@(
-        $samples | ForEach-Object { $_.Desired }
-    )
-    $pendingValues = [double[]]@(
-        $samples | ForEach-Object { $_.Pending }
-    )
-    $positiveGpuBudgets = @(
-        $samples.GpuBudget | Where-Object { $_ -gt 0 }
-    )
-    $gpuBudgetMinimum = [double](
-        ($positiveGpuBudgets | Measure-Object -Minimum).Minimum
-    )
-    $gpuUsedMaximum = [double](
-        ($samples.GpuUsed | Measure-Object -Maximum).Maximum
-    )
+    $frameValues = $frameSamples.ToArray()
+    $gpuValues = $gpuSamples.ToArray()
+    $renderValues = $renderSamples.ToArray()
+    $drawCallValues = $drawCallSamples.ToArray()
+    $desiredValues = $desiredSamples.ToArray()
+    $pendingValues = $pendingSamples.ToArray()
+    $gpuBudgetMinimum = if ($gpuBudgetMinimumValue -lt [double]::PositiveInfinity) {
+        $gpuBudgetMinimumValue
+    } else {
+        0.0
+    }
     $gpuMemoryDenominatorMB = if ($gpuMemoryCapacityMB -gt 0.0) {
         $gpuMemoryCapacityMB
     } else {
         $gpuBudgetMinimum
     }
-    $gpuNameMatch = [regex]::Match(
+    $desiredFinal30MinPercent = [double](
+        ($lastDesiredSamples | Measure-Object -Minimum).Minimum
+    )    $gpuNameMatch = [regex]::Match(
         $normalizedLogContent,
         "LogRHI:\s+Name:\s+(?<name>[^\r\n]+)"
     )
@@ -412,9 +472,9 @@ function Get-RenderedProfile {
     )
 
     $metrics = [ordered]@{
-        measuredFrames = $samples.Count
+        measuredFrames = $frameSamples.Count
         measuredDurationSeconds = [Math]::Round(
-            (($frameValues | Measure-Object -Sum).Sum / 1000.0),
+            ($frameSum / 1000.0),
             1
         )
         frameP95Ms = [Math]::Round(
@@ -426,12 +486,10 @@ function Get-RenderedProfile {
             3
         )
         frameMaxMs = [Math]::Round(
-            (($frameValues | Measure-Object -Maximum).Maximum),
+            $frameMaximum,
             3
         )
-        framesOver50Ms = @(
-            $frameValues | Where-Object { $_ -gt 50.0 }
-        ).Count
+        framesOver50Ms = $framesOver50Ms
         gpuP95Ms = [Math]::Round(
             (Get-Percentile $gpuValues 0.95),
             3
@@ -445,7 +503,7 @@ function Get-RenderedProfile {
             3
         )
         drawCallsP95 = [int](Get-Percentile `
-            ([double[]]@($samples.DrawCalls)) `
+            ([double[]]@($drawCallValues)) `
             0.95)
         gpuMemoryUsedMaxMB = [Math]::Round($gpuUsedMaximum, 1)
         gpuMemoryBudgetMinMB = [Math]::Round($gpuBudgetMinimum, 1)
@@ -475,9 +533,7 @@ function Get-RenderedProfile {
             2
         )
         desiredTextureDataFinal30MinPercent = [Math]::Round(
-            (($samples | Select-Object -Last 30 |
-                ForEach-Object { $_.Desired } |
-                Measure-Object -Minimum).Minimum),
+            $desiredFinal30MinPercent,
             2
         )
         pendingStreamInDataP95 = [Math]::Round(
