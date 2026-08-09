@@ -8,6 +8,8 @@ Supply convoys now lose route speed progressively as their integrity falls.
 An ambushed but still-living convoy therefore takes longer to clear its
 corridor, increasing pressure on time-critical escort operations before the
 existing destruction, salvage, and deadline-resolution paths take over.
+Destruction now also applies convoy integrity to the recoverable cargo yield,
+so a heavily damaged shipment leaves less usable supply at the wreck.
 
 ## Runtime contract
 
@@ -20,6 +22,9 @@ existing destruction, salvage, and deadline-resolution paths take over.
   speed, so the consequence is consistent across route variants.
 - Existing authority-owned convoy state, operation deadlines, escort
   resolution, destruction, salvage, and persistence remain the owning systems.
+- `CalculateDamageAdjustedRecoverableSupply` preserves full recovery for an
+  intact shipment, reduces yield for partial damage, and retains only the
+  configured minimum cargo condition at the wreck state.
 
 ## Automated evidence
 
@@ -32,11 +37,16 @@ Results:
 - UE 5.8 `BrokenHorizonEditor Win64 Development` build passed.
 - `BrokenHorizon.Gameplay.Convoy.DamageSpeed` completed with
   `Result={Success}`.
+- The same test covers intact, partially damaged, and destroyed-cargo recovery
+  yields.
 - The full automation run completed with `84 tests performed`.
 - Startup smoke passed.
 - First Light smoke passed with
   `BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE_COMPLETE result=success`.
 - First Light navigation fallbacks were `8/12`, within the configured limit.
+- The first validation attempt encountered transient MSVC internal compiler
+  errors in untouched operation code and an engine template; the immediate
+  retry passed without unrelated source changes.
 
 Evidence logs:
 

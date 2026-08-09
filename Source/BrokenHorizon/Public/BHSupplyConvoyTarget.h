@@ -35,6 +35,13 @@ public:
         float MinimumSpeedMultiplier
     );
 
+    static float CalculateDamageAdjustedRecoverableSupply(
+        float Payload,
+        float RecoveryFraction,
+        float IntegrityFraction,
+        float MinimumCargoIntegrityAtWreck
+    );
+
     static FBHRouteOperationProfile BuildRouteOperationProfile(
         const FBHWarSupplyConvoyState& ConvoyState
     );
@@ -237,6 +244,17 @@ protected:
         )
     )
     float MinimumDamagedRouteSpeedMultiplier = 0.45f;
+
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category = "Convoy|Salvage",
+        meta = (
+            ClampMin = "0.0",
+            ClampMax = "1.0"
+        )
+    )
+    float MinimumCargoIntegrityAtWreck = 0.50f;
 
     UPROPERTY(
         EditDefaultsOnly,

@@ -57,6 +57,43 @@ bool FBHSupplyConvoyDamageSpeedTest::RunTest(
         FMath::IsNearlyEqual(CriticalSpeed, 0.45f)
     );
 
+    TestTrue(
+        TEXT("Undamaged convoy preserves the full recovery fraction"),
+        FMath::IsNearlyEqual(
+            ABHSupplyConvoyTarget::CalculateDamageAdjustedRecoverableSupply(
+                100.0f,
+                0.60f,
+                1.0f,
+                0.50f
+            ),
+            60.0f
+        )
+    );
+    TestTrue(
+        TEXT("Partially damaged convoy loses recoverable cargo"),
+        FMath::IsNearlyEqual(
+            ABHSupplyConvoyTarget::CalculateDamageAdjustedRecoverableSupply(
+                100.0f,
+                0.60f,
+                0.50f,
+                0.50f
+            ),
+            45.0f
+        )
+    );
+    TestTrue(
+        TEXT("Destroyed convoy keeps only the configured minimum cargo condition"),
+        FMath::IsNearlyEqual(
+            ABHSupplyConvoyTarget::CalculateDamageAdjustedRecoverableSupply(
+                100.0f,
+                0.60f,
+                0.0f,
+                0.50f
+            ),
+            30.0f
+        )
+    );
+
     return true;
 }
 

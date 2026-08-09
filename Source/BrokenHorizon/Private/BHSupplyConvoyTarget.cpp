@@ -170,6 +170,38 @@ float ABHSupplyConvoyTarget::CalculateRouteSpeedMultiplier(
     );
 }
 
+float ABHSupplyConvoyTarget::CalculateDamageAdjustedRecoverableSupply(
+    float Payload,
+    float RecoveryFraction,
+    float IntegrityFraction,
+    float MinimumCargoIntegrityAtWreck
+)
+{
+    const float BaseRecoverableSupply = CalculateRecoverableSupply(
+        Payload,
+        RecoveryFraction
+    );
+    const float ClampedIntegrityFraction = FMath::Clamp(
+        IntegrityFraction,
+        0.0f,
+        1.0f
+    );
+    const float ClampedMinimumCargoIntegrity = FMath::Clamp(
+        MinimumCargoIntegrityAtWreck,
+        0.0f,
+        1.0f
+    );
+    const float CargoConditionMultiplier = FMath::Lerp(
+        ClampedMinimumCargoIntegrity,
+        1.0f,
+        ClampedIntegrityFraction
+    );
+
+    return FMath::FloorToFloat(
+        BaseRecoverableSupply * CargoConditionMultiplier
+    );
+}
+
 FBHRouteOperationProfile
 ABHSupplyConvoyTarget::BuildRouteOperationProfile(
     const FBHWarSupplyConvoyState& ConvoyState
@@ -928,9 +960,11 @@ void ABHSupplyConvoyTarget::HandleConvoyDestroyed(
     RecoverableSupply =
         ConvoyOwner == EBHWarFaction::Enemy &&
         CargoType == EBHWarConvoyCargoType::MilitarySupply
-        ? CalculateRecoverableSupply(
+        ? CalculateDamageAdjustedRecoverableSupply(
             SupplyPayload,
-            EnemyCargoRecoveryFraction
+            EnemyCargoRecoveryFraction,
+            GetHealthPercentage(),
+            MinimumCargoIntegrityAtWreck
         )
         : 0.0f;
 
