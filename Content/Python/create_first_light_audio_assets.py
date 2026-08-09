@@ -1,4 +1,4 @@
-"""Create the two required First Light ambience SoundWave assets once.
+"""Create the First Light ambience SoundWave assets once.
 
 This script is intentionally narrow and idempotent. It imports only the
 matching WAV files from Content/BrokenHorizon/Audio and never saves maps or
@@ -11,6 +11,8 @@ import unreal
 
 
 AUDIO_ASSETS = (
+    "SW_FirstLight_Wind",
+    "SW_FirstLight_Rain",
     "SW_FirstLight_WindRain",
     "SW_FirstLight_DistantWar",
 )
@@ -37,30 +39,42 @@ def main():
 
         if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
             skipped.append(asset_name)
-            continue
+        else:
+            if not os.path.isfile(source_path):
+                unreal.log_error(
+                    f"BH_FIRST_LIGHT_AUDIO_IMPORT missing_source={source_path}"
+                )
+                raise RuntimeError(f"Missing audio source: {source_path}")
 
-        if not os.path.isfile(source_path):
+            task = unreal.AssetImportTask()
+            task.filename = source_path
+            task.destination_path = destination_path
+            task.destination_name = asset_name
+            task.replace_existing = False
+            task.automated = True
+            task.save = True
+            asset_tools.import_asset_tasks([task])
+
+            if not unreal.EditorAssetLibrary.does_asset_exist(asset_path):
+                unreal.log_error(
+                    f"BH_FIRST_LIGHT_AUDIO_IMPORT import_failed={asset_path}"
+                )
+                raise RuntimeError(f"Import failed: {asset_path}")
+
+            created.append(asset_name)
+
+        sound_wave = unreal.EditorAssetLibrary.load_asset(asset_path)
+        if sound_wave is None:
             unreal.log_error(
-                f"BH_FIRST_LIGHT_AUDIO_IMPORT missing_source={source_path}"
+                f"BH_FIRST_LIGHT_AUDIO_IMPORT load_failed={asset_path}"
             )
-            raise RuntimeError(f"Missing audio source: {source_path}")
-
-        task = unreal.AssetImportTask()
-        task.filename = source_path
-        task.destination_path = destination_path
-        task.destination_name = asset_name
-        task.replace_existing = False
-        task.automated = True
-        task.save = True
-        asset_tools.import_asset_tasks([task])
-
-        if not unreal.EditorAssetLibrary.does_asset_exist(asset_path):
+            raise RuntimeError(f"Unable to load imported SoundWave: {asset_path}")
+        sound_wave.set_editor_property("looping", True)
+        if not unreal.EditorAssetLibrary.save_asset(asset_path, only_if_is_dirty=False):
             unreal.log_error(
-                f"BH_FIRST_LIGHT_AUDIO_IMPORT import_failed={asset_path}"
+                f"BH_FIRST_LIGHT_AUDIO_IMPORT save_failed={asset_path}"
             )
-            raise RuntimeError(f"Import failed: {asset_path}")
-
-        created.append(asset_name)
+            raise RuntimeError(f"Unable to save configured SoundWave: {asset_path}")
 
     unreal.log(
         "BH_FIRST_LIGHT_AUDIO_IMPORT result=complete "

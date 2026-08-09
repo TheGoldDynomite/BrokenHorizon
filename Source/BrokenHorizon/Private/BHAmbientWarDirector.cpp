@@ -23,6 +23,8 @@
 #include "NavigationSystem.h"
 #include "Net/UnrealNetwork.h"
 #include "Sound/SoundBase.h"
+#include "UObject/ConstructorHelpers.h"
+#include "UObject/UObjectGlobals.h"
 
 namespace
 {
@@ -108,6 +110,36 @@ int32 LimitPatrolCountBySupply(
 
     return FMath::Min(DesiredCount, SupplyCapacity);
 }
+
+constexpr TCHAR FirstLightWindSoundPath[] = TEXT(
+    "/Game/BrokenHorizon/Audio/SW_FirstLight_Wind.SW_FirstLight_Wind"
+);
+constexpr TCHAR FirstLightRainSoundPath[] = TEXT(
+    "/Game/BrokenHorizon/Audio/SW_FirstLight_Rain.SW_FirstLight_Rain"
+);
+constexpr TCHAR FirstLightWindRainSoundPath[] = TEXT(
+    "/Game/BrokenHorizon/Audio/SW_FirstLight_WindRain.SW_FirstLight_WindRain"
+);
+constexpr TCHAR FirstLightDistantWarSoundPath[] = TEXT(
+    "/Game/BrokenHorizon/Audio/SW_FirstLight_DistantWar.SW_FirstLight_DistantWar"
+);
+
+USoundBase* ResolveConfiguredAmbientSound(
+    TObjectPtr<USoundBase>& ConfiguredSound,
+    const TCHAR* PrimaryPath,
+    const TCHAR* LegacyPath
+)
+{
+    if (!IsValid(ConfiguredSound))
+    {
+        ConfiguredSound = LoadObject<USoundBase>(nullptr, PrimaryPath);
+    }
+    if (!IsValid(ConfiguredSound) && LegacyPath != nullptr)
+    {
+        ConfiguredSound = LoadObject<USoundBase>(nullptr, LegacyPath);
+    }
+    return ConfiguredSound.Get();
+}
 }
 
 ABHAmbientWarDirector::ABHAmbientWarDirector()
@@ -132,6 +164,30 @@ ABHAmbientWarDirector::ABHAmbientWarDirector()
 
     SupplyConvoyTargetClass =
         ABHSupplyConvoyTarget::StaticClass();
+
+    const ConstructorHelpers::FObjectFinder<USoundBase> WindSound(
+        FirstLightWindSoundPath
+    );
+    if (WindSound.Succeeded())
+    {
+        WindLoopSound = WindSound.Object;
+    }
+
+    const ConstructorHelpers::FObjectFinder<USoundBase> RainSound(
+        FirstLightRainSoundPath
+    );
+    if (RainSound.Succeeded())
+    {
+        RainLoopSound = RainSound.Object;
+    }
+
+    const ConstructorHelpers::FObjectFinder<USoundBase> DistantWarSound(
+        FirstLightDistantWarSoundPath
+    );
+    if (DistantWarSound.Succeeded())
+    {
+        DistantWarLoopSound = DistantWarSound.Object;
+    }
 }
 
 void ABHAmbientWarDirector::GetLifetimeReplicatedProps(
@@ -197,6 +253,33 @@ void ABHAmbientWarDirector::SetWeatherMix(
 void ABHAmbientWarDirector::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        const bool bWindReady = ResolveConfiguredAmbientSound(
+            WindLoopSound,
+            FirstLightWindSoundPath,
+            FirstLightWindRainSoundPath
+        ) != nullptr;
+        const bool bRainReady = ResolveConfiguredAmbientSound(
+            RainLoopSound,
+            FirstLightRainSoundPath,
+            FirstLightWindRainSoundPath
+        ) != nullptr;
+        const bool bWarReady = ResolveConfiguredAmbientSound(
+            DistantWarLoopSound,
+            FirstLightDistantWarSoundPath,
+            nullptr
+        ) != nullptr;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT("BH_AMBIENT_AUDIO_READY wind=%s rain=%s war=%s looping=1"),
+            bWindReady ? TEXT("1") : TEXT("0"),
+            bRainReady ? TEXT("1") : TEXT("0"),
+            bWarReady ? TEXT("1") : TEXT("0")
+        );
+    }
 
     if (!HasAuthority())
     {

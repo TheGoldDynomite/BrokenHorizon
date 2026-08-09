@@ -12,24 +12,33 @@ not committed to the repository.
 - First Light ambient assets were imported by
   `Content/Python/create_first_light_audio_assets.py`.
 - Import completed with `0 error(s), 0 warning(s)` and created
-  `SW_FirstLight_WindRain` and `SW_FirstLight_DistantWar` as 48 kHz stereo,
-  12-second SoundWave assets.
+  `SW_FirstLight_Wind`, `SW_FirstLight_Rain`, `SW_FirstLight_WindRain`, and
+  `SW_FirstLight_DistantWar` as 48 kHz stereo, 12-second SoundWave assets.
 - The full validation gate passed on retry after one transient MSVC internal
   compiler error:
   `Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight -AudioFX`.
 - The editor build passed, automation passed, startup smoke passed, First
   Light smoke passed, and the audio/FX audit passed.
+- The automation log reported `85 tests performed`, including the focused
+  First Light ambient asset contract.
 - First Light smoke reported navigation fallbacks `8/12`.
-- Audio/FX audit inventory remains `required=1/18` and `optional=0/27`; this
-  is a structural audit pass, not proof that the presentation layer is fully
-  authored.
+- Audio/FX audit inventory now reports `required=3/18` and `optional=1/27`;
+  this is an improved structural assignment pass, not proof that the entire
+  presentation layer is fully authored.
 - `RunUAT.bat BuildCookRun` completed successfully for the current archive at
-  `Builds/FirstLight-InputFix-Development/Windows`.
-- The current packaged First Light map and default startup path both exited
-  with code `0` under null RHI, unattended, no-sound smoke conditions.
+  `Builds/FirstLight-AmbientAudio-Development/Windows`.
+- The current packaged First Light map exited with code `0` with audio enabled,
+  and the audio device initialized at 48 kHz on the local WASAPI endpoint.
+- Packaged First Light logged
+  `BH_AMBIENT_AUDIO_READY wind=1 rain=1 war=1 looping=1`.
 - The current packaged logs contain no missing First Light audio object,
   navmesh-settings mismatch, fatal error, unhandled exception, or cooked input
   mapping ensure marker.
+- The ambient war director now assigns the distinct wind, rain, and distant-war
+  SoundWaves as native defaults, retains a legacy combined-loop fallback, and
+  keeps all four imported SoundWaves loop-enabled for the three ambient audio
+  components. The focused asset contract loads all four exact package paths and
+  verifies their loop configuration.
 
 ## Runtime fix included
 
@@ -51,4 +60,3 @@ are reused, preventing packaged builds from attempting to replace loaded
 - Complete controller, networked First Light, lower-tier performance, and
   two-hour rendered soak checks.
 - Reconcile the remaining navigation fallbacks before release G1 sign-off.
-
