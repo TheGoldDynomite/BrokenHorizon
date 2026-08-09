@@ -186,6 +186,17 @@ public:
         int32 TotalProbeCount
     );
 
+    static bool ShouldRefreshMuzzleEnvironmentProbe(
+        bool bHasCachedSample,
+        float CurrentTime,
+        float CachedSampleTime,
+        const FVector& MuzzleLocation,
+        const FVector& CachedMuzzleLocation,
+        const FQuat& MuzzleRotation,
+        const FQuat& CachedMuzzleRotation,
+        float OwnerSpeedCentimetersPerSecond
+    );
+
     static float CalculateBulletDropCentimeters(
         float DistanceCentimeters,
         float MuzzleVelocityCentimetersPerSecond,

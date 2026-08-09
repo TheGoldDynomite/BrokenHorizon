@@ -800,6 +800,43 @@ bool ABHRifle::ShouldUseIndoorFireTail(
             TotalProbeCount;
 }
 
+bool ABHRifle::ShouldRefreshMuzzleEnvironmentProbe(
+    bool bHasCachedSample,
+    float CurrentTime,
+    float CachedSampleTime,
+    const FVector& MuzzleLocation,
+    const FVector& CachedMuzzleLocation,
+    const FQuat& MuzzleRotation,
+    const FQuat& CachedMuzzleRotation,
+    float OwnerSpeedCentimetersPerSecond
+)
+{
+    if (!bHasCachedSample)
+    {
+        return true;
+    }
+
+    const float SampleAge = CurrentTime - CachedSampleTime;
+    if (SampleAge < 0.0f)
+    {
+        return true;
+    }
+
+    const bool bOwnerIsMoving =
+        FMath::Max(0.0f, OwnerSpeedCentimetersPerSecond) > 25.0f;
+    const float MaximumSampleAge = bOwnerIsMoving ? 0.06f : 0.12f;
+    const float MaximumMuzzleTravel = bOwnerIsMoving ? 18.0f : 35.0f;
+    const float MaximumRotationTolerance = bOwnerIsMoving ? 0.01f : 0.02f;
+
+    return SampleAge > MaximumSampleAge ||
+        FVector::DistSquared(MuzzleLocation, CachedMuzzleLocation) >
+            FMath::Square(MaximumMuzzleTravel) ||
+        !CachedMuzzleRotation.Equals(
+            MuzzleRotation,
+            MaximumRotationTolerance
+        );
+}
+
 bool ABHRifle::IsMuzzleEnvironmentEnclosed(
     const FVector& MuzzleLocation
 ) const
@@ -813,15 +850,18 @@ bool ABHRifle::IsMuzzleEnvironmentEnclosed(
     const FTransform MuzzleTransform =
         GetPresentationMuzzleTransform();
     const float CurrentTime = World->GetTimeSeconds();
-    if (bHasMuzzleEnvironmentCache &&
-        CurrentTime - CachedMuzzleEnvironmentSampleTime <= 0.12f &&
-        FVector::DistSquared(
+    const float OwnerSpeedCentimetersPerSecond = IsValid(GetOwner())
+        ? GetOwner()->GetVelocity().Size()
+        : 0.0f;
+    if (!ShouldRefreshMuzzleEnvironmentProbe(
+            bHasMuzzleEnvironmentCache,
+            CurrentTime,
+            CachedMuzzleEnvironmentSampleTime,
             MuzzleLocation,
-            CachedMuzzleEnvironmentLocation
-        ) <= FMath::Square(35.0f) &&
-        CachedMuzzleEnvironmentRotation.Equals(
+            CachedMuzzleEnvironmentLocation,
             MuzzleTransform.GetRotation(),
-            0.02f
+            CachedMuzzleEnvironmentRotation,
+            OwnerSpeedCentimetersPerSecond
         ))
     {
         return bCachedMuzzleEnvironmentEnclosed;

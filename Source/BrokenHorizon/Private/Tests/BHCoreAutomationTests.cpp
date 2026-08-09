@@ -8262,6 +8262,101 @@ bool FBHWeaponAudioSpaceContractTest::RunTest(const FString& Parameters)
         TEXT("An empty probe set is safely outdoor"),
         ABHRifle::ShouldUseIndoorFireTail(0, 0)
     );
+
+    const FVector CachedMuzzleLocation = FVector::ZeroVector;
+    const FQuat CachedMuzzleRotation = FQuat::Identity;
+    TestTrue(
+        TEXT("A missing environment sample forces a probe"),
+        ABHRifle::ShouldRefreshMuzzleEnvironmentProbe(
+            false,
+            1.0f,
+            1.0f,
+            CachedMuzzleLocation,
+            CachedMuzzleLocation,
+            CachedMuzzleRotation,
+            CachedMuzzleRotation,
+            0.0f
+        )
+    );
+    TestFalse(
+        TEXT("A fresh stationary sample can be reused"),
+        ABHRifle::ShouldRefreshMuzzleEnvironmentProbe(
+            true,
+            1.10f,
+            1.0f,
+            CachedMuzzleLocation,
+            CachedMuzzleLocation,
+            CachedMuzzleRotation,
+            CachedMuzzleRotation,
+            0.0f
+        )
+    );
+    TestTrue(
+        TEXT("A sample from before a world-time reset is discarded"),
+        ABHRifle::ShouldRefreshMuzzleEnvironmentProbe(
+            true,
+            0.01f,
+            1.0f,
+            CachedMuzzleLocation,
+            CachedMuzzleLocation,
+            CachedMuzzleRotation,
+            CachedMuzzleRotation,
+            0.0f
+        )
+    );
+    TestTrue(
+        TEXT("Muzzle travel invalidates a stationary sample"),
+        ABHRifle::ShouldRefreshMuzzleEnvironmentProbe(
+            true,
+            1.01f,
+            1.0f,
+            FVector(36.0f, 0.0f, 0.0f),
+            CachedMuzzleLocation,
+            CachedMuzzleRotation,
+            CachedMuzzleRotation,
+            0.0f
+        )
+    );
+    TestTrue(
+        TEXT("Moving weapons use a shorter probe lifetime"),
+        ABHRifle::ShouldRefreshMuzzleEnvironmentProbe(
+            true,
+            1.07f,
+            1.0f,
+            CachedMuzzleLocation,
+            CachedMuzzleLocation,
+            CachedMuzzleRotation,
+            CachedMuzzleRotation,
+            400.0f
+        )
+    );
+    TestTrue(
+        TEXT("Moving weapons refresh on smaller muzzle travel"),
+        ABHRifle::ShouldRefreshMuzzleEnvironmentProbe(
+            true,
+            1.01f,
+            1.0f,
+            FVector(19.0f, 0.0f, 0.0f),
+            CachedMuzzleLocation,
+            CachedMuzzleRotation,
+            CachedMuzzleRotation,
+            400.0f
+        )
+    );
+    TestTrue(
+        TEXT("Muzzle orientation changes invalidate the sample"),
+        ABHRifle::ShouldRefreshMuzzleEnvironmentProbe(
+            true,
+            1.01f,
+            1.0f,
+            CachedMuzzleLocation,
+            CachedMuzzleLocation,
+            FQuat(FVector::UpVector, FMath::DegreesToRadians(5.0f)),
+            CachedMuzzleRotation,
+            0.0f
+        )
+    );
+
     TestTrue(
         TEXT("More intense near misses raise pitch"),
         ABHCharacter::CalculateNearMissPitch(1.0f) >

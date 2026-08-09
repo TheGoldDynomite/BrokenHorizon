@@ -1729,3 +1729,18 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - Implementation: live lethal death now uses the same terminal medical/custody cleanup as persistent restore, after surrender conduct is recorded and before corpse presentation, clearing replicated casualty, evacuation, surrender, custody, and timer state.
 - Evidence: editor build passed; `BrokenHorizon.PersistentWar.EnemyDeathPersistence`, `BrokenHorizon.PersistentWar.EnemyDeathStateContract`, and `BrokenHorizon.PersistentWar.WeaponStatePersistence` passed; startup and First Light smoke passed with 3/12 authored navigation fallbacks; a fresh Win64 archive succeeded; packaged First Light completed the guard combat path, four objectives, and route completion with zero fatal/assertion/ensure/unhandled-exception/package-load markers.
 - Remaining review: direct surrendered-hostile death, two-client replication timing, custody/HUD presentation, authored NavMesh coverage, and the preserved aggregate `DistantEventWeatherMix` and `SettingsContract` failures remain open.
+### Environmental weapon acoustics probe freshness (2026-08-09)
+
+The rifle environmental audio probe now uses an explicit movement-aware cache policy instead of a single fixed freshness rule. ABHRifle::ShouldRefreshMuzzleEnvironmentProbe forces a new enclosure probe when no sample exists, world time moves backward, the muzzle travels beyond the allowed distance, or the muzzle orientation changes. Stationary weapons retain the inexpensive 120 ms and 35 cm reuse window; owners moving faster than 25 cm/s use a 60 ms and 18 cm window with a tighter rotation tolerance so doorway transitions and weapon movement do not carry stale indoor/outdoor tails.
+
+The existing five-direction majority-blocked enclosure decision and authored fire-tail assets are unchanged. The new BrokenHorizon.Gameplay.Combat.WeaponAudioSpaceContract assertions cover missing samples, fresh stationary reuse, time reset invalidation, stationary travel, moving lifetime, moving travel, and orientation invalidation.
+
+Validation evidence:
+- BrokenHorizonEditor Win64 Development build passed in Saved/Logs/BHWeaponAcousticRefresh-Build.log.
+- BrokenHorizon.Gameplay.Combat.WeaponAudioSpaceContract passed in Saved/Logs/BHWeaponAcousticRefresh-Tests.log.
+- The aggregate automation wrapper remains red only for the known concurrent DistantEventWeatherMix and SettingsContract regressions; those files were not touched.
+- Independent First Light smoke passed in Saved/Logs/BHWeaponAcousticRefreshSmoke-FirstLight.log with 3/12 navigation fallbacks.
+- A fresh Windows Development cook, stage, pak, and archive passed at Builds/CurrentSource-20260809-WeaponAcousticRefresh-Development.
+- The packaged First Light route passed in Saved/Logs/BHPackagedWeaponAcousticRefresh-FirstLightRoute.log: navigation grenade, keycard, door, three guards, ammo drop, all four objectives, and mission completion succeeded with no fatal/assertion markers.
+
+Remaining gate: manually review indoor/outdoor fire tails while standing still, moving through a doorway, rotating in place, and firing during multiplayer ownership/latency; validate audio assignment and performance with rendered audio enabled.

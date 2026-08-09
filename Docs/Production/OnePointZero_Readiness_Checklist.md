@@ -117,3 +117,12 @@ When every row is **Complete** with evidence, we are ready for 1.0 RC.
 - Live lethal death: aligned with persistence. Surrender, custody, medical-evacuation, incapacitation, and timer flags are cleared immediately after any conduct outcome is recorded.
 - Evidence: source build, canonical persistence/death automation, startup/First Light smoke, fresh package, and packaged guard route passed; First Light completed four objectives with zero fatal package markers.
 - Remaining release review: direct surrendered-hostile multiplayer timing and HUD/corpse presentation, authored navigation coverage, and unrelated aggregate baseline failures remain open.
+### Environmental weapon acoustics probe freshness (2026-08-09)
+
+- [x] Environment cache refreshes when no sample exists or world time regresses.
+- [x] Stationary muzzle movement and orientation changes invalidate cached indoor/outdoor classification.
+- [x] Moving shooters use shorter freshness and travel windows for doorway and traversal realism.
+- [x] Focused WeaponAudioSpaceContract automation passes.
+- [x] Source build, First Light smoke, package cook/stage/pak, and packaged First Light route pass.
+- [ ] Manually review rendered indoor/outdoor tails during stationary fire, traversal, rotation, and multiplayer ownership/latency.
+- [ ] Measure five-ray probe cost under sustained automatic fire with the final audio mix and performance budgets.
