@@ -2449,7 +2449,7 @@ int32 UBHWarMapWidget::NativePaint(
                 UWorld* MapWorld = GetWorld();
                 if (IsValid(MapWorld))
                 {
-                    for (TActorIterator<ABHFieldFortification> It(MapWorld); IsValid(*It); ++It)
+                    for (TActorIterator<ABHFieldFortification> It(MapWorld); It; ++It)
                     {
                         const ABHFieldFortification* Fortification = *It;
                         if (!IsValid(Fortification) ||
@@ -2637,7 +2637,7 @@ int32 UBHWarMapWidget::NativePaint(
             UWorld* MapWorld = GetWorld();
             if (IsValid(MapWorld))
             {
-                for (TActorIterator<ABHFieldFortification> It(MapWorld); IsValid(*It); ++It)
+                for (TActorIterator<ABHFieldFortification> It(MapWorld); It; ++It)
                 {
                     const ABHFieldFortification* Fortification = *It;
                     if (!IsValid(Fortification) ||
