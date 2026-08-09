@@ -62,22 +62,33 @@ bool TryFindLocalSearchLocation(
             Origin,
             ProjectedOrigin,
             FVector(500.0f, 500.0f, 500.0f)
+        ) &&
+        !NavigationSystem->ProjectPointToNavigation(
+            Origin,
+            ProjectedOrigin,
+            FVector(1000.0f, 1000.0f, 1000.0f)
         ))
     {
         return false;
     }
 
-    FNavLocation LocalLocation;
-    if (!NavigationSystem->GetRandomReachablePointInRadius(
-            ProjectedOrigin.Location,
-            LocalSearchRadius,
-            LocalLocation
-        ))
+    for (int32 Attempt = 0; Attempt < 4; ++Attempt)
     {
-        return false;
+        FNavLocation LocalLocation;
+        if (NavigationSystem->GetRandomReachablePointInRadius(
+                ProjectedOrigin.Location,
+                LocalSearchRadius,
+                LocalLocation
+            ))
+        {
+            OutLocation = LocalLocation.Location;
+            return true;
+        }
     }
 
-    OutLocation = LocalLocation.Location;
+    // Holding at the projected NavMesh point is safer than repeatedly
+    // requesting an invalid move from a streamed or sparse tile.
+    OutLocation = ProjectedOrigin.Location;
     return true;
 }
 }

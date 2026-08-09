@@ -1663,3 +1663,10 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - Active tactical smoke uses the multiplier only for zone lifetime, preserving the existing support radius and line-of-sight occlusion rules while making concealment windows respond to field conditions.
 - Evidence target: BrokenHorizon.Gameplay.World.BattlefieldConditions asserts storm dissipation and fog persistence; build and First Light smoke cover the runtime integration.
 - Remaining fallback: smoke material density, wind direction, and multiplayer visual parity still require manual PIE review with the authored smoke assets.
+
+### Bounded AI navigation recovery - 9 August 2026
+
+- AI local-search recovery now retries four bounded reachable-point queries after projection and accepts a wider 1000 cm projection only when the normal 500 cm query fails.
+- If a streamed or sparse tile has a valid projected point but no random sample, the soldier holds at that last reachable location and resumes its existing search or bounded retry state instead of issuing repeated invalid movement requests.
+- Evidence target: the existing NavigationFailureFallback automation remains green; build and First Light smoke measure runtime fallback coverage without changing map assets.
+- Remaining fallback: fixed-coordinate map gaps still require authored NavMesh and manual traversal work; this source change does not claim full navigation coverage.
