@@ -1632,3 +1632,8 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - Distant artillery, aircraft, and small-arms events now preserve their clear-weather combat/frontline levels while applying a bounded wind/rain mask. Severe weather lowers distant readability without making the battlefield silent, preserving an audible war layer during storms.
 - The policy is authority-driven through the replicated weather mix and still uses the existing spatial attenuation and occlusion contract. No audio assets were changed.
 - Evidence: `BHValidation-Build.log`, `BHValidation-Tests.log`, `BHValidation-Smoke.log`, and `BHValidation-FirstLight.log` passed. `BrokenHorizon.Presentation.Audio.DistantEventWeatherMix` and `BrokenHorizon.Presentation.Audio.FirstLightAmbientAssets` both completed with `Result={Success}`. First Light navigation fallback coverage remains 9/12.
+### Urgency-aware casualty waypoint rendering - 9 August 2026
+
+- The field casualty waypoint now grades from amber to red as the stabilization window closes instead of showing every downed operative at the same urgency level. The existing direction, distance, countdown, and treatment instruction remain unchanged.
+- The change is local to the HUD renderer and preserves safe-area behavior. It does not alter casualty persistence, treatment cost, or recovery timing.
+- Evidence: the retry of `BHValidation-Build.log`, `BHValidation-Tests.log`, `BHValidation-Smoke.log`, and `BHValidation-FirstLight.log` passed. The rendered UI gate passed all 33 required captures in `BHValidation-RenderedUI-20260809-042834-Summary.json`. Direct casualty-state visual review remains manual because the canonical capture set does not force a live casualty event.

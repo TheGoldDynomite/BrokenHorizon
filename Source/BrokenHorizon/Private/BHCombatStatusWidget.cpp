@@ -203,6 +203,7 @@ int32 DrawCasualtyWaypoint(
     FSlateWindowElementList& DrawElements,
     int32 LayerId,
     float DirectionAngleRadians,
+    float RecoverySecondsRemaining,
     const FString& Label
 )
 {
@@ -222,10 +223,15 @@ int32 DrawCasualtyWaypoint(
         (WidgetSize.X * 0.5f) +
         (NormalizedBearing * WidgetSize.X * 0.42f);
     const float MarkerY = 264.0f;
+    const float Urgency = FMath::GetMappedRangeValueClamped(
+        FVector2D(120.0f, 0.0f),
+        FVector2D(0.0f, 1.0f),
+        FMath::Max(0.0f, RecoverySecondsRemaining)
+    );
     const FLinearColor MarkerColor(
         1.0f,
-        0.20f,
-        0.16f,
+        FMath::Lerp(0.72f, 0.20f, Urgency),
+        FMath::Lerp(0.20f, 0.16f, Urgency),
         0.98f
     );
     const TArray<FVector2D> MarkerPoints = {
@@ -1763,6 +1769,7 @@ int32 UBHCombatStatusWidget::NativePaint(
             OutDrawElements,
             MaxLayer + 1,
             CasualtyWaypointDirectionAngleRadians,
+            CasualtyWaypointRecoverySecondsRemaining,
             WaypointLabel
         );
     }
