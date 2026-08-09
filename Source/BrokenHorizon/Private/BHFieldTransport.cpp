@@ -1873,9 +1873,18 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
 
     const FBHBattlefieldConditionProfile Conditions =
         UBHBattlefieldConditions::GetCurrentProfile(this);
+    const float TractionMultiplier = FMath::Max(
+        0.25f,
+        Conditions.VehicleTractionMultiplier
+    );
+    const float TractionResponse = FMath::Clamp(
+        TractionMultiplier,
+        0.0f,
+        1.0f
+    );
     const float ForwardLimit =
         (bBoostInput ? BoostForwardSpeed : MaximumForwardSpeed) *
-        Conditions.VehicleTractionMultiplier *
+        TractionMultiplier *
         GetCargoSpeedMultiplier() *
         GetHullMobilityMultiplier();
     float TargetSpeed = 0.0f;
@@ -1887,13 +1896,15 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
     else if (ThrottleInput < 0.0f)
     {
         TargetSpeed = MaximumReverseSpeed *
+            TractionMultiplier *
             GetCargoSpeedMultiplier() *
             GetHullMobilityMultiplier() *
             ThrottleInput;
     }
 
     const float Response = bBrakeInput
-        ? AccelerationResponse * 4.0f
+        ? AccelerationResponse *
+            FMath::Lerp(2.5f, 4.0f, TractionResponse)
         : AccelerationResponse;
     CurrentSpeed = FMath::FInterpTo(
         CurrentSpeed,
@@ -1924,6 +1935,7 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
                 0.0f,
                 SteeringInput *
                     SteeringRate *
+                    TractionResponse *
                     DirectionSign *
                     FMath::Lerp(0.30f, 1.0f, SpeedRatio) *
                     DeltaTime,

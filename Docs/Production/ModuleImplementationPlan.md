@@ -1677,3 +1677,10 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - Squad command and squad ping markers now use separate vertical lanes when both are active. A visible casualty marker also moves command guidance down by one lane so the urgent recovery instruction remains readable.
 - The change is renderer-local and preserves all Blueprint-facing widget setters, waypoint directions, distances, countdowns, and input prompts.
 - Evidence target: the canonical rendered UI gate covers the standard marker composition; a live casualty plus command/ping composition still requires manual PIE review because the capture fixture does not force an incapacitation event.
+
+### Consistent weather-aware transport handling - 9 August 2026
+
+- Field transport traction now affects forward and reverse speed limits, braking response, and steering authority through one bounded condition value.
+- Clear-road handling remains unchanged. Rain and severe storms now reduce reverse control, lengthen braking response, and reduce steering authority in the same direction as the existing forward-speed and fuel penalties.
+- No transport replication, damage, fuel, persistence, or Blueprint-facing property contract changed.
+- Evidence target: the existing transport damage/speed and battlefield-condition automation, editor build, startup smoke, and First Light smoke; physical route and handling feel remain manual.
