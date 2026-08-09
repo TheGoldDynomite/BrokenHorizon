@@ -77,3 +77,17 @@ The First Light feedback-audio pass expands the required audio contract beyond a
 - Fresh packaged error scan: missing object 0, missing package 0, navmesh mismatch 0, empty navmesh 0, fatal error 0, unhandled exception 0, ensure failure 0.
 
 The generated feedback samples are deterministic development source cues and still need human mix/presentation review in the editor and in-game. The UI warning DC-offset note should be cleaned up when the final recorded or designed cue replaces the development sample. Remaining 1.0 gates include rendered visual review, controller/UI interaction review, networked two-client First Light, lower-tier performance, long-duration soak, and raising navigation coverage beyond the current fallback set.
+## Release Candidate Packaged Gate Evidence (2026-08-08)
+
+The packaged validator previously targeted the obsolete Builds/FirstLight-Development/Windows archive. Config/ProjectManifest.json now selects the canonical release-candidate executable at Builds/FirstLight-ReleaseCandidate-Development/Windows/BrokenHorizon.exe, leaving older archives intact.
+
+- Release-candidate package log: Saved/Logs/BHPackage-ReleaseCandidate-20260808.log
+- BuildCookRun result: exit 0; Windows Development archive completed successfully.
+- Official packaged gate: Validate-BrokenHorizon.cmd -Packaged -FirstLight -AudioFX
+- Official gate result: exit 0; Audio/FX readiness passed with required=18/18 and optional=6/27, First Light smoke passed with navigation fallbacks 8/12, and packaged smoke passed.
+- Packaged validation log: Saved/Logs/BHValidation-Packaged.log
+- Audio-enabled release-candidate smoke log: Saved/Logs/BHReleaseCandidatePackagedFirstLightAudio-20260808.log
+- Audio-enabled result: process exit 0; WASAPI initialized at 48 kHz; BH_AMBIENT_AUDIO_READY wind=1 rain=1 war=1 looping=1 appeared.
+- Audio-enabled failure scan: missing object 0, missing package 0, navmesh mismatch 0, empty navmesh 0, fatal error 0, unhandled exception 0, ensure failure 0.
+
+This closes the stale-packaged-artifact validation defect. Multi-platform SDK validation remains limited to the installed Win64 SDK, and the broader manual presentation, multiplayer, performance, soak, and navigation-coverage gates remain open.

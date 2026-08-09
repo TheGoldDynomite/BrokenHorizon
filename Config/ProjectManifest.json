@@ -25,7 +25,7 @@
     "ReachExtraction"
   ],
   "packagedBuild": {
-    "executable": "Builds\\FirstLight-Development\\Windows\\BrokenHorizon.exe",
+    "executable": "Builds\\FirstLight-ReleaseCandidate-Development\\Windows\\BrokenHorizon.exe",
     "map": "/Game/BrokenHorizon/Maps/L_FirstLight_Graybox"
   },
   "documentation": [
