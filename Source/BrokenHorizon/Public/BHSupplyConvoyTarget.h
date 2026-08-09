@@ -29,6 +29,12 @@ public:
         float RecoveryFraction
     );
 
+    static float CalculateRouteSpeedMultiplier(
+        float HealthFraction,
+        float CriticalHealthFraction,
+        float MinimumSpeedMultiplier
+    );
+
     static FBHRouteOperationProfile BuildRouteOperationProfile(
         const FBHWarSupplyConvoyState& ConvoyState
     );
@@ -69,6 +75,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "Convoy")
     float GetHealthPercentage() const;
+
+    UFUNCTION(BlueprintPure, Category = "Convoy|Operation")
+    float GetRouteSpeedMultiplier() const;
 
     UFUNCTION(BlueprintPure, Category = "Convoy")
     EBHWarFaction GetConvoyOwner() const;
@@ -206,6 +215,28 @@ protected:
         meta = (ClampMin = "0.0", Units = "cm/s")
     )
     float MovementSpeed = 450.0f;
+
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category = "Convoy|Movement",
+        meta = (
+            ClampMin = "0.05",
+            ClampMax = "0.95"
+        )
+    )
+    float CriticalHealthFraction = 0.40f;
+
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category = "Convoy|Movement",
+        meta = (
+            ClampMin = "0.10",
+            ClampMax = "1.0"
+        )
+    )
+    float MinimumDamagedRouteSpeedMultiplier = 0.45f;
 
     UPROPERTY(
         EditDefaultsOnly,

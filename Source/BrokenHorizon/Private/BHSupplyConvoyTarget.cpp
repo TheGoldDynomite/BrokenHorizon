@@ -130,6 +130,46 @@ float ABHSupplyConvoyTarget::CalculateRecoverableSupply(
     );
 }
 
+float ABHSupplyConvoyTarget::CalculateRouteSpeedMultiplier(
+    float HealthFraction,
+    float CriticalHealthFraction,
+    float MinimumSpeedMultiplier
+)
+{
+    const float ClampedHealthFraction = FMath::Clamp(
+        HealthFraction,
+        0.0f,
+        1.0f
+    );
+    const float ClampedCriticalFraction = FMath::Clamp(
+        CriticalHealthFraction,
+        KINDA_SMALL_NUMBER,
+        1.0f
+    );
+    const float ClampedMinimumMultiplier = FMath::Clamp(
+        MinimumSpeedMultiplier,
+        0.0f,
+        1.0f
+    );
+
+    if (ClampedHealthFraction >= ClampedCriticalFraction)
+    {
+        return 1.0f;
+    }
+
+    const float DamageAlpha = FMath::Clamp(
+        1.0f -
+            ClampedHealthFraction / ClampedCriticalFraction,
+        0.0f,
+        1.0f
+    );
+    return FMath::Lerp(
+        1.0f,
+        ClampedMinimumMultiplier,
+        DamageAlpha
+    );
+}
+
 FBHRouteOperationProfile
 ABHSupplyConvoyTarget::BuildRouteOperationProfile(
     const FBHWarSupplyConvoyState& ConvoyState
@@ -384,6 +424,19 @@ float ABHSupplyConvoyTarget::GetHealthPercentage() const
     return IsValid(HealthComponent)
         ? HealthComponent->GetHealthPercentage()
         : 0.0f;
+}
+
+float ABHSupplyConvoyTarget::GetRouteSpeedMultiplier() const
+{
+    const float HealthFraction = GetHealthPercentage();
+
+    return HealthFraction <= KINDA_SMALL_NUMBER
+        ? 0.0f
+        : CalculateRouteSpeedMultiplier(
+            HealthFraction,
+            CriticalHealthFraction,
+            MinimumDamagedRouteSpeedMultiplier
+        );
 }
 
 EBHWarFaction ABHSupplyConvoyTarget::GetConvoyOwner() const
@@ -1057,8 +1110,11 @@ void ABHSupplyConvoyTarget::EnableWreckInteraction()
 
 void ABHSupplyConvoyTarget::MoveAlongRoute(float DeltaSeconds)
 {
+    const float EffectiveMovementSpeed =
+        MovementSpeed * GetRouteSpeedMultiplier();
+
     if (!bHasTravelDestination ||
-        MovementSpeed <= KINDA_SMALL_NUMBER)
+        EffectiveMovementSpeed <= KINDA_SMALL_NUMBER)
     {
         return;
     }
@@ -1076,7 +1132,7 @@ void ABHSupplyConvoyTarget::MoveAlongRoute(float DeltaSeconds)
         }
 
         const float TravelDistance = FMath::Min(
-            MovementSpeed * FMath::Max(0.0f, DeltaSeconds),
+            EffectiveMovementSpeed * FMath::Max(0.0f, DeltaSeconds),
             DistanceRemaining
         );
         CurrentRouteDistance = FMath::Clamp(
@@ -1143,7 +1199,7 @@ void ABHSupplyConvoyTarget::MoveAlongRoute(float DeltaSeconds)
         0.0f
     );
     const float TravelDistance = FMath::Min(
-        MovementSpeed * FMath::Max(0.0f, DeltaSeconds),
+        EffectiveMovementSpeed * FMath::Max(0.0f, DeltaSeconds),
         DistanceRemaining
     );
     FVector DesiredLocation =
