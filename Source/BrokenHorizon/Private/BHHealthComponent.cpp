@@ -243,7 +243,9 @@ void UBHHealthComponent::RestorePersistentDeathState()
     CurrentHealth = 0.0f;
     bIsDead = true;
     OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
-}float UBHHealthComponent::GetCurrentHealth() const
+}
+
+float UBHHealthComponent::GetCurrentHealth() const
 {
     return CurrentHealth;
 }

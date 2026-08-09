@@ -107,3 +107,8 @@ When every row is **Complete** with evidence, we are ready for 1.0 RC.
 - Weapon heat and fire mode: contract hardened. SaveGame fields, owner replication flags, current-schema coverage, heat clamping, heat-spread behavior, and legacy validity gating are covered by BrokenHorizon.PersistentWar.WeaponStatePersistence.
 - Evidence: editor build, focused automation, startup smoke, and First Light smoke passed; First Light recorded 3/12 navigation fallbacks.
 - Remaining release review: live equipped-rifle checkpoint round-trip, dedicated-client timing, controller readability, heat/recovery feel, and the unrelated aggregate baseline failures remain open.
+## Latest terminal death-state increment (2026-08-09)
+
+- Defeated enemy restore: hardened. Server-only restore now clears stale incapacitation, medical-evacuation, surrender, custody, and timer state before replicating the corpse state.
+- Evidence: focused contract and canonical automation passed; startup/First Light smoke passed; fresh Win64 package and packaged First Light route passed with four objectives and zero fatal package markers.
+- Remaining release review: multiplayer late-spawn/save-load timing, corpse presentation, authored navigation coverage, and unrelated aggregate baseline failures remain open.

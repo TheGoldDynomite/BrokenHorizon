@@ -1748,7 +1748,7 @@ void ABHEnemySoldier::RestorePersistentCombatState(
 
 void ABHEnemySoldier::RestorePersistentDeathState()
 {
-    if (bDeathHandled)
+    if (!HasAuthority() || bDeathHandled)
     {
         return;
     }
@@ -1759,6 +1759,15 @@ void ABHEnemySoldier::RestorePersistentDeathState()
     }
 
     bDeathHandled = true;
+    bIncapacitated = false;
+    bRequiresMedicalEvacuation = false;
+    IncapacitationSecondsRemaining = 0.0f;
+    bSurrendered = false;
+    bSurrenderSecured = false;
+    SurrenderEscapeSecondsRemaining = 0.0f;
+    bSurrenderConductReported = true;
+    bSurrenderDetentionReported = true;
+    GetWorldTimerManager().ClearTimer(IncapacitationTimerHandle);
     bReloading = false;
     ReloadEndTime = -BIG_NUMBER;
     SetCanBeDamaged(false);
@@ -1780,13 +1789,15 @@ void ABHEnemySoldier::RestorePersistentDeathState()
         SetLifeSpan(CorpseLifeSpan);
     }
 
+    ForceNetUpdate();
     UE_LOG(
         LogTemp,
         Display,
         TEXT("BH_ENEMY_DEATH_STATE_RESTORED id=%s"),
         *GetFieldOperativeID().ToString()
     );
-}float ABHEnemySoldier::GetCombatReadiness() const
+}
+float ABHEnemySoldier::GetCombatReadiness() const
 {
     return FMath::Clamp(CombatReadiness, 0.0f, 1.0f);
 }
