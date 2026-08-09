@@ -1561,6 +1561,20 @@ Enemy soldiers now register bounded navigation invokers with an 8,000 cm generat
 - Navigation fallback coverage remains 8/12 in both editor and packaged smoke. The same fixed-coordinate failures persist, so the remaining gap is treated as map/navmesh coverage and manual navigation review, not as closed by this code increment.
 - The invoker change is retained as runtime support for streamed/open-world AI navigation once the affected map tiles and spawn routes are repaired.
 
+
+
+## Enemy navigation local-search recovery - 2026-08-09
+
+Enemy AI now treats unreachable investigation and combat destinations as a local search problem: it projects the soldier onto nearby navmesh, samples a bounded reachable search point, holds at the last reachable position, and faces/scans instead of immediately issuing another path request. Initial patrol also waits for invoker navigation initialization before requesting its first move.
+
+- Source gate: Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight -LogPrefix BHValidation-LocalSearchFinal-Retry.
+- Source result: exit 0; build, automation, startup, First Light grenade, and full route checks passed.
+- First Light navigation fallback coverage: 5/12, down from 8/12 before the startup defer.
+- Packaged gate: Validate-BrokenHorizon.cmd -Packaged -FirstLight -AudioFX -LogPrefix BHValidation-LocalSearchFinal-Packaged.
+- Packaged result: exit 0; packaged smoke and First Light passed; required audio/FX coverage 18/18 and optional coverage 9/27.
+- Rendered hold-only soak: Validate-BrokenHorizon.cmd -RenderedMultiplayerSoak -LogPrefix BHValidation-LocalSearchHold-Rendered.
+- Rendered result: exit 0; dedicated authority, two connected/rendered clients, 19 observed AI, 570 seconds and 36,000 measured frames, renderer/network proof, zero frames over 50 ms, 100% desired texture recovery, and no stuck-movement warnings. Client A frame/GPU p95 was 11.631/8.828 ms; Client B was 11.571/8.781 ms.
+- The remaining bounded fallback events, including the dense-soak 2->2 combat failures, remain open for manual map/navmesh coverage review. This increment improves recovery behavior but does not claim navigation is fully closed.
 ## Enemy navigation invoker rendered multiplayer acceptance - 2026-08-09
 
 The enemy navigation-invoker build passed the full buffered two-client rendered multiplayer gate.

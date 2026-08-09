@@ -31,10 +31,54 @@ namespace
 constexpr float NavigationBuildRetrySeconds = 0.25f;
 constexpr float NavigationStartupDelaySeconds = 0.5f;
 
+constexpr float LocalSearchRadius = 700.0f;
+
 bool IsNavigationBuilding(UWorld* World)
 {
     return IsValid(World) &&
         UNavigationSystemV1::IsNavigationBeingBuilt(World);
+}
+
+bool TryFindLocalSearchLocation(
+    UWorld* World,
+    const FVector& Origin,
+    FVector& OutLocation
+)
+{
+    if (!IsValid(World) || IsNavigationBuilding(World))
+    {
+        return false;
+    }
+
+    UNavigationSystemV1* NavigationSystem =
+        FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+    if (!IsValid(NavigationSystem))
+    {
+        return false;
+    }
+
+    FNavLocation ProjectedOrigin;
+    if (!NavigationSystem->ProjectPointToNavigation(
+            Origin,
+            ProjectedOrigin,
+            FVector(500.0f, 500.0f, 500.0f)
+        ))
+    {
+        return false;
+    }
+
+    FNavLocation LocalLocation;
+    if (!NavigationSystem->GetRandomReachablePointInRadius(
+            ProjectedOrigin.Location,
+            LocalSearchRadius,
+            LocalLocation
+        ))
+    {
+        return false;
+    }
+
+    OutLocation = LocalLocation.Location;
+    return true;
 }
 }
 
@@ -1887,16 +1931,76 @@ void ABHEnemyAIController::HandleNavigationMoveFailure()
     StopMovement();
     bMoveRequested = false;
 
+    const auto TryEnterLocalSearch =
+        [this, Enemy, CurrentTime](FVector& OutLocation)
+        {
+            if (!TryFindLocalSearchLocation(
+                    GetWorld(),
+                    Enemy->GetActorLocation(),
+                    OutLocation
+                ))
+            {
+                return false;
+            }
+
+            CombatTarget.Reset();
+            bHasSightOfTarget = false;
+            ResetCombatTactics();
+            LastKnownTargetLocation = OutLocation;
+            ClearFocus(EAIFocusPriority::Gameplay);
+            SetState(EBHEnemyAIState::Search);
+            StateEndTime = CurrentTime + Enemy->GetSearchDuration();
+            bMoveRequested = false;
+            return true;
+        };
+
     if (FailedState == EBHEnemyAIState::Combat)
     {
         ReleaseCover();
-        NextCombatPursuitMoveTime = CurrentTime + 0.75f;
-        NextCombatRepositionTime = CurrentTime + 0.75f;
+        FVector LocalSearchLocation;
+        if (TryEnterLocalSearch(LocalSearchLocation))
+        {
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_AI_NAVIGATION_LOCAL_SEARCH soldier=%s "
+                    "failed_state=%d destination=%s"
+                ),
+                *Enemy->GetName(),
+                static_cast<int32>(FailedState),
+                *LocalSearchLocation.ToCompactString()
+            );
+        }
+        else
+        {
+            NextCombatPursuitMoveTime = CurrentTime + 0.75f;
+            NextCombatRepositionTime = CurrentTime + 0.75f;
+        }
     }
     else if (FallbackState == EBHEnemyAIState::Search &&
              FailedState != EBHEnemyAIState::Search)
     {
-        EnterSearch(LastKnownTargetLocation);
+        FVector LocalSearchLocation;
+        if (TryEnterLocalSearch(LocalSearchLocation))
+        {
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_AI_NAVIGATION_LOCAL_SEARCH soldier=%s "
+                    "failed_state=%d destination=%s"
+                ),
+                *Enemy->GetName(),
+                static_cast<int32>(FailedState),
+                *LocalSearchLocation.ToCompactString()
+            );
+        }
+        else
+        {
+            SetState(EBHEnemyAIState::Search);
+            StateEndTime = CurrentTime + Enemy->GetSearchDuration();
+        }
     }
     else if (FallbackState == EBHEnemyAIState::Search)
     {
