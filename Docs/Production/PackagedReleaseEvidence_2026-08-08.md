@@ -174,3 +174,16 @@ Evidence:
 - Audio-enabled packaged First Light smoke passed through WASAPI at 48 kHz with the same readiness markers and no fatal, assertion, or ensure markers.
  
 Remaining audio gate: 18 optional slots remain, primarily enemy/guard barks and rifle/ambient presentation candidates. Player voice is outside the current project contract. Manual audio mix, spatial falloff, and combat-feel review remain required.
+ 
+## Distant event spatial realism increment - 2026-08-08
+ 
+The systemic distant-war event path now uses a native attenuation profile rather than uniform world-volume playback. The profile is a natural-sound spherical field with a 2,500 cm near radius, 10,000 cm falloff, stereo spatialization, air-absorption low-pass filtering from 18 kHz to 1.8 kHz, and lightweight occlusion at 35% volume with 0.15 s interpolation. This keeps the existing server-selected event location and multicast behavior while making artillery, aircraft, and small-arms activity respond to listener distance and cover.
+ 
+Evidence:
+ 
+- Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight -AudioFX passed after the attenuation change: editor build, 66 automation tests, startup smoke, First Light route/navigation smoke, and audio/FX readiness. Audio coverage remained required=18/18, optional=9/27.
+- BuildCookRun refreshed Builds/FirstLight-ReleaseCandidate-Development successfully.
+- Validate-BrokenHorizon.cmd -Packaged -FirstLight -AudioFX passed. The cooked package emitted BH_AMBIENT_EVENT_ATTENUATION_READY model=natural_sound radius_cm=2500 falloff_cm=10000 lpf=1 occlusion=1 alongside all loop and event asset readiness markers.
+- Audio-enabled packaged First Light smoke initialized WASAPI at 48 kHz and emitted the attenuation marker, with no fatal, assertion, or ensure markers.
+ 
+Manual review remains required for subjective event loudness, spatial positioning, occlusion audibility, and the final combat mix on physical speakers/headphones.

@@ -22,6 +22,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 #include "Net/UnrealNetwork.h"
+#include "Sound/SoundAttenuation.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
 #include "UObject/UObjectGlobals.h"
@@ -170,6 +171,33 @@ ABHAmbientWarDirector::ABHAmbientWarDirector()
     WarBedAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("WarBedAudio"));
     WarBedAudioComponent->SetupAttachment(AudioRoot);
     WarBedAudioComponent->bAutoActivate = false;
+
+    DistantEventAttenuation =
+        CreateDefaultSubobject<USoundAttenuation>(
+            TEXT("DistantEventAttenuation")
+        );
+    FSoundAttenuationSettings& EventAttenuation =
+        DistantEventAttenuation->Attenuation;
+    EventAttenuation.DistanceAlgorithm =
+        EAttenuationDistanceModel::NaturalSound;
+    EventAttenuation.FalloffMode = ENaturalSoundFalloffMode::Continues;
+    EventAttenuation.AttenuationShape = EAttenuationShape::Sphere;
+    EventAttenuation.AttenuationShapeExtents =
+        FVector(2500.0f, 0.0f, 0.0f);
+    EventAttenuation.FalloffDistance = 10000.0f;
+    EventAttenuation.bAttenuate = true;
+    EventAttenuation.bSpatialize = true;
+    EventAttenuation.bAttenuateWithLPF = true;
+    EventAttenuation.bApplyNormalizationToStereoSounds = true;
+    EventAttenuation.bEnableOcclusion = true;
+    EventAttenuation.OcclusionLowPassFilterFrequency = 1200.0f;
+    EventAttenuation.OcclusionVolumeAttenuation = 0.35f;
+    EventAttenuation.OcclusionInterpolationTime = 0.15f;
+    EventAttenuation.LPFRadiusMin = 2500.0f;
+    EventAttenuation.LPFRadiusMax = 12500.0f;
+    EventAttenuation.LPFFrequencyAtMin = 18000.0f;
+    EventAttenuation.LPFFrequencyAtMax = 1800.0f;
+    EventAttenuation.StereoSpread = 400.0f;
 
     SupplyConvoyTargetClass =
         ABHSupplyConvoyTarget::StaticClass();
@@ -338,6 +366,14 @@ void ABHAmbientWarDirector::BeginPlay()
             bArtilleryReady ? TEXT("1") : TEXT("0"),
             bAircraftReady ? TEXT("1") : TEXT("0"),
             bSmallArmsReady ? TEXT("1") : TEXT("0")
+        );
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_AMBIENT_EVENT_ATTENUATION_READY model=natural_sound "
+                "radius_cm=2500 falloff_cm=10000 lpf=1 occlusion=1"
+            )
         );
     }
 
@@ -660,7 +696,10 @@ void ABHAmbientWarDirector::MulticastPlayDistantWarEvent_Implementation(
             this,
             EventSound,
             WorldLocation,
-            FMath::Clamp(VolumeMultiplier, 0.0f, 1.0f)
+            FMath::Clamp(VolumeMultiplier, 0.0f, 1.0f),
+            1.0f,
+            0.0f,
+            DistantEventAttenuation
         );
     }
 }

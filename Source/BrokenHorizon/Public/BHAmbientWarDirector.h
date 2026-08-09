@@ -14,6 +14,7 @@ class ABHWorldRoute;
 class UNavigationSystemV1;
 class UAudioComponent;
 class USceneComponent;
+class USoundAttenuation;
 class USoundBase;
 
 UENUM(BlueprintType)
@@ -316,6 +317,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ambient War|Audio")
     TObjectPtr<USoundBase> DistantSmallArmsSound;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ambient War|Audio")
+    TObjectPtr<USoundAttenuation> DistantEventAttenuation;
 
     UPROPERTY(
         EditDefaultsOnly,
