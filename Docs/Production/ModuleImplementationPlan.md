@@ -1641,3 +1641,7 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 
 - The pseudo-localized rendered UI gate passed all 14 high-risk captures at 1280x720 and 1920x1080 with LEET expansion across settings, remapping, war-map, deployment, custom difficulty, and session states.
 - Evidence: `BHValidation-RenderedPseudoLocalization-20260809-043709-Summary.json`. This closes the automated expanded-text layout check; translated linguistic review and interactive controller/couch-distance review remain manual.
+### Packaged smoke scope after presentation increments - 9 August 2026
+
+- The packaged validator launched the manifest Win64 executable successfully after the audio/HUD increments, and First Light smoke passed with navigation fallback coverage at 9/12. The packaged log also confirmed ambient audio readiness and runtime HUD style application.
+- `Validate-BrokenHorizon.cmd -Packaged` exercises the existing packaged executable; it does not cook or archive a new package. Fresh current-source cook/archive qualification therefore remains an explicit release gate rather than being claimed by this smoke result.
