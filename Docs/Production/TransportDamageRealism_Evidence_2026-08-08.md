@@ -13,6 +13,9 @@ replication, and save/load contracts remain intact.
 The native transport label now reports the current mobility percentage so the
 player can understand the handling penalty before the vehicle becomes
 immobilized.
+High-speed collisions now apply capped hull damage through the authoritative
+transport damage path, so careless driving can injure the vehicle and its
+occupants instead of stopping with no consequence.
 
 ## Runtime contract
 
@@ -26,6 +29,9 @@ immobilized.
   and distance-based fuel consumption.
 - `GetMobilityPercentage` exposes the live mobility state to Blueprint and the
   native transport label, reporting `0%` for an immobilized vehicle.
+- Movement blockage applies collision damage only above the tuned speed
+  threshold, with a cooldown and cap to prevent repeated contact from creating
+  runaway damage.
 - The calculation functions clamp invalid fractions and multipliers so
   Blueprint-authored tuning cannot create negative mobility or reduced fuel
   burn from damage.
@@ -41,6 +47,8 @@ Results:
 - UE 5.8 `BrokenHorizonEditor Win64 Development` build passed.
 - `BrokenHorizon.Gameplay.Transport.DamageMobility` completed with
   `Result={Success}`.
+- That test covers no-damage low-speed contact, threshold scaling, and the
+  capped severe-impact damage path.
 - The full automation run completed with `83 tests performed`.
 - Startup smoke passed.
 - First Light smoke passed with

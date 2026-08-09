@@ -16,6 +16,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
+#include "Engine/DamageEvents.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputCoreTypes.h"
 #include "Net/UnrealNetwork.h"
@@ -229,6 +230,27 @@ float ABHFieldTransport::CalculateHullFuelBurnMultiplier(
         1.0f,
         ClampedCriticalMultiplier,
         DamageAlpha
+    );
+}
+
+float ABHFieldTransport::CalculateCollisionDamage(
+    float ImpactSpeed,
+    float DamageSpeedThreshold,
+    float DamagePer100CentimetersPerSecond,
+    float MaximumImpactDamage
+)
+{
+    const float ExcessSpeed = FMath::Max(
+        0.0f,
+        FMath::Abs(ImpactSpeed) - FMath::Max(0.0f, DamageSpeedThreshold)
+    );
+    const float Damage =
+        ExcessSpeed / 100.0f *
+        FMath::Max(0.0f, DamagePer100CentimetersPerSecond);
+    return FMath::Clamp(
+        Damage,
+        0.0f,
+        FMath::Max(0.0f, MaximumImpactDamage)
     );
 }
 
@@ -1819,6 +1841,11 @@ void ABHFieldTransport::TryTransferCivilianAid()
 
 void ABHFieldTransport::UpdateMovement(float DeltaTime)
 {
+    CollisionDamageCooldownRemaining = FMath::Max(
+        0.0f,
+        CollisionDamageCooldownRemaining - DeltaTime
+    );
+
     if (CurrentHull <= KINDA_SMALL_NUMBER ||
         CurrentFuel <= KINDA_SMALL_NUMBER)
     {
@@ -1911,6 +1938,7 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
     }
 
     const FVector PreviousLocation = GetActorLocation();
+    const float CollisionImpactSpeed = FMath::Abs(CurrentSpeed);
     const FVector DesiredLocation =
         PreviousLocation +
         GetActorForwardVector() * CurrentSpeed * DeltaTime;
@@ -2017,6 +2045,40 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
             *Hit.ImpactPoint.ToCompactString(),
             *Hit.ImpactNormal.ToCompactString()
         );
+
+        if (HasAuthority() &&
+            CollisionDamageCooldownRemaining <= 0.0f)
+        {
+            const float ImpactDamage = CalculateCollisionDamage(
+                CollisionImpactSpeed,
+                CollisionDamageSpeedThreshold,
+                CollisionDamagePer100CentimetersPerSecond,
+                MaximumCollisionDamage
+            );
+
+            if (ImpactDamage > KINDA_SMALL_NUMBER)
+            {
+                CollisionDamageCooldownRemaining =
+                    FMath::Max(0.0f, CollisionDamageCooldown);
+                TakeDamage(
+                    ImpactDamage,
+                    FDamageEvent(),
+                    IsValid(Occupant)
+                        ? Occupant->GetController()
+                        : nullptr,
+                    Hit.GetActor()
+                );
+                NotifyDriver(FString::Printf(
+                    TEXT(
+                        "FIELD TRANSPORT IMPACT // "
+                        "HULL DAMAGE %.0f"
+                    ),
+                    ImpactDamage
+                ));
+                ForceNetUpdate();
+            }
+        }
+
         CurrentSpeed = 0.0f;
     }
 }

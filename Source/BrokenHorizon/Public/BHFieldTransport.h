@@ -54,6 +54,13 @@ public:
         float CriticalFuelBurnMultiplier
     );
 
+    static float CalculateCollisionDamage(
+        float ImpactSpeed,
+        float DamageSpeedThreshold,
+        float DamagePer100CentimetersPerSecond,
+        float MaximumImpactDamage
+    );
+
     static bool ShouldRestoreFieldSquadPassengers(
         bool bRestoreDriver,
         bool bHasExplicitPassengerState,
@@ -488,6 +495,52 @@ private:
     UPROPERTY(
         EditAnywhere,
         BlueprintReadOnly,
+        Category = "Field Transport|Protection",
+        meta = (
+            AllowPrivateAccess = "true",
+            ClampMin = "0.0",
+            Units = "cm/s"
+        )
+    )
+    float CollisionDamageSpeedThreshold = 450.0f;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Protection",
+        meta = (
+            AllowPrivateAccess = "true",
+            ClampMin = "0.0"
+        )
+    )
+    float CollisionDamagePer100CentimetersPerSecond = 8.0f;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Protection",
+        meta = (
+            AllowPrivateAccess = "true",
+            ClampMin = "0.0"
+        )
+    )
+    float MaximumCollisionDamage = 120.0f;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Protection",
+        meta = (
+            AllowPrivateAccess = "true",
+            ClampMin = "0.0",
+            Units = "s"
+        )
+    )
+    float CollisionDamageCooldown = 0.75f;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
         Category = "Field Transport|Logistics",
         meta = (
             AllowPrivateAccess = "true",
@@ -576,4 +629,5 @@ private:
     bool bCriticalFuelWarningIssued = false;
     bool bOutOfFuelWarningIssued = false;
     bool bHullDisabledWarningIssued = false;
+    float CollisionDamageCooldownRemaining = 0.0f;
 };

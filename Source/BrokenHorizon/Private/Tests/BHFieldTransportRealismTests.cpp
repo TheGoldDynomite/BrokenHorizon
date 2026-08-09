@@ -89,6 +89,43 @@ bool FBHFieldTransportDamageMobilityTest::RunTest(
         FMath::IsNearlyEqual(CriticalFuelBurn, 1.30f)
     );
 
+    TestTrue(
+        TEXT("Low-speed contact does not damage the transport"),
+        FMath::IsNearlyEqual(
+            ABHFieldTransport::CalculateCollisionDamage(
+                400.0f,
+                450.0f,
+                8.0f,
+                120.0f
+            ),
+            0.0f
+        )
+    );
+    TestTrue(
+        TEXT("Impact damage scales above the speed threshold"),
+        FMath::IsNearlyEqual(
+            ABHFieldTransport::CalculateCollisionDamage(
+                550.0f,
+                450.0f,
+                8.0f,
+                120.0f
+            ),
+            8.0f
+        )
+    );
+    TestTrue(
+        TEXT("Impact damage is capped for severe collisions"),
+        FMath::IsNearlyEqual(
+            ABHFieldTransport::CalculateCollisionDamage(
+                2500.0f,
+                450.0f,
+                8.0f,
+                120.0f
+            ),
+            120.0f
+        )
+    );
+
     return true;
 }
 
