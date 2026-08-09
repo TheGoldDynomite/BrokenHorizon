@@ -2284,12 +2284,25 @@ void ABHWarGameState::RunRenderedUIReviewTest()
         *ReportDirectory,
         true
     );
-    const FString OutputPath = FPaths::Combine(
-        ReportDirectory,
-        FString::Printf(
-            TEXT("BHRenderedUI-%s.png"),
-            *ReviewMode
-        )
+    FString OutputPath;
+    if (!FParse::Value(
+            FCommandLine::Get(),
+            TEXT("BHTestRenderedUIScreenshotPath="),
+            OutputPath) ||
+        OutputPath.IsEmpty())
+    {
+        OutputPath = FPaths::Combine(
+            ReportDirectory,
+            FString::Printf(
+                TEXT("BHRenderedUI-%s.png"),
+                *ReviewMode
+            )
+        );
+    }
+    OutputPath = FPaths::ConvertRelativePathToFull(OutputPath);
+    IFileManager::Get().MakeDirectory(
+        *FPaths::GetPath(OutputPath),
+        true
     );
     FScreenshotRequest::RequestScreenshot(
         OutputPath,

@@ -57,6 +57,19 @@ function Get-PngDimensions {
     }
 }
 
+function Stop-RenderedUIProcessTree {
+    param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+    $children = @(Get-CimInstance Win32_Process `
+        -Filter "ParentProcessId = $ProcessId" `
+        -ErrorAction SilentlyContinue)
+    foreach ($child in $children) {
+        Stop-RenderedUIProcessTree -ProcessId ([int]$child.ProcessId)
+    }
+
+    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
 $captureCases = @(
     [pscustomobject]@{ mode = "HUD"; width = 1280; height = 720 },
     [pscustomobject]@{ mode = "BRIEFING"; width = 1280; height = 720 },
@@ -119,7 +132,7 @@ foreach ($captureCase in $captureCases) {
     ) { $captureCase.profile } else { "DEFAULT" }
     $sourcePath = Join-Path `
         $reportDirectory `
-        "BHRenderedUI-$($captureCase.mode).png"
+        "$LogPrefix-$runId-Source-$($captureCase.mode)-$resolution-$profile.png"
     $capturePath = Join-Path `
         $reportDirectory `
         "$LogPrefix-$runId-$($captureCase.mode)-$resolution-$profile.png"
@@ -152,8 +165,10 @@ foreach ($captureCase in $captureCases) {
     if ($isSessionReview) {
         $arguments +=
             "-BHTestRenderedSessionReview=$($captureCase.sessionReview)"
+        $arguments += "-BHTestRenderedSessionScreenshotPath=$sourcePath"
     } else {
         $arguments += "-BHTestRenderedUIReview=$($captureCase.mode)"
+        $arguments += "-BHTestRenderedUIScreenshotPath=$sourcePath"
     }
     if ($PseudoLocalization) {
         $arguments += "-culture=leet"
@@ -170,17 +185,11 @@ foreach ($captureCase in $captureCases) {
         -PassThru
 
     if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-        Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
-        if (-not $process.WaitForExit(5000)) {
-            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        }
+        Stop-RenderedUIProcessTree -ProcessId $process.Id
         throw "Rendered UI $($captureCase.mode) $resolution timed out."
     }
     if ($process.ExitCode -ne 0) {
         throw "Rendered UI $($captureCase.mode) $resolution exited $($process.ExitCode). See $logPath"
-    }
-    if (-not (Test-Path -LiteralPath $sourcePath)) {
-        throw "Rendered UI $($captureCase.mode) $resolution did not produce $sourcePath"
     }
     if (-not (Test-Path -LiteralPath $logPath)) {
         throw "Rendered UI $($captureCase.mode) $resolution did not produce $logPath"
@@ -210,13 +219,44 @@ foreach ($captureCase in $captureCases) {
         throw "Rendered UI $($captureCase.mode) did not render at $resolution. See $logPath"
     }
 
-    $dimensions = Get-PngDimensions -Path $sourcePath
-    if ($dimensions.width -ne $captureCase.width -or
-        $dimensions.height -ne $captureCase.height) {
-        throw "Rendered UI $($captureCase.mode) PNG was $($dimensions.width)x$($dimensions.height), expected $resolution."
+    $dimensions = $null
+    $captureDeadline = (Get-Date).AddSeconds(15)
+    while ((Get-Date) -lt $captureDeadline) {
+        if (Test-Path -LiteralPath $sourcePath) {
+            try {
+                $candidateDimensions = Get-PngDimensions -Path $sourcePath
+                if ($candidateDimensions.width -eq $captureCase.width -and
+                    $candidateDimensions.height -eq $captureCase.height) {
+                    $dimensions = $candidateDimensions
+                    break
+                }
+            } catch {
+                # The renderer may still be completing the asynchronous PNG write.
+            }
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    if ($null -eq $dimensions) {
+        if (Test-Path -LiteralPath $sourcePath) {
+            $actualDimensions = Get-PngDimensions -Path $sourcePath
+            throw "Rendered UI $($captureCase.mode) PNG was $($actualDimensions.width)x$($actualDimensions.height), expected $resolution."
+        }
+        throw "Rendered UI $($captureCase.mode) $resolution did not produce $sourcePath"
     }
 
-    Copy-Item -LiteralPath $sourcePath -Destination $capturePath
+    $copied = $false
+    for ($copyAttempt = 0; $copyAttempt -lt 20; $copyAttempt++) {
+        try {
+            Copy-Item -LiteralPath $sourcePath -Destination $capturePath -Force
+            $copied = $true
+            break
+        } catch {
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    if (-not $copied) {
+        throw "Rendered UI $($captureCase.mode) $resolution could not copy $sourcePath to $capturePath"
+    }
     $results.Add([pscustomobject]@{
         mode = $captureCase.mode
         map = $caseMap

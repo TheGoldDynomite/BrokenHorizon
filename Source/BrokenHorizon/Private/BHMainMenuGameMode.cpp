@@ -168,12 +168,25 @@ void ABHMainMenuGameMode::RunRenderedSessionReview()
         TEXT("Reports")
     );
     IFileManager::Get().MakeDirectory(*ReportDirectory, true);
-    const FString OutputPath = FPaths::Combine(
-        ReportDirectory,
-        FString::Printf(
-            TEXT("BHRenderedUI-SESSION_%s.png"),
-            *ReviewMode
-        )
+    FString OutputPath;
+    if (!FParse::Value(
+            FCommandLine::Get(),
+            TEXT("BHTestRenderedSessionScreenshotPath="),
+            OutputPath) ||
+        OutputPath.IsEmpty())
+    {
+        OutputPath = FPaths::Combine(
+            ReportDirectory,
+            FString::Printf(
+                TEXT("BHRenderedUI-SESSION_%s.png"),
+                *ReviewMode
+            )
+        );
+    }
+    OutputPath = FPaths::ConvertRelativePathToFull(OutputPath);
+    IFileManager::Get().MakeDirectory(
+        *FPaths::GetPath(OutputPath),
+        true
     );
     FScreenshotRequest::RequestScreenshot(OutputPath, true, false);
     UE_LOG(
