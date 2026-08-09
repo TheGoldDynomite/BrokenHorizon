@@ -254,3 +254,13 @@ The current non-pseudo rendered UI matrix passed with no failed captures.
 - Coverage: HUD, briefing, pause, settings, input remapping, war map, custom difficulty, session ready/searching/connected/error, 1280x720, 1920x1080, 3840x2160, and HUD scale/safe-area extremes.
 - Authoritative summary: Saved/Reports/BHValidation-RenderedUI-Current-RenderedUI-20260809-012148-Summary.json.
 - This is automated rendered-layout evidence. Manual editor/playtest review remains required for visual quality, animation, controller feel, and navigation coverage.
+
+## Enemy navigation invoker increment - 2026-08-09
+
+Enemy soldiers now register bounded navigation invokers with an 8,000 cm generation radius and 12,000 cm removal radius, matching the project’s invoker-driven runtime navigation strategy without forcing full-map nav generation.
+
+- Source gate: editor build, platform validation, automation, startup smoke, and First Light smoke passed.
+- Packaged release archive rebuilt successfully with the change.
+- Packaged First Light and Audio/FX acceptance passed; required audio coverage remains 18/18 and optional coverage remains 9/27.
+- Navigation fallback coverage remains 8/12 in both editor and packaged smoke. The same fixed-coordinate failures persist, so the remaining gap is treated as map/navmesh coverage and manual navigation review, not as closed by this code increment.
+- The invoker change is retained as runtime support for streamed/open-world AI navigation once the affected map tiles and spawn routes are repaired.

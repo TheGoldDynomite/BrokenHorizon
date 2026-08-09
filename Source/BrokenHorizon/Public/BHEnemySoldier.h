@@ -11,6 +11,7 @@ class ABHImpactEffect;
 class UAnimMontage;
 class UAnimSequenceBase;
 class UBHHealthComponent;
+class UNavigationInvokerComponent;
 class UNiagaraSystem;
 class USceneComponent;
 class USoundBase;
@@ -453,6 +454,13 @@ protected:
         Category = "Enemy|Health"
     )
     TObjectPtr<UBHHealthComponent> HealthComponent;
+
+    UPROPERTY(
+        VisibleAnywhere,
+        BlueprintReadOnly,
+        Category = "Enemy|Navigation"
+    )
+    TObjectPtr<UNavigationInvokerComponent> NavigationInvoker;
 
     UPROPERTY(
         VisibleAnywhere,

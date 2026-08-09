@@ -7,6 +7,7 @@
 #include "BHEnemyAIController.h"
 #include "BHFragGrenade.h"
 #include "BHHealthComponent.h"
+#include "NavigationInvokerComponent.h"
 #include "BHInjuryComponent.h"
 #include "BHImpactEffect.h"
 #include "BHPatrolPoint.h"
@@ -169,6 +170,13 @@ ABHEnemySoldier::ABHEnemySoldier()
         TEXT("HealthComponent")
     );
 
+    NavigationInvoker = CreateDefaultSubobject<UNavigationInvokerComponent>(
+        TEXT("NavigationInvoker")
+    );
+    NavigationInvoker->SetGenerationRadii(
+        8000.0f,
+        12000.0f
+    );
     ArchetypeLabel = CreateDefaultSubobject<UTextRenderComponent>(
         TEXT("ArchetypeLabel")
     );
