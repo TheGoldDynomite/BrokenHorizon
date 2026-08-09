@@ -6309,6 +6309,20 @@ void ABHCharacter::HandleFirstPersonActionFinished()
     RefreshFirstPersonArmsAnimation();
 }
 
+void ABHCharacter::CancelFirstPersonActionAnimation()
+{
+    GetWorldTimerManager().ClearTimer(FirstPersonActionTimerHandle);
+    bFirstPersonActionPlaying = false;
+    ActiveFirstPersonLoop.Reset();
+    RefreshFirstPersonArmsAnimation();
+}
+
+void ABHCharacter::CancelFirstPersonReloadMotion()
+{
+    bFirstPersonReloadMotionPlaying = false;
+    FirstPersonReloadElapsed = 0.0f;
+    FirstPersonReloadDuration = 0.0f;
+}
 void ABHCharacter::UpdateFirstPersonPresentationOffsets(float DeltaTime)
 {
     if (!IsValid(FirstPersonArms) ||

@@ -727,6 +727,10 @@ bool UBHWeaponComponent::InterruptReload(FName InterruptReason)
         return false;
     }
 
+    if (IsValid(EquippedRifle))
+    {
+        EquippedRifle->CancelReloadPresentation();
+    }
     StopAllActions();
     const FString Reason = InterruptReason.IsNone()
         ? TEXT("external")

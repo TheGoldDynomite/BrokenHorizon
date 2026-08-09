@@ -581,6 +581,8 @@ public:
 
     void AddFirstPersonFireKick();
     void PlayFirstPersonReloadMotion(float Duration);
+    void CancelFirstPersonActionAnimation();
+    void CancelFirstPersonReloadMotion();
 
     UFUNCTION(BlueprintCallable, Category = "UI")
     void ShowStatusNotification(const FText& Message);

@@ -215,6 +215,8 @@ public:
 
     void PlayDryFirePresentation();
     void PlayReloadPresentation(float DurationOverride = -1.0f);
+    UFUNCTION(BlueprintCallable, Category = "Rifle|Presentation")
+    void CancelReloadPresentation();
     void SetAimPresentation(bool bNewIsAiming);
 
     UFUNCTION(BlueprintPure, Category = "Rifle|Presentation")

@@ -1157,6 +1157,27 @@ void ABHRifle::PlayReloadPresentation(float DurationOverride)
     OnReloadPresentation();
 }
 
+void ABHRifle::CancelReloadPresentation()
+{
+    if (ABHCharacter* CharacterOwner = Cast<ABHCharacter>(GetOwner()))
+    {
+        if (USkeletalMeshComponent* FirstPersonArms = CharacterOwner->GetFirstPersonArmsMesh())
+        {
+            if (UAnimInstance* AnimInstance = FirstPersonArms->GetAnimInstance())
+            {
+                AnimInstance->Montage_Stop(0.08f);
+            }
+        }
+
+        CharacterOwner->CancelFirstPersonActionAnimation();
+        CharacterOwner->CancelFirstPersonReloadMotion();
+    }
+
+    if (IsValid(RifleSkeletalMesh))
+    {
+        RifleSkeletalMesh->Stop();
+    }
+}
 void ABHRifle::SetAimPresentation(bool bNewIsAiming)
 {
     OnAimPresentationChanged(bNewIsAiming);
