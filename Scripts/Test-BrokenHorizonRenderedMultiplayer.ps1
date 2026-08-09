@@ -2,9 +2,9 @@
 param(
     [ValidateRange(1024, 65535)]
     [int]$Port = 0,
-    [ValidateRange(30, 1200)]
+    [ValidateRange(30, 9000)]
     [int]$TimeoutSeconds = 120,
-    [ValidateRange(600, 100000)]
+    [ValidateRange(600, 1000000)]
     [int]$CaptureFrames = 1800,
     [ValidateRange(60, 1200)]
     [int]$WarmupFrames = 600,
@@ -13,6 +13,8 @@ param(
     [ValidateRange(1, 4)]
     [int]$RenderedClientCount = 2,
     [switch]$SustainedSoak,
+    [ValidateRange(570.0, 7200.0)]
+    [double]$RequiredSoakSeconds = 570.0,
     [switch]$ProductionRouteHUD,
     [string]$LogPrefix = "BHRenderedMultiplayer"
 )
@@ -23,6 +25,9 @@ if ($WarmupFrames -ge $CaptureFrames) {
 }
 if ($RenderedClientCount -gt $ClientCount) {
     throw "Rendered client count cannot exceed total client count."
+}
+if ($RequiredSoakSeconds -gt 570.0 -and -not $SustainedSoak) {
+    throw "A required soak duration needs -SustainedSoak."
 }
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -711,8 +716,16 @@ try {
         $renderedClientEvidence += $profileEvidence
     }
 
-    $minimumMeasuredSoakFrames = 36000
-    $minimumMeasuredSoakSeconds = 570.0
+    $minimumMeasuredSoakFrames = if ($SustainedSoak -and $RequiredSoakSeconds -gt 570.0) {
+        $CaptureFrames - $WarmupFrames
+    } else {
+        36000
+    }
+    $minimumMeasuredSoakSeconds = if ($SustainedSoak) {
+        $RequiredSoakSeconds
+    } else {
+        0.0
+    }
     $soakProof = -not $SustainedSoak -or
         @(
             $renderedClientEvidence |
@@ -745,6 +758,9 @@ try {
         rendererProof = $true
         networkProof = $true
         sustainedSoakRequested = [bool]$SustainedSoak
+        requiredSoakSeconds = if ($SustainedSoak) {
+            $RequiredSoakSeconds
+        } else { 0.0 }
         sustainedSoakProof = $soakProof
         minimumMeasuredSoakFrames = if ($SustainedSoak) {
             $minimumMeasuredSoakFrames
@@ -779,7 +795,11 @@ try {
             "GPU-memory acceptance uses detected physical capacity; each client's fluctuating WDDM local budget is retained as a diagnostic metric.",
             "Offscreen 720p evidence does not replace visible multi-client UI and image-quality review.",
             $(if ($SustainedSoak) {
-                "This ten-minute rendered soak is not a two-hour rendered or packaged-build proof."
+                if ($RequiredSoakSeconds -gt 570.0) {
+                    "This rendered soak is not packaged-build or geographic-network proof."
+                } else {
+                    "This ten-minute rendered soak is not a two-hour rendered or packaged-build proof."
+                }
             } else {
                 "This bounded First Light combat-density window is not a long-session rendered soak or packaged-build proof."
             })
