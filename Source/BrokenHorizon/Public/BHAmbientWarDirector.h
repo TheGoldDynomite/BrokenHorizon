@@ -51,6 +51,12 @@ public:
         EBHAmbientAudioState AudioState
     );
 
+    static float CalculateDistantEventVolume(
+        EBHAmbientAudioState AudioState,
+        float WindIntensity,
+        float RainIntensity
+    );
+
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Ambient War|Audio")
     void SetWeatherMix(float WindIntensity, float RainIntensity);
 

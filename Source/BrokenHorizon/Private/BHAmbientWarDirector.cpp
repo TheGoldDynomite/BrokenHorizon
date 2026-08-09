@@ -296,6 +296,24 @@ float ABHAmbientWarDirector::CalculateWarBedVolume(
     }
 }
 
+float ABHAmbientWarDirector::CalculateDistantEventVolume(
+    EBHAmbientAudioState AudioState,
+    float WindIntensity,
+    float RainIntensity
+)
+{
+    const float BaseVolume =
+        AudioState == EBHAmbientAudioState::Combat ? 0.75f : 0.55f;
+    const float SafeWind = FMath::Clamp(WindIntensity, 0.0f, 1.0f);
+    const float SafeRain = FMath::Clamp(RainIntensity, 0.0f, 1.0f);
+    const float WeatherMask = FMath::Clamp(
+        1.0f - (SafeWind * 0.14f + SafeRain * 0.24f),
+        0.55f,
+        1.0f
+    );
+
+    return FMath::Clamp(BaseVolume * WeatherMask, 0.0f, 1.0f);
+}
 void ABHAmbientWarDirector::SetWeatherMix(
     float WindIntensity,
     float RainIntensity
@@ -604,7 +622,11 @@ void ABHAmbientWarDirector::UpdateDistantWarEvents(
     MulticastPlayDistantWarEvent(
         EventType,
         EventLocation,
-        AmbientAudioState == EBHAmbientAudioState::Combat ? 0.75f : 0.55f
+        CalculateDistantEventVolume(
+            AmbientAudioState,
+            ReplicatedWindIntensity,
+            ReplicatedRainIntensity
+        )
     );
     NextDistantWarEventTime = World->GetTimeSeconds() + FMath::FRandRange(
         FMath::Max(1.0f, MinimumDistantEventInterval),

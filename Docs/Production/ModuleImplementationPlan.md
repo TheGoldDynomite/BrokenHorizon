@@ -1627,3 +1627,8 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 
 - The target-handoff visibility decision is now a pure AI policy function with coverage for new unseen targets, squad casualty alerts, retained contact, and direct line of sight. This protects the distinction between a last-known contact and a visually confirmed target.
 - `BHValidation-Tests.log` executed `BrokenHorizon.Gameplay.AI.VisualContactHandoff` with `Result={Success}`. The full validation also passed build/UHT, startup smoke, and First Light smoke; navigation fallback coverage remains 9/12.
+### Weather-aware distant-war audio - 9 August 2026
+
+- Distant artillery, aircraft, and small-arms events now preserve their clear-weather combat/frontline levels while applying a bounded wind/rain mask. Severe weather lowers distant readability without making the battlefield silent, preserving an audible war layer during storms.
+- The policy is authority-driven through the replicated weather mix and still uses the existing spatial attenuation and occlusion contract. No audio assets were changed.
+- Evidence: `BHValidation-Build.log`, `BHValidation-Tests.log`, `BHValidation-Smoke.log`, and `BHValidation-FirstLight.log` passed. `BrokenHorizon.Presentation.Audio.DistantEventWeatherMix` and `BrokenHorizon.Presentation.Audio.FirstLightAmbientAssets` both completed with `Result={Success}`. First Light navigation fallback coverage remains 9/12.

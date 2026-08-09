@@ -1,3 +1,5 @@
+#include "BHAmbientWarDirector.h"
+#include "Math/UnrealMathUtility.h"
 #include "Misc/AutomationTest.h"
 #include "Sound/SoundBase.h"
 #include "Sound/SoundWave.h"
@@ -63,5 +65,48 @@ bool FBHFirstLightAmbientAudioAssetTest::RunTest(const FString& Parameters)
             );
         }
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHDistantWarWeatherMixTest,
+    "BrokenHorizon.Presentation.Audio.DistantEventWeatherMix",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter
+)
+
+bool FBHDistantWarWeatherMixTest::RunTest(const FString& Parameters)
+{
+    const float ClearCombatVolume =
+        ABHAmbientWarDirector::CalculateDistantEventVolume(
+            EBHAmbientAudioState::Combat,
+            0.0f,
+            0.0f
+        );
+    const float SevereWeatherVolume =
+        ABHAmbientWarDirector::CalculateDistantEventVolume(
+            EBHAmbientAudioState::Combat,
+            1.0f,
+            1.0f
+        );
+    const float ClearFrontlineVolume =
+        ABHAmbientWarDirector::CalculateDistantEventVolume(
+            EBHAmbientAudioState::Frontline,
+            0.0f,
+            0.0f
+        );
+
+    TestTrue(
+        TEXT("Clear combat events retain the authored combat level"),
+        FMath::IsNearlyEqual(ClearCombatVolume, 0.75f)
+    );
+    TestTrue(
+        TEXT("Severe weather masks distant combat without silencing it"),
+        SevereWeatherVolume < ClearCombatVolume &&
+        SevereWeatherVolume >= 0.75f * 0.55f
+    );
+    TestTrue(
+        TEXT("Clear frontline events retain the authored frontline level"),
+        FMath::IsNearlyEqual(ClearFrontlineVolume, 0.55f)
+    );
     return true;
 }
