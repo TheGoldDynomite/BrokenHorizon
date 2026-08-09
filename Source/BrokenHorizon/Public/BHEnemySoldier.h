@@ -1324,6 +1324,7 @@ private:
     void StartIncapacitationTimer();
     void UpdateIncapacitationTimer();
     void ExpireFriendlyIncapacitation();
+    void ClearTerminalMedicalAndCustodyState();
     USoundBase* ResolveBarkSound(EBHEnemyBarkType BarkType) const;
     bool IsMuzzleEnvironmentEnclosed(const FVector& MuzzleLocation) const;
     bool UpdateReloadState(float CurrentTime);

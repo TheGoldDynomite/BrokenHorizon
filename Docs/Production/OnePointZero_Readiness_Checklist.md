@@ -112,3 +112,8 @@ When every row is **Complete** with evidence, we are ready for 1.0 RC.
 - Defeated enemy restore: hardened. Server-only restore now clears stale incapacitation, medical-evacuation, surrender, custody, and timer state before replicating the corpse state.
 - Evidence: focused contract and canonical automation passed; startup/First Light smoke passed; fresh Win64 package and packaged First Light route passed with four objectives and zero fatal package markers.
 - Remaining release review: multiplayer late-spawn/save-load timing, corpse presentation, authored navigation coverage, and unrelated aggregate baseline failures remain open.
+## Latest live terminal death increment (2026-08-09)
+
+- Live lethal death: aligned with persistence. Surrender, custody, medical-evacuation, incapacitation, and timer flags are cleared immediately after any conduct outcome is recorded.
+- Evidence: source build, canonical persistence/death automation, startup/First Light smoke, fresh package, and packaged guard route passed; First Light completed four objectives with zero fatal package markers.
+- Remaining release review: direct surrendered-hostile multiplayer timing and HUD/corpse presentation, authored navigation coverage, and unrelated aggregate baseline failures remain open.

@@ -1759,15 +1759,7 @@ void ABHEnemySoldier::RestorePersistentDeathState()
     }
 
     bDeathHandled = true;
-    bIncapacitated = false;
-    bRequiresMedicalEvacuation = false;
-    IncapacitationSecondsRemaining = 0.0f;
-    bSurrendered = false;
-    bSurrenderSecured = false;
-    SurrenderEscapeSecondsRemaining = 0.0f;
-    bSurrenderConductReported = true;
-    bSurrenderDetentionReported = true;
-    GetWorldTimerManager().ClearTimer(IncapacitationTimerHandle);
+    ClearTerminalMedicalAndCustodyState();
     bReloading = false;
     ReloadEndTime = -BIG_NUMBER;
     SetCanBeDamaged(false);
@@ -2568,6 +2560,7 @@ void ABHEnemySoldier::HandleDeath(AActor* DamageCauser)
     }
 
     bDeathHandled = true;
+    ClearTerminalMedicalAndCustodyState();
     PlayBark(EBHEnemyBarkType::Casualty);
     if (UBHSaveSubsystem* SaveSubsystem =
         GetGameInstance()
@@ -2810,6 +2803,19 @@ void ABHEnemySoldier::ExpireFriendlyIncapacitation()
     }
 }
 
+void ABHEnemySoldier::ClearTerminalMedicalAndCustodyState()
+{
+    bIncapacitated = false;
+    bRequiresMedicalEvacuation = false;
+    IncapacitationSecondsRemaining = 0.0f;
+    bSurrendered = false;
+    bSurrenderSecured = false;
+    SurrenderEscapeSecondsRemaining = 0.0f;
+    bSurrenderConductReported = true;
+    bSurrenderDetentionReported = true;
+    GetWorldTimerManager().ClearTimer(IncapacitationTimerHandle);
+    ForceNetUpdate();
+}
 void ABHEnemySoldier::RestoreFromDeathPresentation()
 {
     GetWorldTimerManager().ClearTimer(
