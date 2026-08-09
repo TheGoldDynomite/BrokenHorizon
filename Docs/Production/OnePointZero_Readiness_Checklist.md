@@ -102,3 +102,8 @@ When every row is **Complete** with evidence, we are ready for 1.0 RC.
 - Defeated enemy combat state: integrated. Stable field-operative IDs are saved at death and restored as inert zero-health enemies across save/load and corpse expiry.
 - Evidence: focused persistence automation, editor build, source smoke, fresh package, and packaged First Light route passed. Aggregate automation remains partially blocked by the preserved unrelated DistantEventWeatherMix and SettingsContract failures.
 - Manual/release follow-up: verify multiplayer load timing and corpse presentation in the editor; continue clearing the aggregate baseline before 1.0 sign-off.
+## Latest weapon persistence increment (2026-08-09)
+
+- Weapon heat and fire mode: contract hardened. SaveGame fields, owner replication flags, current-schema coverage, heat clamping, heat-spread behavior, and legacy validity gating are covered by BrokenHorizon.PersistentWar.WeaponStatePersistence.
+- Evidence: editor build, focused automation, startup smoke, and First Light smoke passed; First Light recorded 3/12 navigation fallbacks.
+- Remaining release review: live equipped-rifle checkpoint round-trip, dedicated-client timing, controller readability, heat/recovery feel, and the unrelated aggregate baseline failures remain open.
