@@ -1650,3 +1650,9 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - Battlefield conditions now expose a separate `ExplosionNoiseMultiplier`. Rain reduces explosive AI-hearing loudness and range to 84 percent, dense fog slightly carries it to 105 percent, and severe storms reduce it to 62 percent. Gunfire and movement-noise contracts remain separate.
 - Frag grenades and engineering charges apply the multiplier to both `UAISense_Hearing` loudness and maximum range, so weather changes tactical discovery without changing damage or blast radius.
 - Evidence: `BHValidation-Build.log`, `BHValidation-Tests.log`, `BHValidation-Smoke.log`, and `BHValidation-FirstLight.log` passed. `BrokenHorizon.Gameplay.World.BattlefieldConditions` completed with `Result={Success}`. First Light navigation fallback coverage was 3/12 in this run.
+### Weather-aware tactical-support artillery hearing - 9 August 2026
+
+- ABHTacticalSupportZone now applies the replicated battlefield condition ExplosionNoiseMultiplier to mortar impact loudness and hearing range, keeping artillery detection consistent with frag grenades and engineering charges.
+- Mortar dispersion and artillery hearing now share the same weather contract: severe storms reduce reliable explosive localization while rain and fog make smaller, bounded adjustments.
+- Validation target: BrokenHorizon.Gameplay.World.BattlefieldConditions covers the storm hearing bound; build and First Light smoke cover the tactical-support source integration.
+- Remaining fallback: the actual mortar cadence, AI reaction quality, and spatial readability still require manual PIE review with a real support request.

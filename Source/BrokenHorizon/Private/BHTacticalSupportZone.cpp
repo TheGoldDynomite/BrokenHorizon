@@ -371,12 +371,17 @@ void ABHTacticalSupportZone::FireNextMortarShell()
         IsValid(RequestingCharacter) ? RequestingCharacter->GetController() : nullptr,
         ECC_Visibility
     );
+    const float ExplosionNoiseMultiplier = FMath::Max(
+        0.0f,
+        UBHBattlefieldConditions::GetCurrentProfile(this).
+            ExplosionNoiseMultiplier
+    );
     UAISense_Hearing::ReportNoiseEvent(
         this,
         Impact,
-        3.0f,
+        3.0f * ExplosionNoiseMultiplier,
         RequestingCharacter,
-        5000.0f,
+        5000.0f * ExplosionNoiseMultiplier,
         FName(TEXT("Artillery"))
     );
     MulticastMortarImpact(Impact);
