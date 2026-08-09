@@ -1637,3 +1637,7 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - The field casualty waypoint now grades from amber to red as the stabilization window closes instead of showing every downed operative at the same urgency level. The existing direction, distance, countdown, and treatment instruction remain unchanged.
 - The change is local to the HUD renderer and preserves safe-area behavior. It does not alter casualty persistence, treatment cost, or recovery timing.
 - Evidence: the retry of `BHValidation-Build.log`, `BHValidation-Tests.log`, `BHValidation-Smoke.log`, and `BHValidation-FirstLight.log` passed. The rendered UI gate passed all 33 required captures in `BHValidation-RenderedUI-20260809-042834-Summary.json`. Direct casualty-state visual review remains manual because the canonical capture set does not force a live casualty event.
+### Pseudo-localized HUD qualification - 9 August 2026
+
+- The pseudo-localized rendered UI gate passed all 14 high-risk captures at 1280x720 and 1920x1080 with LEET expansion across settings, remapping, war-map, deployment, custom difficulty, and session states.
+- Evidence: `BHValidation-RenderedPseudoLocalization-20260809-043709-Summary.json`. This closes the automated expanded-text layout check; translated linguistic review and interactive controller/couch-distance review remain manual.
