@@ -91,3 +91,20 @@ The packaged validator previously targeted the obsolete Builds/FirstLight-Develo
 - Audio-enabled failure scan: missing object 0, missing package 0, navmesh mismatch 0, empty navmesh 0, fatal error 0, unhandled exception 0, ensure failure 0.
 
 This closes the stale-packaged-artifact validation defect. Multi-platform SDK validation remains limited to the installed Win64 SDK, and the broader manual presentation, multiplayer, performance, soak, and navigation-coverage gates remain open.
+## Cooperative Squad Ping Resilience Evidence (2026-08-08)
+
+The network impairment gate exposed a delayed-controller UI race: ClientA received the authoritative squad ping and tracked hostile, but its local CombatStatus widget had not been created when the pawn first began. The ping update path now lazily creates the local widget once the owning controller and LocalPlayer are available, initializes health/stamina/grenade/engineering state, and leaves replicated tracked or last-known presentation semantics unchanged.
+
+- New helper: Source/BrokenHorizon/Private/BHCharacterHUD.cpp
+- Call-site declaration and invocation: Source/BrokenHorizon/BHCharacter.h and Source/BrokenHorizon/BHCharacter.cpp
+- Dedicated helper build: Validate-BrokenHorizon.cmd -Build passed after the source-file split.
+- Network scenario gate: Validate-BrokenHorizon.cmd -Tests -Smoke -FirstLight -NetworkBudget -NetworkScale -NetworkImpairment
+- Network result: exit 0; automation, startup smoke, First Light smoke, multiplayer reconnect, impairment, and network budget evidence passed.
+- Squad-ping summary: Saved/Logs/BHValidation-NetworkImpairment-20260808-185524-Summary.json reports squadPingReplicationRequired=true and squadPingReplicationVerified=true.
+- ClientA evidence: Saved/Logs/BHValidation-NetworkImpairment-20260808-185524-ClientA.log records BH_SQUAD_PING_APPLIED followed by BH_SQUAD_PING_PRESENTATION revision=1 tracked=1 visible=0 mode=LAST_KNOWN.
+- Network budget result: aggregate outbound p95 52758 B/s, per-client outbound maximum 13284 B/s, 44 channels.
+- Updated package log: Saved/Logs/BHPackage-ReleaseCandidate-NetworkFix-20260808.log
+- Updated packaged gate: Validate-BrokenHorizon.cmd -Packaged -FirstLight -AudioFX passed with exit 0.
+- Updated audio-enabled package smoke: Saved/Logs/BHReleaseCandidate-PackagedAudio-NetworkFix-20260808.log; process exit 0, WASAPI 48 kHz, ambient marker present, and zero missing-object, missing-package, navmesh, fatal, exception, and ensure markers.
+
+This closes the deterministic delayed-controller squad-ping presentation failure under impairment. Manual rendered UI review, longer multiplayer soak, lower-tier performance, and broader navigation coverage remain open 1.0 gates.

@@ -931,6 +931,8 @@ protected:
 
     void UpdateSquadCommandWaypointHUD();
 
+    void EnsureCombatStatusWidget();
+
     void UpdateSquadPingWaypointHUD();
 
     void ExecuteSquadPing();

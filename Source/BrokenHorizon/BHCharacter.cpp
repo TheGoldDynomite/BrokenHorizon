@@ -4940,6 +4940,8 @@ void ABHCharacter::UpdateSquadCommandWaypointHUD()
 
 void ABHCharacter::UpdateSquadPingWaypointHUD()
 {
+    EnsureCombatStatusWidget();
+
     if (!IsValid(CombatStatusWidget))
     {
         return;
