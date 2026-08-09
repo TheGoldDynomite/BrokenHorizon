@@ -123,6 +123,15 @@ constexpr TCHAR FirstLightWindRainSoundPath[] = TEXT(
 constexpr TCHAR FirstLightDistantWarSoundPath[] = TEXT(
     "/Game/BrokenHorizon/Audio/SW_FirstLight_DistantWar.SW_FirstLight_DistantWar"
 );
+constexpr TCHAR FirstLightDistantArtillerySoundPath[] = TEXT(
+    "/Game/BrokenHorizon/Audio/SW_FirstLight_DistantArtillery.SW_FirstLight_DistantArtillery"
+);
+constexpr TCHAR FirstLightDistantAircraftSoundPath[] = TEXT(
+    "/Game/BrokenHorizon/Audio/SW_FirstLight_DistantAircraft.SW_FirstLight_DistantAircraft"
+);
+constexpr TCHAR FirstLightDistantSmallArmsSoundPath[] = TEXT(
+    "/Game/BrokenHorizon/Audio/SW_FirstLight_DistantSmallArms.SW_FirstLight_DistantSmallArms"
+);
 
 USoundBase* ResolveConfiguredAmbientSound(
     TObjectPtr<USoundBase>& ConfiguredSound,
@@ -187,6 +196,30 @@ ABHAmbientWarDirector::ABHAmbientWarDirector()
     if (DistantWarSound.Succeeded())
     {
         DistantWarLoopSound = DistantWarSound.Object;
+    }
+
+    const ConstructorHelpers::FObjectFinder<USoundBase> DistantArtilleryAsset(
+        FirstLightDistantArtillerySoundPath
+    );
+    if (DistantArtilleryAsset.Succeeded())
+    {
+        DistantArtillerySound = DistantArtilleryAsset.Object;
+    }
+
+    const ConstructorHelpers::FObjectFinder<USoundBase> DistantAircraftAsset(
+        FirstLightDistantAircraftSoundPath
+    );
+    if (DistantAircraftAsset.Succeeded())
+    {
+        DistantAircraftSound = DistantAircraftAsset.Object;
+    }
+
+    const ConstructorHelpers::FObjectFinder<USoundBase> DistantSmallArmsAsset(
+        FirstLightDistantSmallArmsSoundPath
+    );
+    if (DistantSmallArmsAsset.Succeeded())
+    {
+        DistantSmallArmsSound = DistantSmallArmsAsset.Object;
     }
 }
 
@@ -278,6 +311,33 @@ void ABHAmbientWarDirector::BeginPlay()
             bWindReady ? TEXT("1") : TEXT("0"),
             bRainReady ? TEXT("1") : TEXT("0"),
             bWarReady ? TEXT("1") : TEXT("0")
+        );
+
+        const bool bArtilleryReady = ResolveConfiguredAmbientSound(
+            DistantArtillerySound,
+            FirstLightDistantArtillerySoundPath,
+            nullptr
+        ) != nullptr;
+        const bool bAircraftReady = ResolveConfiguredAmbientSound(
+            DistantAircraftSound,
+            FirstLightDistantAircraftSoundPath,
+            nullptr
+        ) != nullptr;
+        const bool bSmallArmsReady = ResolveConfiguredAmbientSound(
+            DistantSmallArmsSound,
+            FirstLightDistantSmallArmsSoundPath,
+            nullptr
+        ) != nullptr;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_AMBIENT_EVENT_AUDIO_READY artillery=%s "
+                "aircraft=%s small_arms=%s"
+            ),
+            bArtilleryReady ? TEXT("1") : TEXT("0"),
+            bAircraftReady ? TEXT("1") : TEXT("0"),
+            bSmallArmsReady ? TEXT("1") : TEXT("0")
         );
     }
 

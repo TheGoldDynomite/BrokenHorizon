@@ -160,3 +160,17 @@ The lower-tier renderer gates and sustained cooperative test now have current ev
 - Buffered cooperative soak passed: `Saved/Reports/BHValidation-RenderedMultiplayerSoak-20260808-201905-Summary.json` reports `sustainedSoakProof=true`, 62400 measured frames per client, ClientA/ClientB durations `581.5/577.3 s`, frame p95 `11.564/11.512 ms`, GPU p95 `8.854/8.793 ms`, zero frames over 50 ms, two connected/rendered clients, dedicated authority, 19 observed AI, and full war/combat/squad-ping replication proof. Log: `Saved/Logs/BHValidation-RenderedMultiplayerSoak-Buffered-20260808.log`.
 
 Remaining release gates are the known limitations: this is a localhost ten-minute rendered soak rather than a two-hour packaged soak or geographic-network proof; optional audio cue coverage is `6/27`; non-Win64 SDKs are not installed; and manual review remains open for graybox lighting/material quality and interaction feel.
+ 
+## Distant battlefield event audio increment - 2026-08-08
+ 
+The First Light ambient-war event path now has deterministic fallback assets for three systemic distant cues: artillery impacts, aircraft overflight, and small-arms activity. ABHAmbientWarDirector resolves the three Blueprint-facing sound properties from /Game/BrokenHorizon/Audio, preserves Blueprint overrides, and emits a separate readiness marker so release logs distinguish the event cues from the existing weather and war-bed loops. The source generator is deterministic and creates stereo 48 kHz PCM WAV sources; the Unreal import remains narrow and idempotent.
+ 
+Evidence:
+ 
+- Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight -Assets -AudioFX passed: editor build, automation, startup smoke, First Light smoke, asset audit, and audio/FX audit. Audio coverage is required=18/18, optional=9/27.
+- Unreal imported and saved SW_FirstLight_DistantArtillery (4.50 s), SW_FirstLight_DistantAircraft (8.00 s), and SW_FirstLight_DistantSmallArms (2.60 s) without errors.
+- BuildCookRun refreshed Builds/FirstLight-ReleaseCandidate-Development; cook, stage, IoStore, archive, and Windows Development output completed successfully.
+- Validate-BrokenHorizon.cmd -Packaged -FirstLight -AudioFX passed. The cooked First Light log emitted BH_AMBIENT_AUDIO_READY wind=1 rain=1 war=1 looping=1 and BH_AMBIENT_EVENT_AUDIO_READY artillery=1 aircraft=1 small_arms=1.
+- Audio-enabled packaged First Light smoke passed through WASAPI at 48 kHz with the same readiness markers and no fatal, assertion, or ensure markers.
+ 
+Remaining audio gate: 18 optional slots remain, primarily enemy/guard barks and rifle/ambient presentation candidates. Player voice is outside the current project contract. Manual audio mix, spatial falloff, and combat-feel review remain required.
