@@ -1623,3 +1623,7 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - `LastKnownTargetLocation` is still updated for direct damage and squad alerts, while `LastConfirmedTargetTime` is refreshed only after an unobscured line-of-sight check. This preserves realistic search and reacquisition pacing across target switches.
 - Validation evidence: `BHValidation-Build.log` passed, `BHValidation-Tests.log` passed, `BHValidation-Smoke.log` passed, and `BHValidation-FirstLight.log` passed. First Light reported navigation fallback coverage at 9/12; the remaining fixed-coordinate cases are still a map/NavMesh and manual traversal gate.
 - Direct two-ally casualty execution remains a manual/PIE item because the editor commandlet fixture does not bind normal pawn `BeginPlay` death delegates. The source contract and normal runtime casualty recovery checks remain passing.
+### AI visual-contact policy regression contract - 9 August 2026
+
+- The target-handoff visibility decision is now a pure AI policy function with coverage for new unseen targets, squad casualty alerts, retained contact, and direct line of sight. This protects the distinction between a last-known contact and a visually confirmed target.
+- `BHValidation-Tests.log` executed `BrokenHorizon.Gameplay.AI.VisualContactHandoff` with `Result={Success}`. The full validation also passed build/UHT, startup smoke, and First Light smoke; navigation fallback coverage remains 9/12.

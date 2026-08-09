@@ -53,6 +53,13 @@ public:
         EBHEnemyAIState FailedState
     );
 
+    static bool ResolveVisualContactState(
+        bool bStartingNewCombat,
+        bool bReceivingSquadAlert,
+        bool bHasSightOfPreviousTarget,
+        bool bHasLineOfSight
+    );
+
     static float CalculateCoverSelectionScore(
         float DistanceToCover,
         float DistanceToTarget,

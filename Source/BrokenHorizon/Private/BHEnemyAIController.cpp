@@ -1093,15 +1093,12 @@ void ABHEnemyAIController::EnterCombat(AActor* NewTarget)
     CombatTarget = NewTarget;
     const bool bLineOfSight = HasUnobscuredLineOfSight(NewTarget);
     const bool bReceivingNewSquadAlert = bReceivingSquadAlert;
-
-    if (bStartingNewCombat || bReceivingNewSquadAlert)
-    {
-        bHasSightOfTarget = bLineOfSight;
-    }
-    else
-    {
-        bHasSightOfTarget = bHasSightOfTarget || bLineOfSight;
-    }
+    bHasSightOfTarget = ResolveVisualContactState(
+        bStartingNewCombat,
+        bReceivingNewSquadAlert,
+        bHasSightOfTarget,
+        bLineOfSight
+    );
 
     if (bStartingNewCombat || bLineOfSight || bReceivingNewSquadAlert)
     {
@@ -1904,6 +1901,20 @@ void ABHEnemyAIController::UpdateHoldMovement()
 
 }
 
+bool ABHEnemyAIController::ResolveVisualContactState(
+    bool bStartingNewCombat,
+    bool bReceivingSquadAlert,
+    bool bHasSightOfPreviousTarget,
+    bool bHasLineOfSight
+)
+{
+    if (bStartingNewCombat || bReceivingSquadAlert)
+    {
+        return bHasLineOfSight;
+    }
+
+    return bHasSightOfPreviousTarget || bHasLineOfSight;
+}
 EBHEnemyAIState ABHEnemyAIController::ResolveNavigationFailureFallback(
     EBHEnemyAIState FailedState
 )

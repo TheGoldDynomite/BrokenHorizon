@@ -709,6 +709,39 @@ bool FBHEnemyLethalDamageReactionTest::RunTest(
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHEnemyVisualContactHandoffTest,
+    "BrokenHorizon.Gameplay.AI.VisualContactHandoff",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHEnemyVisualContactHandoffTest::RunTest(
+    const FString& Parameters
+)
+{
+    TestFalse(
+        TEXT("A new unseen target clears stale visual contact"),
+        ABHEnemyAIController::ResolveVisualContactState(
+            true, false, true, false)
+    );
+    TestFalse(
+        TEXT("A squad alert does not claim visual contact"),
+        ABHEnemyAIController::ResolveVisualContactState(
+            false, true, true, false)
+    );
+    TestTrue(
+        TEXT("An unchanged target retains valid visual contact"),
+        ABHEnemyAIController::ResolveVisualContactState(
+            false, false, true, false)
+    );
+    TestTrue(
+        TEXT("Direct line of sight confirms a new target"),
+        ABHEnemyAIController::ResolveVisualContactState(
+            true, false, false, true)
+    );
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBHWeaponReplicationContractTest,
     "BrokenHorizon.Gameplay.Weapon.ReplicationContract",
     EAutomationTestFlags::EditorContext |
