@@ -196,3 +196,12 @@ Manual review remains required for subjective event loudness, spatial positionin
 - ClientB then terminated at rendered frame 13,859 with an Unreal D3D12 fatal error: `Out of video memory trying to allocate a rendering resource`. Evidence: `Saved/Logs/BHRenderedTwoHourRetry-20260808-211147-ClientB.log`.
 - Result: the two-hour rendered two-client soak is **not passed**. The prior buffered ten-minute rendered multiplayer soak remains the valid sustained-render evidence; the historical non-rendered two-hour campaign/reconnect evidence remains separate. The open release gate is now specifically sustained two-client renderer memory stability, followed by the existing navigation and manual feel reviews.
 - Follow-up commit `1e65610` makes marker waits scan every run-owned host/client log, so a secondary rendered-client fatal error fails the validator immediately. A short two-client rendered compatibility pass after the change passed with ClientA/ClientB frame/GPU p95 of `11.715/9.058 ms` and `11.59/9.098 ms`; this does not replace the failed extended soak.
+
+## VSM renderer memory stability increment - 2026-08-08
+
+The sustained two-client rendered gate exposed D3D12 local-budget exhaustion on the installed 8 GB RTX 5060 Ti while the project used Lumen, Nanite, ray tracing, and virtual shadows. The RHI dump showed the virtual-shadow physical page pool as the largest single allocation at 512 MB, with dynamic VSM resolution already available in UE 5.8. The project now bounds the VSM physical cache at 1,024 pages and lowers the dynamic page-pool load threshold to 0.75. Lumen, Nanite, ray tracing, and virtual shadows remain enabled; the change lets shadow resolution bias down before local memory exhaustion rather than removing realistic lighting features.
+
+- Renderer configuration: `Config/DefaultEngine.ini`, `r.Shadow.Virtual.MaxPhysicalPages=1024`, `r.Shadow.Virtual.DynamicRes.MaxPagePoolLoadFactor=0.75`.
+- Source gate: `Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight` passed. Editor build, platform validation, automation, startup, and First Light smoke passed; navigation fallbacks remain bounded at `8/12`.
+- Buffered rendered soak: `Validate-BrokenHorizon.cmd -RenderedMultiplayerSoak -LogPrefix BHValidation-RenderedMultiplayerSoak-VSMPageCap` passed with two connected/rendered clients. ClientA/ClientB frame/GPU p95 were `11.600/8.825 ms` and `11.577/8.822 ms`.
+- The extended two-hour rendered gate remains required and will be rerun against this corrected renderer budget before it can be called complete.

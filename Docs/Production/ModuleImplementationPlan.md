@@ -1499,3 +1499,10 @@ Manual review still required: verify the inserted join control in the rendered
 - Rejected GPU-budget-collapse diagnostics remain preserved and are not cited
   as passes. Cold-cache packaged pipeline-cache behavior remains a separate RC
   gate.
+
+### GDD-11 renderer memory stability and VSM pool guard - 8 August 2026
+
+- The extended rendered multiplayer gate exposed a real D3D12 local-budget failure on the installed 8 GB RTX 5060 Ti after 13,859 frames. The RHI dump showed a 512 MB virtual-shadow physical page pool, 630 MB of UAV textures, and a 4,147 MB local budget.
+- Bounded the VSM physical page cache to 1,024 pages and set the UE 5.8 dynamic VSM page-pool load threshold to 0.75. Lumen, Nanite, ray tracing, and virtual shadows remain enabled; the renderer can reduce shadow resolution before exhausting local memory.
+- `Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight` passed after the configuration change. The buffered two-client rendered soak passed with ClientA/ClientB frame/GPU p95 of `11.600/8.825 ms` and `11.577/8.822 ms`.
+- The extended two-hour rendered acceptance run must still be rerun with this guard; visual shadow coverage and manual speaker/display review remain open.
