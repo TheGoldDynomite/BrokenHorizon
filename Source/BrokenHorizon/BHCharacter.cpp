@@ -1011,22 +1011,43 @@ void ABHCharacter::RefreshPlayerInputMappings()
         InputSubsystem->RemoveMappingContext(RuntimePlayerMappingContext);
     }
 
-    RuntimePlayerMappingContext = DuplicateObject<UInputMappingContext>(
-        PlayerMappingContext,
+    const TArray<FEnhancedActionKeyMapping> SourceMappings =
+        PlayerMappingContext->GetMappings();
+
+    // Cooked mapping contexts already own loaded modifier and trigger objects.
+    // Recursively duplicating them causes packaged builds to attempt to replace
+    // those loaded subobjects. Rebuild a transient context and reuse the source
+    // references instead.
+    RuntimePlayerMappingContext = NewObject<UInputMappingContext>(
         this,
-        TEXT("IMC_BHRuntimePlayer")
+        NAME_None,
+        RF_Transient
     );
     if (!IsValid(RuntimePlayerMappingContext))
     {
         return;
     }
 
+    for (const FEnhancedActionKeyMapping& SourceMapping : SourceMappings)
+    {
+        if (!IsValid(SourceMapping.Action) || !SourceMapping.Key.IsValid())
+        {
+            continue;
+        }
+
+        FEnhancedActionKeyMapping& RuntimeMapping =
+            RuntimePlayerMappingContext->MapKey(
+                SourceMapping.Action,
+                SourceMapping.Key
+            );
+        RuntimeMapping.Modifiers = SourceMapping.Modifiers;
+        RuntimeMapping.Triggers = SourceMapping.Triggers;
+    }
+
     const UBHUserSettingsSubsystem* SettingsSubsystem =
         GetGameInstance()
         ? GetGameInstance()->GetSubsystem<UBHUserSettingsSubsystem>()
         : nullptr;
-    const TArray<FEnhancedActionKeyMapping> SourceMappings =
-        PlayerMappingContext->GetMappings();
     for (const FEnhancedActionKeyMapping& SourceMapping : SourceMappings)
     {
         const FName BindingID = ResolveMappingBindingID(
