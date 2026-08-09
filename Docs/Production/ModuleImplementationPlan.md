@@ -1512,3 +1512,18 @@ Manual review still required: verify the inserted join control in the rendered
 - The VSM page-pool guard completed the long rendered acceptance run without a D3D12 local-budget failure. The dedicated First Light host and two rendered 1280x720 clients measured `779400` frames each and `7232.9/7261.6 s` per-client duration against the `7080 s` requirement.
 - The final summary reports `result=Passed`, `sustainedSoakProof=true`, frame p95 `11.560/11.586 ms`, GPU p95 `8.694/8.699 ms`, zero frames over 50 ms, and `32.4%` maximum GPU-memory usage per client.
 - This closes the extended two-client renderer-memory gate for the installed Win64 environment. Packaged proof, navigation coverage, manual visual/audio/controller review, and non-Win64 platform validation remain open.
+
+## VSM release-candidate packaged acceptance - 2026-08-09
+
+The release archive and authoritative packaged validation gate passed after applying the virtual-shadow-map physical page cap for the tested 8 GB GPU path.
+
+- Release archive refreshed successfully at Builds/FirstLight-ReleaseCandidate-Development with UE 5.8 BuildCookRun using Win64 Development build, cook, stage, pak, IoStore, compression, and archive steps.
+- Packaged gate command: Validate-BrokenHorizon.cmd -Packaged -FirstLight -AudioFX -LogPrefix BHValidation-VSMPageCap-Packaged.
+- Packaged gate result: exit code 0; packaged smoke, First Light smoke, and Audio/FX readiness all passed.
+- Audio/FX readiness reported required coverage 18/18 and optional coverage 9/27.
+- Packaged runtime confirmed ambient wind, rain, war ambience, looping ambience, artillery, aircraft, small-arms, natural-sound attenuation, LPF, and occlusion readiness.
+- The accepted navigation result remains 8/12 fallback-covered checks; the remaining four require manual map/navigation coverage work rather than another controller fallback.
+- No fatal, assertion, ensure, exception, or out-of-video-memory markers were reported by the packaged gate. The expected lower-priority scalability warning for r.Shadow.Virtual.MaxPhysicalPages confirms the project setting remains authoritative at 1024.
+- Packaged logs: Saved/Logs/BHValidation-VSMPageCap-Packaged-AudioFX.log, Saved/Logs/BHValidation-VSMPageCap-Packaged-FirstLight.log, and Saved/Logs/BHValidation-VSMPageCap-Packaged-Packaged.log.
+
+This closes the current release-candidate packaged acceptance gate for the tested Win64 environment. Manual editor/playtest review, navigation coverage completion, optional audio/content coverage, and non-Win64 release qualification remain open 1.0 work.
