@@ -205,3 +205,14 @@ The sustained two-client rendered gate exposed D3D12 local-budget exhaustion on 
 - Source gate: `Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight` passed. Editor build, platform validation, automation, startup, and First Light smoke passed; navigation fallbacks remain bounded at `8/12`.
 - Buffered rendered soak: `Validate-BrokenHorizon.cmd -RenderedMultiplayerSoak -LogPrefix BHValidation-RenderedMultiplayerSoak-VSMPageCap` passed with two connected/rendered clients. ClientA/ClientB frame/GPU p95 were `11.600/8.825 ms` and `11.577/8.822 ms`.
 - The extended two-hour rendered gate remains required and will be rerun against this corrected renderer budget before it can be called complete.
+
+## Extended rendered multiplayer soak acceptance - 2026-08-09
+
+The VSM memory guard cleared the previously failing sustained-render gate without disabling the project lighting stack. The completed run used the dedicated First Light host with two rendered 1280x720 D3D12 clients, `-CaptureFrames 780000`, `-WarmupFrames 600`, `-SustainedSoak`, and `-RequiredSoakSeconds 7080`.
+
+- Summary: `Saved/Reports/BHRenderedTwoHourVSMCap-20260808-215118-Summary.json`.
+- Result: `Passed`; `sustainedSoakProof=true`; two connected players and two rendered players; GPU capacity detected as `8151 MB`.
+- Measured evidence: `779400` frames per client; ClientA/ClientB durations `7261.6/7232.9 s` against the `7080 s` requirement.
+- Performance evidence: ClientA/ClientB frame p95 `11.586/11.560 ms`, frame p99 `12.576/12.516 ms`, GPU p95 `8.699/8.694 ms`, GPU p99 `9.133/9.136 ms`, and zero frames over 50 ms for either client.
+- Memory evidence: both clients reported a maximum GPU-memory usage of `32.4%`; neither client emitted fatal, assertion, unhandled-exception, or out-of-video-memory markers.
+- The corrected VSM page-pool budget therefore closes the sustained two-client renderer-memory gate for this Win64 development environment. Packaged renderer proof and manual visual/audio/navigation review remain separate release gates.

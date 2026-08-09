@@ -1506,3 +1506,9 @@ Manual review still required: verify the inserted join control in the rendered
 - Bounded the VSM physical page cache to 1,024 pages and set the UE 5.8 dynamic VSM page-pool load threshold to 0.75. Lumen, Nanite, ray tracing, and virtual shadows remain enabled; the renderer can reduce shadow resolution before exhausting local memory.
 - `Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight` passed after the configuration change. The buffered two-client rendered soak passed with ClientA/ClientB frame/GPU p95 of `11.600/8.825 ms` and `11.577/8.822 ms`.
 - The extended two-hour rendered acceptance run must still be rerun with this guard; visual shadow coverage and manual speaker/display review remain open.
+
+### GDD-11 extended rendered soak acceptance - 9 August 2026
+
+- The VSM page-pool guard completed the long rendered acceptance run without a D3D12 local-budget failure. The dedicated First Light host and two rendered 1280x720 clients measured `779400` frames each and `7232.9/7261.6 s` per-client duration against the `7080 s` requirement.
+- The final summary reports `result=Passed`, `sustainedSoakProof=true`, frame p95 `11.560/11.586 ms`, GPU p95 `8.694/8.699 ms`, zero frames over 50 ms, and `32.4%` maximum GPU-memory usage per client.
+- This closes the extended two-client renderer-memory gate for the installed Win64 environment. Packaged proof, navigation coverage, manual visual/audio/controller review, and non-Win64 platform validation remain open.
