@@ -1092,14 +1092,27 @@ void ABHEnemyAIController::EnterCombat(AActor* NewTarget)
 
     CombatTarget = NewTarget;
     const bool bLineOfSight = HasUnobscuredLineOfSight(NewTarget);
-    bHasSightOfTarget = bHasSightOfTarget || bLineOfSight;
+    const bool bReceivingNewSquadAlert = bReceivingSquadAlert;
 
-    if (bStartingNewCombat || bLineOfSight)
+    if (bStartingNewCombat || bReceivingNewSquadAlert)
+    {
+        bHasSightOfTarget = bLineOfSight;
+    }
+    else
+    {
+        bHasSightOfTarget = bHasSightOfTarget || bLineOfSight;
+    }
+
+    if (bStartingNewCombat || bLineOfSight || bReceivingNewSquadAlert)
     {
         LastKnownTargetLocation =
             NewTarget->GetActorLocation();
-        LastConfirmedTargetTime =
-            GetWorld()->GetTimeSeconds();
+
+        if (bLineOfSight)
+        {
+            LastConfirmedTargetTime =
+                GetWorld()->GetTimeSeconds();
+        }
     }
 
     SetState(EBHEnemyAIState::Combat);

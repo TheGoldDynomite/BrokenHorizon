@@ -1616,3 +1616,10 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - Packaged result: First Light route and all four objectives completed; audio/FX readiness required 18/18, optional 9/27, errors 0.
 - Rendered soak: BHValidation-CasualtyAlertPropagation-Rendered-RenderedMultiplayerSoak-20260809-034124-Summary.json passed with dedicated authority, two connected/rendered clients, 19 observed AI, 570 seconds and 36,000 minimum measured frames, renderer/network proof, zero frames over 50 ms, desired texture recovery 100 percent, pending stream-in p95 0, and no stuck-movement warnings. Client A frame/GPU p95 was 11.558/9.05 ms; Client B was 11.628/9.06 ms. Host telemetry recorded 2,605 navigation fallbacks, 2,462 local-search recoveries, and zero stuck-movement warnings.
 - The soak contained no casualty event, so direct runtime observation of BH_AI_CASUALTY_ALERT remains open. Manual two-ally casualty, command-conflict, and casualty-readability playtesting is still required.
+
+### AI visual-contact certainty on casualty alerts - 9 August 2026
+
+- `ABHEnemyAIController::EnterCombat` now clears inherited visual-contact state when a new target or squad casualty alert is received. An ally can react to a last-known hostile location without firing as though it has already seen that target.
+- `LastKnownTargetLocation` is still updated for direct damage and squad alerts, while `LastConfirmedTargetTime` is refreshed only after an unobscured line-of-sight check. This preserves realistic search and reacquisition pacing across target switches.
+- Validation evidence: `BHValidation-Build.log` passed, `BHValidation-Tests.log` passed, `BHValidation-Smoke.log` passed, and `BHValidation-FirstLight.log` passed. First Light reported navigation fallback coverage at 9/12; the remaining fixed-coordinate cases are still a map/NavMesh and manual traversal gate.
+- Direct two-ally casualty execution remains a manual/PIE item because the editor commandlet fixture does not bind normal pawn `BeginPlay` death delegates. The source contract and normal runtime casualty recovery checks remain passing.
