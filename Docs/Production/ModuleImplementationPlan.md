@@ -1684,3 +1684,11 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - Clear-road handling remains unchanged. Rain and severe storms now reduce reverse control, lengthen braking response, and reduce steering authority in the same direction as the existing forward-speed and fuel penalties.
 - No transport replication, damage, fuel, persistence, or Blueprint-facing property contract changed.
 - Evidence target: the existing transport damage/speed and battlefield-condition automation, editor build, startup smoke, and First Light smoke; physical route and handling feel remain manual.
+
+### Fresh current-source Win64 archive - 9 August 2026
+
+- UE5.8 `BuildCookRun` built, cooked, staged, pak/IoStore-packed, compressed, and archived the current source to `Builds/CurrentSource-20260809-Development` with `BUILD SUCCESSFUL` and AutomationTool exit code 0.
+- The fresh root executable at `Builds/CurrentSource-20260809-Development/Windows/BrokenHorizon.exe` launched `/Game/BrokenHorizon/Maps/L_FirstLight_Graybox` with exit code 0.
+- The direct packaged First Light log at `Saved/Logs/BHCurrentSourcePackaged-FirstLight.log` contains normal world teardown and `LogExit: Exiting.` markers, with no fatal, assertion, ensure, unhandled-exception, or package-load failure markers.
+- This closes fresh current-source Win64 Development archive proof for the present source state. Shipping configuration, lower-tier performance, controller/input route review, manual visual/content review, and strict packaged Audio/FX review remain open release gates.
+- The First Light source validation still reports three navigation fallback events out of twelve sampled recoveries; authored NavMesh coverage and route quality remain a manual map gate rather than a source-only completion claim.
