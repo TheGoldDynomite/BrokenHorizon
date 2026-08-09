@@ -1527,3 +1527,16 @@ The release archive and authoritative packaged validation gate passed after appl
 - Packaged logs: Saved/Logs/BHValidation-VSMPageCap-Packaged-AudioFX.log, Saved/Logs/BHValidation-VSMPageCap-Packaged-FirstLight.log, and Saved/Logs/BHValidation-VSMPageCap-Packaged-Packaged.log.
 
 This closes the current release-candidate packaged acceptance gate for the tested Win64 environment. Manual editor/playtest review, navigation coverage completion, optional audio/content coverage, and non-Win64 release qualification remain open 1.0 work.
+
+## Rendered profile streaming validator acceptance - 2026-08-09
+
+The optimized typed-buffer rendered profile aggregation passed a complete buffered two-client rendered multiplayer soak.
+
+- Command: Validate-BrokenHorizon.cmd -RenderedMultiplayerSoak -LogPrefix BHValidation-RenderedProfileStreaming.
+- Result: exit code 0; two clients connected and the complete capture and post-run CSV aggregation completed successfully.
+- ClientA frame/GPU p95: 11.771/9.095 ms.
+- ClientB frame/GPU p95: 11.489/9.108 ms.
+- Authoritative summary: Saved/Reports/BHValidation-RenderedProfileStreaming-RenderedMultiplayerSoak-20260809-010152-Summary.json.
+- The pass confirms the typed numeric buffers, incremental hitch/memory counters, percentile arrays, and texture-streaming tail aggregation preserve the existing rendered-soak gate behavior.
+
+The extended two-client soak remains the long-duration acceptance gate; this buffered pass closes the parser regression check.

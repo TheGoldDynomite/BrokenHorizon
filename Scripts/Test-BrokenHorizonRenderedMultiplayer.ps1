@@ -462,7 +462,8 @@ function Get-RenderedProfile {
     }
     $desiredFinal30MinPercent = [double](
         ($lastDesiredSamples | Measure-Object -Minimum).Minimum
-    )    $gpuNameMatch = [regex]::Match(
+    )
+    $gpuNameMatch = [regex]::Match(
         $normalizedLogContent,
         "LogRHI:\s+Name:\s+(?<name>[^\r\n]+)"
     )
