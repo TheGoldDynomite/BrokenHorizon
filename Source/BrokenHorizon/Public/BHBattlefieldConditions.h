@@ -47,6 +47,9 @@ struct BROKENHORIZON_API FBHBattlefieldConditionProfile
     float ExplosionNoiseMultiplier = 1.0f;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    float SmokePersistenceMultiplier = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     float WeaponSpreadMultiplier = 1.0f;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

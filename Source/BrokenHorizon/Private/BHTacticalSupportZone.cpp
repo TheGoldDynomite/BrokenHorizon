@@ -133,7 +133,16 @@ void ABHTacticalSupportZone::BeginPlay()
 
     if (SupportType == EBHTacticalSupportType::SmokeScreen)
     {
-        SetLifeSpan(FMath::Max(1.0f, SmokeDuration));
+        const float SmokePersistenceMultiplier = FMath::Clamp(
+            UBHBattlefieldConditions::GetCurrentProfile(this).
+                SmokePersistenceMultiplier,
+            0.25f,
+            1.5f
+        );
+        SetLifeSpan(FMath::Max(
+            1.0f,
+            SmokeDuration * SmokePersistenceMultiplier
+        ));
     }
     else
     {

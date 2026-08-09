@@ -10272,6 +10272,10 @@ bool FBHBattlefieldConditionsContractTest::RunTest(
         Storm.MovementNoiseMultiplier < 0.75f);
     TestTrue(TEXT("Storm noise masks explosive hearing"),
         Storm.ExplosionNoiseMultiplier < 0.75f);
+    TestTrue(TEXT("Storm disperses smoke faster"),
+        Storm.SmokePersistenceMultiplier < 0.50f);
+    TestTrue(TEXT("Dense fog preserves smoke persistence"),
+        Fog.SmokePersistenceMultiplier > 1.0f);
     TestTrue(TEXT("Wet storm conditions reduce vehicle traction"),
         Storm.VehicleTractionMultiplier < 0.75f);
     TestTrue(TEXT("Storm corrections increase indirect-fire dispersion"),

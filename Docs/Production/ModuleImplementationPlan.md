@@ -1656,3 +1656,10 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - Mortar dispersion and artillery hearing now share the same weather contract: severe storms reduce reliable explosive localization while rain and fog make smaller, bounded adjustments.
 - Validation target: BrokenHorizon.Gameplay.World.BattlefieldConditions covers the storm hearing bound; build and First Light smoke cover the tactical-support source integration.
 - Remaining fallback: the actual mortar cadence, AI reaction quality, and spatial readability still require manual PIE review with a real support request.
+
+### Weather-aware smoke persistence - 9 August 2026
+
+- Battlefield conditions now expose SmokePersistenceMultiplier as a separate contract from sight, sound, damage, and mortar dispersion. Rain shortens smoke persistence to 74 percent, dense fog extends it to 112 percent, and severe storms shorten it to 42 percent.
+- Active tactical smoke uses the multiplier only for zone lifetime, preserving the existing support radius and line-of-sight occlusion rules while making concealment windows respond to field conditions.
+- Evidence target: BrokenHorizon.Gameplay.World.BattlefieldConditions asserts storm dissipation and fog persistence; build and First Light smoke cover the runtime integration.
+- Remaining fallback: smoke material density, wind direction, and multiplayer visual parity still require manual PIE review with the authored smoke assets.
