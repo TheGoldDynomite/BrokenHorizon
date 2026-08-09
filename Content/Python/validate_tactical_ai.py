@@ -502,8 +502,8 @@ def _validate_source_contract():
 
     for fragment in (
         "DrawSquadCommandWaypoint(",
-        "SQUAD HOLD POINT // %.0f M // C FOLLOW",
-        "ORDER FOLLOW // AIM + C MOVE/HOLD",
+        "SQUAD HOLD POINT // %.0f M // [%s] FOLLOW",
+        "ORDER FOLLOW // AIM + [%s] MOVE/HOLD",
     ):
         if fragment not in combat_status_source:
             raise RuntimeError(

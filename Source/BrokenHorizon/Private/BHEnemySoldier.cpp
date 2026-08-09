@@ -160,6 +160,106 @@ EBHCombatantArchetype ABHEnemySoldier::ChooseFormationArchetype(
     return EBHCombatantArchetype::Rifleman;
 }
 
+namespace
+{
+    int32 ApplyCasualtyMoraleShock(
+        ABHEnemySoldier* Casualty,
+        AActor* DamageCauser
+    )
+    {
+        if (!IsValid(Casualty) ||
+            !IsValid(Casualty->GetWorld()))
+        {
+            return 0;
+        }
+
+        const float MoraleRadius =
+            Casualty->GetAllyCasualtyMoraleRadius();
+        const float BaseSuppression =
+            Casualty->GetAllyCasualtySuppression();
+
+        if (MoraleRadius <= 0.0f ||
+            BaseSuppression <= 0.0f)
+        {
+            return 0;
+        }
+
+        int32 AffectedAllies = 0;
+        float TotalSuppressionApplied = 0.0f;
+
+        for (TActorIterator<ABHEnemySoldier> It(
+                Casualty->GetWorld());
+            It;
+            ++It)
+        {
+            ABHEnemySoldier* Ally = *It;
+
+            if (!IsValid(Ally) ||
+                Ally == Casualty ||
+                Ally->IsDead() ||
+                Ally->IsIncapacitated() ||
+                Ally->GetCombatFaction() !=
+                    Casualty->GetCombatFaction() ||
+                FVector::DistSquared2D(
+                    Ally->GetActorLocation(),
+                    Casualty->GetActorLocation()
+                ) > FMath::Square(MoraleRadius))
+            {
+                continue;
+            }
+
+            const float Distance = FVector::Dist2D(
+                Ally->GetActorLocation(),
+                Casualty->GetActorLocation()
+            );
+            const float DistanceAlpha = 1.0f -
+                FMath::Clamp(
+                    Distance / MoraleRadius,
+                    0.0f,
+                    1.0f
+                );
+            const float AppliedSuppression = BaseSuppression *
+                FMath::Lerp(
+                    0.35f,
+                    1.0f,
+                    DistanceAlpha
+                );
+
+            Ally->ApplySuppression(
+                AppliedSuppression,
+                DamageCauser
+            );
+            TotalSuppressionApplied += AppliedSuppression;
+            ++AffectedAllies;
+        }
+
+        if (AffectedAllies > 0)
+        {
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_AI_MORALE_SHOCK distance_falloff "
+                    "casualty=%s faction=%d state=%s affected=%d "
+                    "total=%.2f radius=%.0f"
+                ),
+                *Casualty->GetName(),
+                static_cast<int32>(
+                    Casualty->GetCombatFaction()
+                ),
+                Casualty->IsIncapacitated()
+                    ? TEXT("incapacitated")
+                    : TEXT("lethal"),
+                AffectedAllies,
+                TotalSuppressionApplied,
+                MoraleRadius
+            );
+        }
+
+        return AffectedAllies;
+    }
+}
+
 ABHEnemySoldier::ABHEnemySoldier()
 {
     PrimaryActorTick.bCanEverTick = false;
@@ -2407,55 +2507,10 @@ void ABHEnemySoldier::HandleDeath(AActor* DamageCauser)
         EnemyController->HandlePawnDeath();
     }
 
-    const float MoraleRadius = GetAllyCasualtyMoraleRadius();
-    const float MoraleSuppression = GetAllyCasualtySuppression();
-    int32 AffectedAllies = 0;
-
-    if (MoraleRadius > 0.0f && MoraleSuppression > 0.0f)
-    {
-        for (TActorIterator<ABHEnemySoldier> It(GetWorld());
-            It;
-            ++It)
-        {
-            ABHEnemySoldier* Ally = *It;
-
-            if (!IsValid(Ally) ||
-                Ally == this ||
-                Ally->IsDead() ||
-                Ally->GetCombatFaction() != CombatFaction ||
-                FVector::DistSquared2D(
-                    Ally->GetActorLocation(),
-                    GetActorLocation()
-                ) > FMath::Square(MoraleRadius))
-            {
-                continue;
-            }
-
-            Ally->ApplySuppression(
-                MoraleSuppression,
-                DamageCauser
-            );
-            ++AffectedAllies;
-        }
-    }
-
-    if (AffectedAllies > 0)
-    {
-        UE_LOG(
-            LogTemp,
-            Display,
-            TEXT(
-                "BH_AI_MORALE_SHOCK casualty=%s faction=%d "
-                "affected=%d amount=%.2f radius=%.0f"
-            ),
-            *GetName(),
-            static_cast<int32>(CombatFaction),
-            AffectedAllies,
-            MoraleSuppression,
-            MoraleRadius
-        );
-    }
-
+    ApplyCasualtyMoraleShock(
+        this,
+        DamageCauser
+    );
     if (!ObjectiveIdToCompleteOnDeath.IsNone())
     {
         bool bLivingObjectivePeerExists = false;
@@ -2569,6 +2624,11 @@ void ABHEnemySoldier::EnterFriendlyIncapacitation(
     {
         EnemyController->HandlePawnDeath();
     }
+    ApplyCasualtyMoraleShock(
+        this,
+        DamageCauser
+    );
+
 
     if (bPlayPresentation)
     {

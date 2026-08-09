@@ -1587,3 +1587,17 @@ The enemy navigation-invoker build passed the full buffered two-client rendered 
 - Authoritative summary: Saved/Reports/BHValidation-EnemyNavInvoker-Rendered-RenderedMultiplayerSoak-20260809-014045-Summary.json.
 
 This confirms the bounded invoker does not regress the tested multiplayer rendering, memory, streaming, or network gate. It does not replace the unresolved map/navmesh coverage review; First Light navigation fallback remains 8/12.
+
+
+## Enemy casualty morale falloff - 2026-08-09
+
+Enemy casualty morale now uses one shared response for lethal deaths and friendly incapacitations. Living same-faction allies within the morale radius receive a distance-scaled suppression event: full configured pressure at the casualty location, tapering to 35 percent at the edge of the configured radius. Incapacitated allies are excluded so a downed operative does not react as an active combatant.
+
+- Source gate: Validate-BrokenHorizon.cmd -Build -Tests -Smoke -FirstLight -LogPrefix BHValidation-CasualtyMoraleFalloff.
+- Source result: exit 0; the modified enemy soldier translation unit compiled, automation passed, startup passed, and First Light passed with 5/12 bounded navigation fallbacks.
+- Tactical-AI runtime gate: validate_tactical_ai.py with log BHValidation-CasualtyMoraleFalloff-TacticalAI-Final.log.
+- Tactical-AI result: ALL CHECKS PASSED, including friendly incapacitation persistence and stabilization, finite ammunition, grenade safety, withdrawal, casualty pressure contracts, persistent squad orders, and rally waypoint presentation.
+- Validator maintenance: the tactical-AI source contract now matches the current canonical bracketed controller prompts used by the widget and C++ automation tests; no runtime UI string was changed.
+- Release gate: Win64 Development BuildCookRun archive completed successfully, followed by Validate-BrokenHorizon.cmd -Packaged -FirstLight -AudioFX -LogPrefix BHValidation-CasualtyMoraleFalloff-Packaged.
+- Packaged result: exit 0; packaged smoke and First Light passed. Audio/FX readiness reports required 18/18, optional 9/27, and errors 0.
+- The automated runtime recovery check exercises friendly incapacitation entry and stabilization. A manual two-ally falloff and command-conflict feel pass remains open, along with the broader casualty readability and presentation review.
