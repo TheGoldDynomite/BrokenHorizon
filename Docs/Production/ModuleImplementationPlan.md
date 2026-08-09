@@ -1670,3 +1670,10 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 - If a streamed or sparse tile has a valid projected point but no random sample, the soldier holds at that last reachable location and resumes its existing search or bounded retry state instead of issuing repeated invalid movement requests.
 - Evidence target: the existing NavigationFailureFallback automation remains green; build and First Light smoke measure runtime fallback coverage without changing map assets.
 - Remaining fallback: fixed-coordinate map gaps still require authored NavMesh and manual traversal work; this source change does not claim full navigation coverage.
+
+### HUD casualty and command lane separation - 9 August 2026
+
+- Casualty instructions now allocate a two-line text box when the stabilization prompt contains a line break, preventing the treatment instruction from being clipped or visually colliding with the next marker.
+- Squad command and squad ping markers now use separate vertical lanes when both are active. A visible casualty marker also moves command guidance down by one lane so the urgent recovery instruction remains readable.
+- The change is renderer-local and preserves all Blueprint-facing widget setters, waypoint directions, distances, countdowns, and input prompts.
+- Evidence target: the canonical rendered UI gate covers the standard marker composition; a live casualty plus command/ping composition still requires manual PIE review because the capture fixture does not force an incapacitation event.

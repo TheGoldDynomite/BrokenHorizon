@@ -11,7 +11,9 @@
 
 namespace
 {
-constexpr float SquadPingMarkerY = 310.0f;
+constexpr float DefaultSquadCommandMarkerY = 314.0f;
+constexpr float CasualtySquadCommandMarkerY = 338.0f;
+constexpr float SquadWaypointLaneSpacing = 50.0f;
 
 int32 DrawScreenTint(
     const FGeometry& Geometry,
@@ -264,11 +266,15 @@ int32 DrawCasualtyWaypoint(
         MarkerY + 13.0f
     );
 
+    const float LabelHeight = Label.Contains(TEXT("\n"))
+        ? 44.0f
+        : 26.0f;
+
     FSlateDrawElement::MakeText(
         DrawElements,
         LayerId + 1,
         Geometry.ToPaintGeometry(
-            FVector2D(LabelWidth, 26.0f),
+            FVector2D(LabelWidth, LabelHeight),
             FSlateLayoutTransform(TextPosition)
         ),
         Label,
@@ -1660,6 +1666,12 @@ int32 UBHCombatStatusWidget::NativePaint(
         FName(TEXT("SquadOrder")),
         TEXT("C")
     );
+    const float CommandWaypointY = bCasualtyWaypointVisible
+        ? CasualtySquadCommandMarkerY
+        : DefaultSquadCommandMarkerY;
+    const float PingWaypointY = bSquadCommandWaypointVisible
+        ? CommandWaypointY + SquadWaypointLaneSpacing
+        : CommandWaypointY;
 
     if (bOperationWaypointVisible)
     {
@@ -1786,7 +1798,7 @@ int32 UBHCombatStatusWidget::NativePaint(
                 SquadOrderPrompt
             ),
             FLinearColor(0.32f, 0.78f, 1.0f, 0.98f),
-            314.0f
+            CommandWaypointY
         );
     }
 
@@ -1807,7 +1819,7 @@ int32 UBHCombatStatusWidget::NativePaint(
             bSquadPingLineOfSightVisible
                 ? FLinearColor(1.0f, 0.72f, 0.12f, 0.98f)
                 : FLinearColor(0.82f, 0.58f, 0.18f, 0.72f),
-            SquadPingMarkerY
+            PingWaypointY
         );
     }
 
