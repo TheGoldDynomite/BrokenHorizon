@@ -26,6 +26,18 @@
 #include "Perception/AISense_Sight.h"
 #include "TimerManager.h"
 
+namespace
+{
+constexpr float NavigationBuildRetrySeconds = 0.25f;
+constexpr float NavigationStartupDelaySeconds = 0.5f;
+
+bool IsNavigationBuilding(UWorld* World)
+{
+    return IsValid(World) &&
+        UNavigationSystemV1::IsNavigationBeingBuilt(World);
+}
+}
+
 ABHEnemyAIController::ABHEnemyAIController()
 {
     PrimaryActorTick.bCanEverTick = true;
@@ -81,7 +93,8 @@ void ABHEnemyAIController::OnPossess(APawn* InPawn)
     bWithdrawingForAmmunition = false;
     AmmunitionWithdrawalEndTime = -BIG_NUMBER;
     SetState(EBHEnemyAIState::Patrol);
-    BeginPatrolMove();
+    NextPatrolRetryTime =
+        GetWorld()->GetTimeSeconds() + NavigationStartupDelaySeconds;
 }
 
 void ABHEnemyAIController::ConfigurePerception()
@@ -1483,6 +1496,20 @@ void ABHEnemyAIController::EnterReturnToPatrol()
 void ABHEnemyAIController::BeginPatrolMove()
 {
     ABHEnemySoldier* Enemy = GetEnemySoldier();
+    UWorld* World = GetWorld();
+
+    if (!IsValid(World))
+    {
+        return;
+    }
+
+    if (IsNavigationBuilding(World))
+    {
+        bMoveRequested = false;
+        NextPatrolRetryTime =
+            World->GetTimeSeconds() + NavigationBuildRetrySeconds;
+        return;
+    }
 
     if (!IsValid(Enemy))
     {
@@ -1595,6 +1622,20 @@ void ABHEnemyAIController::SchedulePatrolAdvance()
 void ABHEnemyAIController::MoveToNearestPatrolPoint()
 {
     ABHEnemySoldier* Enemy = GetEnemySoldier();
+    UWorld* World = GetWorld();
+
+    if (!IsValid(World))
+    {
+        return;
+    }
+
+    if (IsNavigationBuilding(World))
+    {
+        bMoveRequested = false;
+        NextPatrolRetryTime =
+            World->GetTimeSeconds() + NavigationBuildRetrySeconds;
+        return;
+    }
 
     if (HasFollowTarget())
     {
