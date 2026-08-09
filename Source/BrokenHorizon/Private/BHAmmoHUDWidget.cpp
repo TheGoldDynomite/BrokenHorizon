@@ -1,12 +1,47 @@
 #include "BHAmmoHUDWidget.h"
 
 #include "BHUIStyle.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/TextBlock.h"
 #include "HAL/FileManager.h"
 #include "HighResScreenshot.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+
+namespace
+{
+constexpr float AmmoHUDSafeInset = 32.0f;
+}
+
+void UBHAmmoHUDWidget::NativeConstruct()
+{
+    Super::NativeConstruct();
+    ApplySafeAreaLayout();
+}
+
+void UBHAmmoHUDWidget::ApplySafeAreaLayout()
+{
+    if (!IsValid(AmmoText))
+    {
+        return;
+    }
+
+    if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AmmoText->Slot))
+    {
+        CanvasSlot->SetAnchors(FAnchors(1.0f, 1.0f));
+        CanvasSlot->SetAlignment(FVector2D(1.0f, 1.0f));
+        CanvasSlot->SetPosition(
+            FVector2D(-AmmoHUDSafeInset, -AmmoHUDSafeInset)
+        );
+        CanvasSlot->SetAutoSize(true);
+        return;
+    }
+
+    AmmoText->SetRenderTranslation(
+        FVector2D(-AmmoHUDSafeInset, -AmmoHUDSafeInset)
+    );
+}
 
 void UBHAmmoHUDWidget::SetAmmo(
     int32 MagazineAmmo,

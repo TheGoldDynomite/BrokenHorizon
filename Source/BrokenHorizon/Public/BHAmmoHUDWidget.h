@@ -28,10 +28,13 @@ public:
     void SetWeaponBraced(bool bBraced);
 
 protected:
+    virtual void NativeConstruct() override;
+
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UTextBlock> AmmoText;
 
 private:
+    void ApplySafeAreaLayout();
     void RefreshAmmoText();
 
     int32 CachedMagazineAmmo = 0;
