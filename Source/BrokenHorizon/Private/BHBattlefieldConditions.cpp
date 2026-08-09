@@ -41,6 +41,7 @@ UBHBattlefieldConditions::BuildProfileForTurn(int32 TurnNumber)
         Profile.SightRangeMultiplier *= 0.78f;
         Profile.MovementNoiseMultiplier *= 0.78f;
         Profile.GunfireNoiseMultiplier *= 0.88f;
+        Profile.ExplosionNoiseMultiplier *= 0.84f;
         Profile.WeaponSpreadMultiplier *= 1.08f;
         Profile.InfantrySpeedMultiplier *= 0.94f;
         Profile.VehicleTractionMultiplier *= 0.82f;
@@ -52,12 +53,14 @@ UBHBattlefieldConditions::BuildProfileForTurn(int32 TurnNumber)
         Profile.SightRangeMultiplier *= 0.48f;
         Profile.MovementNoiseMultiplier *= 1.08f;
         Profile.MortarDispersionMultiplier *= 1.28f;
+        Profile.ExplosionNoiseMultiplier *= 1.05f;
         Profile.ConditionLabel = TEXT("DENSE FOG");
         break;
     case EBHBattlefieldWeather::Storm:
         Profile.SightRangeMultiplier *= 0.58f;
         Profile.MovementNoiseMultiplier *= 0.62f;
         Profile.GunfireNoiseMultiplier *= 0.65f;
+        Profile.ExplosionNoiseMultiplier *= 0.62f;
         Profile.WeaponSpreadMultiplier *= 1.16f;
         Profile.InfantrySpeedMultiplier *= 0.90f;
         Profile.VehicleTractionMultiplier *= 0.68f;

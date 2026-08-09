@@ -1,6 +1,7 @@
 #include "BHFragGrenade.h"
 
 #include "BHCharacter.h"
+#include "BHBattlefieldConditions.h"
 #include "BHEnemyAIController.h"
 #include "BHEnemySoldier.h"
 #include "Components/SphereComponent.h"
@@ -288,12 +289,18 @@ void ABHFragGrenade::Explode()
         ECC_Visibility
     );
 
+    const float ExplosionNoiseMultiplier = FMath::Max(
+        0.0f,
+        UBHBattlefieldConditions::GetCurrentProfile(this).
+            ExplosionNoiseMultiplier
+    );
     UAISense_Hearing::ReportNoiseEvent(
         this,
         BlastOrigin,
-        2.0f,
+        2.0f * ExplosionNoiseMultiplier,
         GetInstigator(),
-        FMath::Max(0.0f, ExplosionNoiseRange),
+        FMath::Max(0.0f, ExplosionNoiseRange) *
+            ExplosionNoiseMultiplier,
         FName(TEXT("Explosion"))
     );
 

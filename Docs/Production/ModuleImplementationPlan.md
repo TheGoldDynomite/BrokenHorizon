@@ -1645,3 +1645,8 @@ Nearby living same-faction allies now receive a bounded contact alert when a cas
 
 - The packaged validator launched the manifest Win64 executable successfully after the audio/HUD increments, and First Light smoke passed with navigation fallback coverage at 9/12. The packaged log also confirmed ambient audio readiness and runtime HUD style application.
 - `Validate-BrokenHorizon.cmd -Packaged` exercises the existing packaged executable; it does not cook or archive a new package. Fresh current-source cook/archive qualification therefore remains an explicit release gate rather than being claimed by this smoke result.
+### Weather-aware explosive hearing - 9 August 2026
+
+- Battlefield conditions now expose a separate `ExplosionNoiseMultiplier`. Rain reduces explosive AI-hearing loudness and range to 84 percent, dense fog slightly carries it to 105 percent, and severe storms reduce it to 62 percent. Gunfire and movement-noise contracts remain separate.
+- Frag grenades and engineering charges apply the multiplier to both `UAISense_Hearing` loudness and maximum range, so weather changes tactical discovery without changing damage or blast radius.
+- Evidence: `BHValidation-Build.log`, `BHValidation-Tests.log`, `BHValidation-Smoke.log`, and `BHValidation-FirstLight.log` passed. `BrokenHorizon.Gameplay.World.BattlefieldConditions` completed with `Result={Success}`. First Light navigation fallback coverage was 3/12 in this run.

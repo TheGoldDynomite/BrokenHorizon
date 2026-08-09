@@ -1,6 +1,7 @@
 #include "BHEngineeringCharge.h"
 
 #include "BHCharacter.h"
+#include "BHBattlefieldConditions.h"
 #include "BHDoor.h"
 #include "BHRaidSabotageTarget.h"
 #include "Components/BoxComponent.h"
@@ -161,8 +162,17 @@ bool ABHEngineeringCharge::Detonate(ABHCharacter* RequestingCharacter)
         RequestingCharacter ? RequestingCharacter->GetController() : nullptr,
         ECC_Visibility
     );
+    const float ExplosionNoiseMultiplier = FMath::Max(
+        0.0f,
+        UBHBattlefieldConditions::GetCurrentProfile(this).
+            ExplosionNoiseMultiplier
+    );
     UAISense_Hearing::ReportNoiseEvent(
-        this, GetActorLocation(), 3.0f, RequestingCharacter, 8500.0f,
+        this,
+        GetActorLocation(),
+        3.0f * ExplosionNoiseMultiplier,
+        RequestingCharacter,
+        8500.0f * ExplosionNoiseMultiplier,
         FName(TEXT("Explosion"))
     );
     UE_LOG(LogTemp, Display,
