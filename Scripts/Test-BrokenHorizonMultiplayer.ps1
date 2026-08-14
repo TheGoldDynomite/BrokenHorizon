@@ -20,12 +20,13 @@ param(
     [int]$AllowedObservedPacketLossPerSample = 0,
     [ValidateRange(2, 16)]
     [int]$NetworkBudgetClientCount = 2,
-    [ValidateSet("Priority", "Attack", "Defend", "Raid")]
+    [ValidateSet("Priority", "Attack", "Defend", "Raid", "Resupply")]
     [string]$OperationType = "Priority",
     [ValidateRange(0, 10000)]
     [int]$LegacySchemaVersion = 0,
     [string]$LogPrefix = "G3-Multiplayer",
     [switch]$RequireActiveOperation,
+    [switch]$RequireWatercraftDelivery,
     [switch]$RequireServerTravel,
     [switch]$RequireTransportPersistence,
     [switch]$RequireOperationCompletion,
@@ -73,7 +74,8 @@ $uproject = Join-Path $projectRoot $manifest.uproject
 $editor = Join-Path $manifest.engineRoot "Engine\Binaries\Win64\UnrealEditor.exe"
 $logDirectory = Join-Path $projectRoot "Saved\Logs"
 $firstLightMap = $manifest.maps.firstLight
-$testMap = if ($RequireTransportPersistence -or $SoakSeconds -gt 0) {
+$testMap = if (($RequireTransportPersistence -or $SoakSeconds -gt 0) -and
+    -not ($RequireActiveOperation -and $OperationType -eq "Attack")) {
     $manifest.maps.openWorld
 } else {
     $firstLightMap
@@ -355,12 +357,19 @@ try {
         if ($OperationType -ne "Priority") {
             $hostArguments += "-BHTestOperationType=$OperationType"
         }
+        if ($OperationType -eq "Attack") {
+            $hostArguments += "-BHTestForceAttackTarget"
+            $hostArguments += "-BHTestBeginCommittedOperation"
+        }
+    }
+    if ($RequireWatercraftDelivery) {
+        $hostArguments += "-BHTestWatercraftDeliveryWhenOccupied"
     }
     if ($RequireContextOwnership) {
         $hostArguments += "-BHTestFieldSquadContextOwnership"
     }
     if ($RequireServerTravel) {
-        $travelDelaySeconds = 90
+        $travelDelaySeconds = 20
         $hostArguments += "-BHTestServerTravelAfterSeconds=$travelDelaySeconds"
     }
     $hostProcess = Start-BHProcess -Arguments $hostArguments
@@ -373,6 +382,7 @@ try {
         "Attack" { 1 }
         "Defend" { 2 }
         "Raid" { 3 }
+        "Resupply" { 4 }
         default { $null }
     }
 
@@ -677,6 +687,14 @@ try {
             -LogPath $hostLog `
             -Pattern "BH_TEST_OPERATION_COMMIT result=success .*type=$expectedOperationTypeValue" `
             -Label "$OperationType operation routing"
+    }
+
+
+    if ($RequireWatercraftDelivery) {
+        $hostContent = Wait-ForLogMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_TEST_WATERCRAFT_DELIVERY_OCCUPIED .*remaining=0\.0 occupant=1" `
+            -Label "Occupied watercraft cargo delivery"
     }
 
     $crashPreparedContent = $null

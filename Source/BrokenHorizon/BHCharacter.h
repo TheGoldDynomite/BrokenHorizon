@@ -4,6 +4,7 @@
 #include "Engine/EngineBaseTypes.h"
 #include "BHMissionData.h"
 #include "BHObjectiveNotificationWidget.h"
+#include "BHLoadoutWeight.h"
 #include "BHWarTypes.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
@@ -34,6 +35,8 @@ class UBHPauseMenuWidget;
 class UBHWarMapWidget;
 class UBHWarSubsystem;
 class UBHCombatStatusWidget;
+class UBHInventoryWidget;
+enum class EBHSalvagePickupType : uint8;
 class UBHInjuryComponent;
 class UBHUserSettingsSubsystem;
 class UBHSubtitleWidget;
@@ -46,6 +49,7 @@ class ABHEnemySoldier;
 class ABHFragGrenade;
 class ABHSmokeGrenade;
 class ABHEngineeringCharge;
+class ABHAntiVehicleProjectile;
 enum class EBHEngineeringChargeMode : uint8;
 class UAnimSequenceBase;
 class USkeletalMeshComponent;
@@ -70,6 +74,61 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     float,
     MaxStamina
 );
+
+USTRUCT(BlueprintType)
+struct BROKENHORIZON_API FBHInventorySnapshot
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    FName ActiveWeaponRole = NAME_None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    int32 MagazineRounds = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    int32 ReserveRounds = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    int32 MaximumReserveRounds = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    int32 FragGrenades = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    int32 SmokeGrenades = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    int32 EngineeringCharges = 0;
+    int32 AntiVehicleRounds = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    int32 Medkits = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    int32 FieldDressings = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    int32 MissionItemCount = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    float HelmetDurabilityFraction = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    float BodyArmorDurabilityFraction = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    float CarriedWeightKilograms = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    float ContainerCapacityKilograms = 40.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    float ContainerRemainingKilograms = 40.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    EBHCarryLoadState CarryLoadState = EBHCarryLoadState::FightingLoad;
+};
 
 UCLASS()
 class BROKENHORIZON_API ABHCharacter : public ACharacter
@@ -200,6 +259,8 @@ public:
         EBHWarPriorityType OperationType
     );
 
+    void PrepareDeploymentModeForTest();
+
     UFUNCTION(BlueprintPure, Category = "Persistent War")
     bool IsWarMapOpen() const;
 
@@ -311,6 +372,7 @@ public:
 
     void PresentSharedOperationDebrief(const FText& Message);
     FText GetMissionCompleteMessage() const;
+    void ApplyRapidOperationRedeployment();
 
     UFUNCTION(BlueprintCallable, Category = "Game Shell")
     bool RestartCheckpoint();
@@ -501,6 +563,28 @@ public:
     UFUNCTION(BlueprintPure, Category = "Weapon")
     UBHWeaponComponent* GetWeaponComponent() const;
 
+    UFUNCTION(BlueprintPure, Category = "Inventory")
+    FBHInventorySnapshot GetInventorySnapshot() const;
+
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    void ToggleInventoryPanel();
+
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    void CycleInventoryWeaponRole();
+
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    bool DropInventoryItem(EBHSalvagePickupType ItemType, int32 Quantity = 1);
+
+    UFUNCTION(BlueprintCallable, Category = "Inventory|Transfer")
+    bool TransferInventoryItemTo(
+        ABHCharacter* Recipient,
+        EBHSalvagePickupType ItemType,
+        int32 Quantity = 1
+    );
+
+    UFUNCTION(BlueprintCallable, Category = "Inventory|Transfer")
+    bool TransferFragToNearestAlly(int32 Quantity = 1);
+
     UFUNCTION(BlueprintPure, Category = "Combat|Grenades")
     int32 GetFragGrenadeCount() const;
 
@@ -644,6 +728,17 @@ public:
     UFUNCTION()
     void OnMissionCompleted();
 
+    UFUNCTION(BlueprintCallable, Category = "Combat|Anti Vehicle")
+    void LaunchAntiVehicleProjectile();
+
+    UFUNCTION(BlueprintPure, Category = "Combat|Anti Vehicle")
+    int32 GetAntiVehicleRoundCount() const;
+
+    UFUNCTION(BlueprintCallable, Category = "Combat|Anti Vehicle")
+    int32 AddAntiVehicleRounds(int32 Amount);
+
+    void RestoreAntiVehicleRoundCount(int32 SavedCount);
+
 protected:
     virtual void BeginPlay() override;
 
@@ -714,6 +809,7 @@ protected:
     void PerformWeaponBash();
     void PerformFieldObservation();
     void UseEngineeringTool();
+
     bool PlaceEngineeringCharge(
         AActor* TargetActor,
         EBHEngineeringChargeMode Mode
@@ -754,7 +850,20 @@ protected:
     void ServerInteract(AActor* RequestedTarget);
 
     UFUNCTION(Server, Reliable)
+    void ServerDropInventoryItem(EBHSalvagePickupType ItemType, int32 Quantity);
+
+    UFUNCTION(Server, Reliable)
+    void ServerTransferInventoryItem(
+        ABHCharacter* Recipient,
+        EBHSalvagePickupType ItemType,
+        int32 Quantity
+    );
+
+    UFUNCTION(Server, Reliable)
     void ServerUseEngineeringTool();
+
+    UFUNCTION(Server, Reliable)
+    void ServerLaunchAntiVehicleProjectile();
 
     UFUNCTION(Server, Reliable)
     void ServerUseFieldDressing();
@@ -1392,6 +1501,15 @@ protected:
     )
     TSubclassOf<ABHEngineeringCharge> EngineeringChargeClass;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Combat|Anti Vehicle")
+    TSubclassOf<ABHAntiVehicleProjectile> AntiVehicleProjectileClass;
+
+    UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Combat|Anti Vehicle", meta = (ClampMin = "0"))
+    int32 AntiVehicleRoundCount = 2;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Combat|Anti Vehicle", meta = (ClampMin = "0"))
+    int32 MaxAntiVehicleRounds = 2;
+
     UPROPERTY(
         EditDefaultsOnly,
         BlueprintReadOnly,
@@ -1682,6 +1800,9 @@ protected:
     TObjectPtr<UInputAction> EngineeringInputAction;
 
     UPROPERTY(Transient)
+    TObjectPtr<UInputAction> AntiVehicleInputAction;
+
+    UPROPERTY(Transient)
     TObjectPtr<UInputAction> SquadOrderInputAction;
 
     UPROPERTY(Transient)
@@ -1773,6 +1894,20 @@ protected:
         Category = "Broken Horizon|Input"
     )
     TObjectPtr<UInputAction> PauseAction;
+
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category = "Broken Horizon|Input"
+    )
+    TObjectPtr<UInputAction> InventoryAction;
+
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category = "Broken Horizon|Input"
+    )
+    TObjectPtr<UInputAction> InventoryCycleAction;
 
     UPROPERTY(
         EditDefaultsOnly,
@@ -2137,13 +2272,13 @@ protected:
     float CurrentStamina = 100.0f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Stamina")
-    float StaminaDrainRate = 25.0f;
+    float StaminaDrainRate = 10.0f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Stamina")
-    float StaminaRecoveryRate = 20.0f;
+    float StaminaRecoveryRate = 30.0f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Broken Horizon|Stamina")
-    float StaminaRecoveryDelay = 1.0f;
+    float StaminaRecoveryDelay = 0.75f;
 
     bool bIsSprinting = false;
     float TimeSinceSprintStopped = 0.0f;
@@ -2378,6 +2513,12 @@ protected:
 
     UPROPERTY()
     TObjectPtr<UBHCombatStatusWidget> CombatStatusWidget;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
+    TSubclassOf<UBHInventoryWidget> InventoryWidgetClass;
+
+    UPROPERTY()
+    TObjectPtr<UBHInventoryWidget> InventoryWidget;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Game Shell|Accessibility")
     TSubclassOf<UBHSubtitleWidget> SubtitleWidgetClass;

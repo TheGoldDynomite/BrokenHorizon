@@ -57,6 +57,12 @@ struct BROKENHORIZON_API FBHRifleConfig
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
     bool bAutomatic = true;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire", meta = (ClampMin = "1", ClampMax = "32"))
+    int32 PelletCount = 1;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire", meta = (ClampMin = "0.0", ClampMax = "45.0", Units = "deg"))
+    float PelletSpreadDegrees = 0.0f;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage", meta = (ClampMin = "0.0"))
     float Damage = 25.0f;
 

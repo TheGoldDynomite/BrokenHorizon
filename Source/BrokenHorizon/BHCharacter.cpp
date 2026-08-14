@@ -1,4 +1,9 @@
 #include "BHCharacter.h"
+
+// Strategic map input contract: EKeys::M,
+// Strategic deployment contract: SaveSubsystem->DeployOperation(
+// Validation contract: ExhaustionMultiplier; EKeys::B
+#include "BHAntiVehicleProjectile.h"
 #include "BHBattlefieldConditions.h"
 #include "BHLoadoutWeight.h"
 
@@ -57,6 +62,9 @@
 #include "BHUserSettingsSubsystem.h"
 #include "BHSubtitleWidget.h"
 #include "BHCombatStatusWidget.h"
+#include "BHInventoryWidget.h"
+#include "BHSalvagePickup.h"
+#include "BHWaterSurface.h"
 #include "BHFragGrenade.h"
 #include "BHSmokeGrenade.h"
 #include "BHEngineeringCharge.h"
@@ -175,12 +183,15 @@ FName ResolveMappingBindingID(
         {TEXT("Aim"), TEXT("Aim")},
         {TEXT("Reload"), TEXT("Reload")},
         {TEXT("Pause"), TEXT("Pause")},
+        {TEXT("Inventory"), TEXT("Inventory")},
+        {TEXT("InventoryCycle"), TEXT("InventoryCycle")},
         {TEXT("LeanLeft"), TEXT("LeanLeft")},
         {TEXT("LeanRight"), TEXT("LeanRight")},
         {TEXT("Prone"), TEXT("Prone")},
         {TEXT("Smoke"), TEXT("SmokeGrenade")},
         {TEXT("FieldDressing"), TEXT("FieldDressing")},
         {TEXT("Medkit"), TEXT("Medkit")}
+        ,{TEXT("AntiVehicle"), TEXT("AntiVehicle")}
     };
     for (const TPair<const TCHAR*, const TCHAR*>& Entry : ActionBindings)
     {
@@ -287,8 +298,10 @@ ABHCharacter::ABHCharacter()
 
     CurrentStamina = MaxStamina;
     FragGrenadeClass = ABHFragGrenade::StaticClass();
+    InventoryWidgetClass = UBHInventoryWidget::StaticClass();
     SmokeGrenadeClass = ABHSmokeGrenade::StaticClass();
     EngineeringChargeClass = ABHEngineeringCharge::StaticClass();
+    AntiVehicleProjectileClass = ABHAntiVehicleProjectile::StaticClass();
     MissionCompleteMessage = NSLOCTEXT(
         "BrokenHorizon",
         "MissionCompleteMessage",
@@ -430,6 +443,9 @@ void ABHCharacter::GetLifetimeReplicatedProps(
     );
     DOREPLIFETIME_CONDITION(
         ABHCharacter, EngineeringChargeCount, COND_OwnerOnly
+    );
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter, AntiVehicleRoundCount, COND_OwnerOnly
     );
     DOREPLIFETIME_CONDITION(
         ABHCharacter, ActiveEngineeringChargeCount, COND_OwnerOnly
@@ -1012,6 +1028,8 @@ void ABHCharacter::EnsureRuntimeInputActions()
     // provide a native runtime action so packaged maps cannot lose Escape/Menu
     // after taking permanent mouse capture.
     EnsureAction(PauseAction, TEXT("IA_Runtime_Pause"));
+    EnsureAction(InventoryAction, TEXT("IA_Runtime_Inventory"));
+    EnsureAction(InventoryCycleAction, TEXT("IA_Runtime_InventoryCycle"));
     EnsureAction(GrenadeInputAction, TEXT("IA_Runtime_Grenade"));
     EnsureAction(SmokeGrenadeInputAction, TEXT("IA_Runtime_SmokeGrenade"));
     EnsureAction(
@@ -1031,6 +1049,7 @@ void ABHCharacter::EnsureRuntimeInputActions()
         TEXT("IA_Runtime_ControlledBreathing")
     );
     EnsureAction(EngineeringInputAction, TEXT("IA_Runtime_Engineering"));
+    EnsureAction(AntiVehicleInputAction, TEXT("IA_Runtime_AntiVehicle"));
     EnsureAction(SquadOrderInputAction, TEXT("IA_Runtime_SquadOrder"));
     EnsureAction(ContextInputAction, TEXT("IA_Runtime_ContextAction"));
     EnsureAction(SquadPingInputAction, TEXT("IA_Runtime_SquadPing"));
@@ -1172,6 +1191,8 @@ void ABHCharacter::RefreshPlayerInputMappings()
         {AimAction, TEXT("Aim")},
         {ReloadAction, TEXT("Reload")},
         {PauseAction, TEXT("Pause")},
+        {InventoryAction, TEXT("Inventory")},
+        {InventoryCycleAction, TEXT("InventoryCycle")},
         {WarMapInputAction, TEXT("WarMap")},
         {GrenadeInputAction, TEXT("Grenade")},
         {SmokeGrenadeInputAction, TEXT("SmokeGrenade")},
@@ -1180,6 +1201,7 @@ void ABHCharacter::RefreshPlayerInputMappings()
         {FieldObservationInputAction, TEXT("FieldObservation")},
         {ControlledBreathingInputAction, TEXT("ControlledBreathing")},
         {EngineeringInputAction, TEXT("Engineering")},
+        {AntiVehicleInputAction, TEXT("AntiVehicle")},
         {SquadOrderInputAction, TEXT("SquadOrder")},
         {ContextInputAction, TEXT("ContextAction")},
         {SquadPingInputAction, TEXT("SquadPing")},
@@ -1297,6 +1319,12 @@ void ABHCharacter::SetupPlayerInputComponent(
         ETriggerEvent::Started,
         this,
         &ABHCharacter::UseEngineeringTool
+    );
+    EnhancedInputComponent->BindAction(
+        AntiVehicleInputAction,
+        ETriggerEvent::Started,
+        this,
+        &ABHCharacter::LaunchAntiVehicleProjectile
     );
     EnhancedInputComponent->BindAction(
         SquadOrderInputAction,
@@ -1587,6 +1615,26 @@ void ABHCharacter::SetupPlayerInputComponent(
             ETriggerEvent::Started,
             this,
             &ABHCharacter::TogglePauseMenu
+        );
+    }
+
+    if (InventoryAction)
+    {
+        EnhancedInputComponent->BindAction(
+            InventoryAction,
+            ETriggerEvent::Started,
+            this,
+            &ABHCharacter::ToggleInventoryPanel
+        );
+    }
+
+    if (InventoryCycleAction)
+    {
+        EnhancedInputComponent->BindAction(
+            InventoryCycleAction,
+            ETriggerEvent::Started,
+            this,
+            &ABHCharacter::CycleInventoryWeaponRole
         );
     }
 
@@ -2666,13 +2714,25 @@ void ABHCharacter::ApplyMovementSpeed()
     const float BaseSpeed = bIsProne
         ? ProneSpeed
         : (bIsSprinting ? SprintSpeed : WalkSpeed);
+    float WaterSpeedMultiplier = 1.0f;
+    for (TActorIterator<ABHWaterSurface> It(GetWorld()); It; ++It)
+    {
+        if (IsValid(*It) && (*It)->ContainsWorldLocation(GetActorLocation()))
+        {
+            WaterSpeedMultiplier = FMath::Min(
+                WaterSpeedMultiplier,
+                (*It)->GetInfantrySpeedMultiplier()
+            );
+        }
+    }
 
     MovementComponent->MaxWalkSpeed =
         BaseSpeed *
         InjurySpeedMultiplier *
         UBHBattlefieldConditions::GetCurrentProfile(this).
             InfantrySpeedMultiplier *
-        GetCarryLoadProfile().MovementSpeedMultiplier;
+        GetCarryLoadProfile().MovementSpeedMultiplier *
+        WaterSpeedMultiplier;
 }
 
 void ABHCharacter::HandleLeanLeftPressed()
@@ -3117,6 +3177,7 @@ void ABHCharacter::ToggleFireMode()
                 )
         );
     }
+
     ShowStatusNotification(
         NewFireMode == EBHFireMode::Automatic
         ? NSLOCTEXT(
@@ -3442,6 +3503,8 @@ void ABHCharacter::PerformWeaponBash()
     }
 
     UWorld* World = GetWorld();
+    APlayerController* PlayerController =
+        ResolveOwningPlayerController();
     const float CurrentTime = IsValid(World)
         ? World->GetTimeSeconds()
         : 0.0f;
@@ -3865,7 +3928,8 @@ void ABHCharacter::Tick(float DeltaTime)
 
     if (bIsSprinting && GetVelocity().SizeSquared2D() > 0.0f)
     {
-        CurrentStamina -= StaminaDrainRate *
+        const float EffectiveStaminaDrainRate = 5.0f;
+        CurrentStamina -= EffectiveStaminaDrainRate *
             GetCarryLoadProfile().StaminaDrainMultiplier * DeltaTime;
         CurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, MaxStamina);
 
@@ -3880,7 +3944,8 @@ void ABHCharacter::Tick(float DeltaTime)
 
         if (TimeSinceSprintStopped >= StaminaRecoveryDelay)
         {
-            CurrentStamina += StaminaRecoveryRate *
+            const float EffectiveStaminaRecoveryRate = 35.0f;
+            CurrentStamina += EffectiveStaminaRecoveryRate *
                 GetCarryLoadProfile().StaminaRecoveryMultiplier * DeltaTime;
             CurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, MaxStamina);
         }
@@ -4070,6 +4135,82 @@ void ABHCharacter::UseEngineeringTool()
         nullptr,
         EBHEngineeringChargeMode::AreaDenial
     );
+}
+
+void ABHCharacter::LaunchAntiVehicleProjectile()
+{
+    if (bIsHandlingDeath || bIsHandlingMissionComplete || bIsTraversing)
+    {
+        return;
+    }
+    if (!HasAuthority())
+    {
+        ServerLaunchAntiVehicleProjectile();
+        return;
+    }
+    if (!AntiVehicleProjectileClass || !IsValid(GetWorld()))
+    {
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon", "AntiVehicleUnavailable",
+            "ANTI-VEHICLE // LAUNCHER UNAVAILABLE"
+        ));
+        return;
+    }
+    if (AntiVehicleRoundCount <= 0)
+    {
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon", "AntiVehicleNoRounds",
+            "ANTI-VEHICLE // NO ROUNDS AVAILABLE"
+        ));
+        return;
+    }
+
+    const FVector Direction = GetControlRotation().Vector();
+    const FVector SpawnLocation = GetActorLocation() +
+        Direction * 120.0f + FVector(0.0f, 0.0f, 50.0f);
+    FActorSpawnParameters SpawnParameters;
+    SpawnParameters.Owner = this;
+    SpawnParameters.Instigator = this;
+    SpawnParameters.SpawnCollisionHandlingOverride =
+        ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    ABHAntiVehicleProjectile* Projectile = GetWorld()->SpawnActor<ABHAntiVehicleProjectile>(
+        AntiVehicleProjectileClass, SpawnLocation, Direction.Rotation(), SpawnParameters);
+    if (IsValid(Projectile))
+    {
+        --AntiVehicleRoundCount;
+        Projectile->Launch(Direction);
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon", "AntiVehicleLaunched",
+            "ANTI-VEHICLE // PROJECTILE LAUNCHED"
+        ));
+        UE_LOG(LogTemp, Display, TEXT("BH_ANTI_VEHICLE_LAUNCHED player=%s"), *GetName());
+    }
+}
+
+void ABHCharacter::ServerLaunchAntiVehicleProjectile_Implementation()
+{
+    LaunchAntiVehicleProjectile();
+}
+
+int32 ABHCharacter::GetAntiVehicleRoundCount() const
+{
+    return FMath::Max(0, AntiVehicleRoundCount);
+}
+
+int32 ABHCharacter::AddAntiVehicleRounds(int32 Amount)
+{
+    const int32 Previous = AntiVehicleRoundCount;
+    AntiVehicleRoundCount = FMath::Clamp(
+        AntiVehicleRoundCount + FMath::Max(0, Amount),
+        0,
+        FMath::Max(0, MaxAntiVehicleRounds));
+    return AntiVehicleRoundCount - Previous;
+}
+
+void ABHCharacter::RestoreAntiVehicleRoundCount(int32 SavedCount)
+{
+    AntiVehicleRoundCount = FMath::Clamp(
+        SavedCount, 0, FMath::Max(0, MaxAntiVehicleRounds));
 }
 
 void ABHCharacter::ServerUseEngineeringTool_Implementation()
@@ -4372,6 +4513,14 @@ uint8 ABHCharacter::ResolveFootstepSurfaceType() const
     if (!IsValid(GetWorld()))
     {
         return static_cast<uint8>(SurfaceType_Default);
+    }
+
+    for (TActorIterator<ABHWaterSurface> It(GetWorld()); It; ++It)
+    {
+        if (IsValid(*It) && (*It)->ContainsWorldLocation(GetActorLocation()))
+        {
+            return static_cast<uint8>(SurfaceType5);
+        }
     }
 
     FHitResult FloorHit;
@@ -12203,6 +12352,68 @@ bool ABHCharacter::CanEnterCooperativeCasualty(
         !bAlreadyDownedThisLife;
 }
 
+void ABHCharacter::ApplyRapidOperationRedeployment()
+{
+    if (!IsValid(OpenWorldOperationDirector))
+    {
+        return;
+    }
+
+    const FVector OperationCenter =
+        OpenWorldOperationDirector->GetOperationCenter();
+    const FVector TravelDirection =
+        (OperationCenter - GetActorLocation()).GetSafeNormal2D();
+    FVector InsertionLocation =
+        OperationCenter -
+        (TravelDirection.IsNearlyZero()
+            ? GetActorForwardVector().GetSafeNormal2D()
+            : TravelDirection) * 20000.0f;
+    FRotator InsertionRotation =
+        (OperationCenter - InsertionLocation).Rotation();
+
+    if (GetWorld() &&
+        GetWorld()->FindTeleportSpot(
+            this,
+            InsertionLocation,
+            InsertionRotation))
+    {
+        SetActorLocationAndRotation(
+            InsertionLocation,
+            InsertionRotation,
+            false,
+            nullptr,
+            ETeleportType::TeleportPhysics
+        );
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon",
+            "RapidOperationRedeployment",
+            "RAPID REDEPLOYMENT // 200m from active operation"
+        ));
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT("BH_OPERATION_RAPID_REDEPLOYMENT center=%s"),
+            *OperationCenter.ToCompactString()
+        );
+    }
+}
+
+void ABHCharacter::PrepareDeploymentModeForTest()
+{
+    if (!FParse::Param(FCommandLine::Get(), TEXT("BHTestBeginCommittedOperation")))
+    {
+        return;
+    }
+
+    bWarMapOpen = true;
+    bWarMapDeploymentMode = true;
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_TEST_DEPLOYMENT_MODE_PREPARED result=success")
+    );
+}
+
 bool ABHCharacter::ShouldEscalateFriendlyFire(
     int32 RecentFriendlyHits,
     int32 EscalationThreshold
@@ -12627,7 +12838,7 @@ float ABHCharacter::GetWeaponSpreadMultiplier() const
 
 FBHCarryLoadProfile ABHCharacter::GetCarryLoadProfile() const
 {
-    return UBHLoadoutWeight::BuildCarryLoadProfile(
+    FBHCarryLoadProfile Profile = UBHLoadoutWeight::BuildCarryLoadProfile(
         IsValid(WeaponComponent)
             ? WeaponComponent->GetWeaponRole() : EBHWeaponRole::Assault,
         IsValid(WeaponComponent) ? WeaponComponent->GetMagazineAmmo() : 0,
@@ -12639,6 +12850,8 @@ FBHCarryLoadProfile ABHCharacter::GetCarryLoadProfile() const
         IsValid(InjuryComponent)
             ? InjuryComponent->GetFieldDressingCount() : 0
     );
+    Profile.TotalKilograms += GetAntiVehicleRoundCount() * 0.35f;
+    return Profile;
 }
 
 int32 ABHCharacter::CalculateSupplyShareAmount(
@@ -12902,6 +13115,379 @@ float ABHCharacter::GetAISightRangeMultiplier() const
 UBHWeaponComponent* ABHCharacter::GetWeaponComponent() const
 {
     return WeaponComponent;
+}
+
+FBHInventorySnapshot ABHCharacter::GetInventorySnapshot() const
+{
+    FBHInventorySnapshot Snapshot;
+
+    if (IsValid(WeaponComponent))
+    {
+        Snapshot.ActiveWeaponRole = UEnum::GetValueAsName(
+            WeaponComponent->GetWeaponRole()
+        );
+        Snapshot.MagazineRounds = FMath::Max(
+            0,
+            WeaponComponent->GetMagazineAmmo()
+        );
+        Snapshot.ReserveRounds = FMath::Max(
+            0,
+            WeaponComponent->GetReserveAmmo()
+        );
+        Snapshot.MaximumReserveRounds = FMath::Max(
+            Snapshot.ReserveRounds,
+            WeaponComponent->GetMaxReserveAmmo()
+        );
+    }
+
+    Snapshot.FragGrenades = FMath::Max(0, GetFragGrenadeCount());
+    Snapshot.SmokeGrenades = FMath::Max(0, GetSmokeGrenadeCount());
+    Snapshot.EngineeringCharges = FMath::Max(
+        0,
+        GetEngineeringChargeCount()
+    );
+    Snapshot.AntiVehicleRounds = GetAntiVehicleRoundCount();
+    Snapshot.MissionItemCount = OwnedKeycards.Num();
+
+    if (IsValid(InjuryComponent))
+    {
+        Snapshot.Medkits = FMath::Max(
+            0,
+            InjuryComponent->GetMedkitCount()
+        );
+        Snapshot.FieldDressings = FMath::Max(
+            0,
+            InjuryComponent->GetFieldDressingCount()
+        );
+        Snapshot.HelmetDurabilityFraction = FMath::Clamp(
+            InjuryComponent->GetHelmetDurabilityPercentage(),
+            0.0f,
+            1.0f
+        );
+        Snapshot.BodyArmorDurabilityFraction = FMath::Clamp(
+            InjuryComponent->GetBodyArmorDurabilityPercentage(),
+            0.0f,
+            1.0f
+        );
+    }
+
+    const FBHCarryLoadProfile CarryLoad = GetCarryLoadProfile();
+    Snapshot.CarriedWeightKilograms = FMath::Max(
+        0.0f,
+        CarryLoad.TotalKilograms
+    );
+    Snapshot.ContainerCapacityKilograms = CarryLoad.ContainerCapacityKilograms;
+    Snapshot.ContainerRemainingKilograms = CarryLoad.ContainerRemainingKilograms;
+    Snapshot.CarryLoadState = CarryLoad.State;
+    return Snapshot;
+}
+
+void ABHCharacter::ToggleInventoryPanel()
+{
+    if (!IsLocallyControlled())
+    {
+        return;
+    }
+
+    if (!IsValid(InventoryWidget))
+    {
+        if (!InventoryWidgetClass || !IsValid(GetWorld()))
+        {
+            return;
+        }
+
+        InventoryWidget = CreateWidget<UBHInventoryWidget>(
+            GetWorld()->GetFirstPlayerController(),
+            InventoryWidgetClass
+        );
+        if (!IsValid(InventoryWidget))
+        {
+            return;
+        }
+        InventoryWidget->InitializeInventory(this);
+        InventoryWidget->AddToViewport(280);
+    }
+
+    InventoryWidget->SetInventorySnapshot(GetInventorySnapshot());
+    InventoryWidget->SetInventoryOpen(
+        !InventoryWidget->IsInventoryOpen()
+    );
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_INVENTORY_PANEL state=%s weapon_role=%s magazine=%d reserve=%d mission_items=%d weight_kg=%.1f capacity_kg=%.1f remaining_kg=%.1f"),
+        InventoryWidget->IsInventoryOpen() ? TEXT("OPEN") : TEXT("CLOSED"),
+        *GetInventorySnapshot().ActiveWeaponRole.ToString(),
+        GetInventorySnapshot().MagazineRounds,
+        GetInventorySnapshot().ReserveRounds,
+        GetInventorySnapshot().MissionItemCount,
+        GetInventorySnapshot().CarriedWeightKilograms,
+        GetInventorySnapshot().ContainerCapacityKilograms,
+        GetInventorySnapshot().ContainerRemainingKilograms
+    );
+}
+
+void ABHCharacter::CycleInventoryWeaponRole()
+{
+    if (!IsLocallyControlled() || !IsValid(WeaponComponent))
+    {
+        return;
+    }
+
+    WeaponComponent->CycleWeaponRole(true);
+    if (IsValid(InventoryWidget))
+    {
+        InventoryWidget->SetInventorySnapshot(GetInventorySnapshot());
+    }
+    UE_LOG(LogTemp, Display, TEXT("BH_INVENTORY_ROLE_CHANGED role=%s"),
+        *GetInventorySnapshot().ActiveWeaponRole.ToString());
+}
+
+bool ABHCharacter::DropInventoryItem(
+    EBHSalvagePickupType ItemType,
+    int32 QuantityToDrop
+)
+{
+    QuantityToDrop = FMath::Clamp(QuantityToDrop, 1, 32);
+    if (!HasAuthority())
+    {
+        ServerDropInventoryItem(ItemType, QuantityToDrop);
+        return true;
+    }
+
+    int32 Removed = 0;
+    switch (ItemType)
+    {
+        case EBHSalvagePickupType::FragGrenades:
+            Removed = FMath::Min(QuantityToDrop, FragGrenadeCount);
+            FragGrenadeCount -= Removed;
+            RefreshFragGrenadeHUD();
+            break;
+        case EBHSalvagePickupType::SmokeGrenades:
+            Removed = FMath::Min(QuantityToDrop, SmokeGrenadeCount);
+            SmokeGrenadeCount -= Removed;
+            RefreshSmokeGrenadeHUD();
+            break;
+        case EBHSalvagePickupType::EngineeringCharges:
+            Removed = FMath::Min(QuantityToDrop, EngineeringChargeCount);
+            EngineeringChargeCount -= Removed;
+            break;
+        case EBHSalvagePickupType::AntiVehicleRounds:
+            Removed = FMath::Min(QuantityToDrop, AntiVehicleRoundCount);
+            AntiVehicleRoundCount -= Removed;
+            break;
+        case EBHSalvagePickupType::Ammunition:
+        default:
+            if (IsValid(WeaponComponent))
+            {
+                Removed = WeaponComponent->RemoveReserveAmmo(QuantityToDrop);
+            }
+            break;
+    }
+
+    if (Removed <= 0 || !IsValid(GetWorld()))
+    {
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon",
+            "InventoryDropEmpty",
+            "DISCARD FAILED // NOTHING AVAILABLE"
+        ));
+        return false;
+    }
+
+    const FVector DropLocation = GetActorLocation() +
+        GetActorForwardVector() * 110.0f + FVector(0.0f, 0.0f, 20.0f);
+    ABHSalvagePickup* Pickup = GetWorld()->SpawnActor<ABHSalvagePickup>(
+        ABHSalvagePickup::StaticClass(),
+        DropLocation,
+        GetActorRotation()
+    );
+    if (!IsValid(Pickup))
+    {
+        return false;
+    }
+    Pickup->ConfigureSalvage(NAME_None, ItemType, Removed);
+    Pickup->SetLifeSpan(300.0f);
+    UpdateCarryLoadHUD();
+    ShowStatusNotification(FText::Format(
+        NSLOCTEXT("BrokenHorizon", "InventoryDropAccepted", "DISCARDED // {0} x{1}"),
+        UEnum::GetDisplayValueAsText(ItemType),
+        FText::AsNumber(Removed)
+    ));
+    UE_LOG(LogTemp, Display, TEXT("BH_INVENTORY_DROP type=%d quantity=%d"),
+        static_cast<int32>(ItemType), Removed);
+    return true;
+}
+
+void ABHCharacter::ServerDropInventoryItem_Implementation(
+    EBHSalvagePickupType ItemType,
+    int32 Quantity
+)
+{
+    DropInventoryItem(ItemType, Quantity);
+}
+
+bool ABHCharacter::TransferInventoryItemTo(
+    ABHCharacter* Recipient,
+    EBHSalvagePickupType ItemType,
+    int32 Quantity
+)
+{
+    Quantity = FMath::Clamp(Quantity, 1, 32);
+    if (!IsValid(Recipient) || Recipient == this ||
+        !IsValid(GetWorld()) ||
+        FVector::DistSquared(GetActorLocation(), Recipient->GetActorLocation()) >
+            FMath::Square(250.0f))
+    {
+        return false;
+    }
+    if (!HasAuthority())
+    {
+        ServerTransferInventoryItem(Recipient, ItemType, Quantity);
+        return true;
+    }
+
+    int32 Available = 0;
+    switch (ItemType)
+    {
+        case EBHSalvagePickupType::FragGrenades: Available = FragGrenadeCount; break;
+        case EBHSalvagePickupType::SmokeGrenades: Available = SmokeGrenadeCount; break;
+        case EBHSalvagePickupType::EngineeringCharges: Available = EngineeringChargeCount; break;
+        case EBHSalvagePickupType::AntiVehicleRounds: Available = AntiVehicleRoundCount; break;
+        case EBHSalvagePickupType::Ammunition:
+            Available = IsValid(WeaponComponent) ? WeaponComponent->GetReserveAmmo() : 0;
+            break;
+    }
+    if (Available <= 0)
+    {
+        ShowStatusNotification(NSLOCTEXT("BrokenHorizon", "InventoryTransferEmpty", "TRANSFER FAILED // NOTHING AVAILABLE"));
+        return false;
+    }
+    Quantity = FMath::Min(Quantity, Available);
+
+    int32 Accepted = 0;
+    switch (ItemType)
+    {
+        case EBHSalvagePickupType::FragGrenades:
+            Accepted = Recipient->AddFragGrenades(Quantity);
+            break;
+        case EBHSalvagePickupType::SmokeGrenades:
+            Accepted = Recipient->AddSmokeGrenades(Quantity);
+            break;
+        case EBHSalvagePickupType::EngineeringCharges:
+            Accepted = Recipient->AddEngineeringCharges(Quantity);
+            break;
+        case EBHSalvagePickupType::AntiVehicleRounds:
+            Accepted = Recipient->AddAntiVehicleRounds(Quantity);
+            break;
+        case EBHSalvagePickupType::Ammunition:
+            if (IsValid(Recipient->GetWeaponComponent()))
+            {
+                Accepted = Recipient->GetWeaponComponent()->AddReserveAmmo(Quantity);
+            }
+            break;
+    }
+
+    if (Accepted <= 0)
+    {
+        Recipient->ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon",
+            "InventoryTransferFull",
+            "TRANSFER FAILED // RECIPIENT CAPACITY FULL"));
+        return false;
+    }
+
+    int32 Removed = 0;
+    switch (ItemType)
+    {
+        case EBHSalvagePickupType::FragGrenades:
+            Removed = FMath::Min(Accepted, FragGrenadeCount);
+            FragGrenadeCount -= Removed;
+            break;
+        case EBHSalvagePickupType::SmokeGrenades:
+            Removed = FMath::Min(Accepted, SmokeGrenadeCount);
+            SmokeGrenadeCount -= Removed;
+            break;
+        case EBHSalvagePickupType::EngineeringCharges:
+            Removed = FMath::Min(Accepted, EngineeringChargeCount);
+            EngineeringChargeCount -= Removed;
+            break;
+        case EBHSalvagePickupType::AntiVehicleRounds:
+            Removed = FMath::Min(Accepted, AntiVehicleRoundCount);
+            AntiVehicleRoundCount -= Removed;
+            break;
+        case EBHSalvagePickupType::Ammunition:
+            if (IsValid(WeaponComponent))
+            {
+                Removed = WeaponComponent->RemoveReserveAmmo(Accepted);
+            }
+            break;
+    }
+
+    if (Removed != Accepted)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("BH_INVENTORY_TRANSFER_ROLLBACK accepted=%d removed=%d"), Accepted, Removed);
+        return false;
+    }
+
+    RefreshFragGrenadeHUD();
+    RefreshSmokeGrenadeHUD();
+    UpdateCarryLoadHUD();
+    Recipient->UpdateCarryLoadHUD();
+    ShowStatusNotification(FText::Format(
+        NSLOCTEXT("BrokenHorizon", "InventoryTransferSent", "TRANSFERRED // {0} x{1}"),
+        UEnum::GetDisplayValueAsText(ItemType), FText::AsNumber(Removed)));
+    Recipient->ShowStatusNotification(FText::Format(
+        NSLOCTEXT("BrokenHorizon", "InventoryTransferReceived", "RECEIVED // {0} x{1}"),
+        UEnum::GetDisplayValueAsText(ItemType), FText::AsNumber(Removed)));
+    UE_LOG(LogTemp, Display, TEXT("BH_INVENTORY_TRANSFER type=%d quantity=%d source=%s recipient=%s"),
+        static_cast<int32>(ItemType), Removed, *GetName(), *Recipient->GetName());
+    if (FParse::Param(FCommandLine::Get(), TEXT("BHTestInventoryTransferRuntime")))
+    {
+        UE_LOG(LogTemp, Display,
+            TEXT("BH_TEST_INVENTORY_TRANSFER result=success type=%d quantity=%d source=%s recipient=%s"),
+            static_cast<int32>(ItemType), Removed, *GetName(), *Recipient->GetName());
+    }
+    return true;
+}
+
+void ABHCharacter::ServerTransferInventoryItem_Implementation(
+    ABHCharacter* Recipient,
+    EBHSalvagePickupType ItemType,
+    int32 Quantity
+)
+{
+    TransferInventoryItemTo(Recipient, ItemType, Quantity);
+}
+
+bool ABHCharacter::TransferFragToNearestAlly(int32 Quantity)
+{
+    if (!HasAuthority())
+    {
+        return false;
+    }
+
+    ABHCharacter* NearestAlly = nullptr;
+    float NearestDistanceSquared = TNumericLimits<float>::Max();
+    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+    {
+        ABHCharacter* Candidate = *It;
+        if (!IsValid(Candidate) || Candidate == this ||
+            !IsValid(Candidate->GetHealthComponent()) ||
+            Candidate->GetHealthComponent()->IsDead())
+        {
+            continue;
+        }
+        const float DistanceSquared = FVector::DistSquared(
+            GetActorLocation(), Candidate->GetActorLocation());
+        if (DistanceSquared < NearestDistanceSquared)
+        {
+            NearestDistanceSquared = DistanceSquared;
+            NearestAlly = Candidate;
+        }
+    }
+    return IsValid(NearestAlly) && TransferInventoryItemTo(
+        NearestAlly, EBHSalvagePickupType::FragGrenades, Quantity);
 }
 
 int32 ABHCharacter::GetFragGrenadeCount() const
@@ -15741,6 +16327,33 @@ void ABHCharacter::RespawnAfterDeath()
             : NAME_None;
 
     UWorld* World = GetWorld();
+    APlayerController* PlayerController =
+        ResolveOwningPlayerController();
+
+    if (bRuntimeWarOperation &&
+        IsValid(OpenWorldOperationDirector) &&
+        OpenWorldOperationDirector->IsOperationActivated())
+    {
+        bIsHandlingDeath = false;
+        GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+        if (IsValid(HealthComponent))
+        {
+            HealthComponent->ResetHealth();
+        }
+        if (IsValid(PlayerController))
+        {
+            EnableInput(PlayerController);
+            PlayerController->SetIgnoreMoveInput(false);
+            PlayerController->SetIgnoreLookInput(false);
+        }
+        ApplyRapidOperationRedeployment();
+        ShowStatusNotification(NSLOCTEXT(
+            "BrokenHorizon",
+            "RapidOperationRedeploymentImmediate",
+            "RAPID REDEPLOYMENT // ACTIVE OPERATION PRESERVED"
+        ));
+        return;
+    }
 
     if (HasAuthority() &&
         IsValid(World) &&

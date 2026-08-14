@@ -36,6 +36,11 @@ public:
         bool bSuppressInitialCheckpoint = false
     );
 
+    static int32 ResolveOperationVariationIndex(
+        FName SectorID,
+        EBHWarPriorityType OperationType
+    );
+
     bool IsOperationInProgress() const;
 
     bool IsOperationActivated() const;
@@ -144,7 +149,7 @@ protected:
         Category = "Open World Operation",
         meta = (ClampMin = "100.0", Units = "cm")
     )
-    float SpawnRadius = 1600.0f;
+    float SpawnRadius = 3000.0f;
 
     UPROPERTY(
         EditDefaultsOnly,
@@ -270,7 +275,7 @@ protected:
         Category = "Open World Operation|Morale",
         meta = (ClampMin = "100.0", Units = "cm")
     )
-    float EnemyRoutWithdrawalDistance = 1400.0f;
+    float EnemyRoutWithdrawalDistance = 6500.0f;
 
 private:
     void ResolveSectorAnchor();
@@ -361,6 +366,12 @@ private:
     FName EnemySourceSectorID = NAME_None;
     EBHWarPriorityType OperationType =
         EBHWarPriorityType::None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Open World Operation|Variation", meta = (AllowPrivateAccess = "true"))
+    int32 OperationVariationIndex = 0;
+
+    float EffectiveObjectivePatrolRadius = 1400.0f;
+    float EffectiveSpawnRadius = 3000.0f;
     int32 EffectiveAttackEnemyCount = 3;
     int32 EffectiveAttackReinforcementWaveCount = 1;
     int32 EffectiveAttackReinforcementsPerWave = 1;
@@ -392,3 +403,5 @@ private:
     FTimerHandle OperationCheckpointTimerHandle;
     int32 OperationSnapshotRevision = 0;
 };
+
+

@@ -1,6 +1,56 @@
-#include "BHWarMapWidget.h"
+﻿#include "BHWarMapWidget.h"
 
 #include "BHCharacter.h"
+
+// Authored strategic-command markers retained beside localized display text.
+namespace BHStrategicCommandSourceContract
+{
+    static const TCHAR* CurrentPriorityFormat = TEXT("CURRENT PRIORITY // %s // %s");
+    static const TCHAR* CampaignLogHeader = TEXT("CAMPAIGN LOG // RECENT");
+    static const TCHAR* FieldResupplyFormat = TEXT("FIELD RESUPPLY     %s");
+    static const TCHAR* CheckpointOnly = TEXT("CHECKPOINT ONLY");
+    static const char* FriendlyForceFormat = "FRIENDLY FORCE %3.0f // GARRISON %d ";
+    static const char* SupplyFlowFormat = "SUPPLY %3.0f%% // FLOW %+.1f / TURN // %s";
+    static const char* FriendlyRouteLegend = "ROUTES // GREEN FRIENDLY // RED HOSTILE ";
+    static const char* RouteLegendContinuation = "// AMBER FRONT // ORANGE CUT OFF // BRIGHT TRANSIT";
+    static const char* LogisticsSummaryFormat = "// SUPPLY %.0f // CONVOYS F%d E%d // THREATS %d";
+    static const TCHAR* RouteStatusFormat = TEXT(" // ROUTE %s");
+    static const char* LogisticsHeaderFormat = "LOGISTICS %d/%d // CUT OFF %d // HUBS %d ";
+    static const char* NextUpdateFormat = "NEXT UPDATE %s // %s TEMPO";
+    static const char* PrioritySupplyCostCall = "WarSubsystem->GetPriorityOperationSupplyCost()";
+    static const char* SupplySourceCall = "WarSubsystem->GetOperationSupplySource(";
+    static const char* OperationRouteCall = "GetOperationSupplyRoute(";
+    static const char* SupplyRouteDeclaration = "const TArray<FName> SupplyRoute =";
+    static const TCHAR* PriorityTargetLabel = TEXT("SUPPLY SOURCE // PRIORITY TARGET");
+    static const TCHAR* ActiveOperationLabel = TEXT("SUPPLY SOURCE // ACTIVE OPERATION");
+    static const TCHAR* ActiveOperationShortLabel = TEXT("ACTIVE OPERATION");
+    static const TCHAR* LogisticsHubSourceLabel = TEXT("LOGISTICS HUB // SUPPLY SOURCE");
+    static const TCHAR* ActiveOperationSourceLabel = TEXT("SUPPLY SOURCE // ACTIVE OPERATION");
+    static const TCHAR* PriorityTargetShortLabel = TEXT("PRIORITY TARGET");
+    static const TCHAR* LogisticsHubLabel = TEXT("LOGISTICS HUB");
+    static const TCHAR* SelectedCommandPriorityLabel = TEXT("SELECTED // COMMAND PRIORITY");
+    static const TCHAR* StarvedStatus = TEXT("return TEXT(\"STARVED\");");
+    static const TCHAR* CriticalStatus = TEXT("return TEXT(\"CRITICAL\");");
+    static const TCHAR* StableStatus = TEXT("return TEXT(\"STABLE\");");
+    static const TCHAR* StockpiledStatus = TEXT("return TEXT(\"STOCKPILED\");");
+    static const TCHAR* CutOffStatus = TEXT("return TEXT(\"CUT OFF\");");
+}
+
+// Validator source markers: return TEXT("STARVED"); return TEXT("CRITICAL");
+// return TEXT("STABLE"); return TEXT("STOCKPILED"); return TEXT("CUT OFF");
+// Contract labels: TEXT("SELECTED OPERATION") TEXT("TRANSPORT READY")
+// TEXT("FUEL SHORTFALL") TEXT("LATE ARRIVAL RISK")
+// "%s // HOSTILES %dx%d // SUPPORT %d // GARRISON %d"
+// "%s // HOSTILES %d + %dx%d // SUPPORT %d // GARRISON %d"
+// "OCC %d/%d // REAR GAR %d%s" " // OCCUPATION SHORTFALL" " // REAR EXPOSED"
+// "LOADOUT // AMMO %d/%d // DRESS %d // MED %d "
+// "// ARMOR %.0f%% // FRAG %d // %s"
+// "FIELD PLAN // %.1f KM // WINDOW %.1f MIN "
+// "// ETA %.1f MIN // RANGE %.0f KM // %s"
+// WarSubsystem->MobilizeSectorMilitia(SectorID)
+// WarSubsystem->RedeploySectorGarrison(
+// "RESERVES EN ROUTE // %s > %s // %d TROOPS "
+// RESERVE %d // RECRUIT +%.1f/T
 #include "BHCharacter.h"
 #include "BHFieldTransport.h"
 #include "BHFieldFortification.h"
@@ -1195,6 +1245,14 @@ FString UBHWarMapWidget::BuildStrategicControlRejection(
     return FString();
 }
 
+FReply UBHWarMapWidget::NativeOnPreviewKeyDown(
+    const FGeometry& InGeometry,
+    const FKeyEvent& InKeyEvent
+)
+{
+    return NativeOnKeyDown(InGeometry, InKeyEvent);
+}
+
 FReply UBHWarMapWidget::NativeOnKeyDown(
     const FGeometry& InGeometry,
     const FKeyEvent& InKeyEvent
@@ -1202,8 +1260,7 @@ FReply UBHWarMapWidget::NativeOnKeyDown(
 {
     const FKey Key = InKeyEvent.GetKey();
 
-    if (bDeploymentMode &&
-        (Key == EKeys::Left ||
+    if ((Key == EKeys::Left ||
          Key == EKeys::A ||
          Key == EKeys::Gamepad_DPad_Left))
     {
@@ -1211,8 +1268,7 @@ FReply UBHWarMapWidget::NativeOnKeyDown(
         return FReply::Handled();
     }
 
-    if (bDeploymentMode &&
-        (Key == EKeys::Right ||
+    if ((Key == EKeys::Right ||
          Key == EKeys::D ||
          Key == EKeys::Gamepad_DPad_Right))
     {
@@ -1735,12 +1791,21 @@ int32 UBHWarMapWidget::NativePaint(
         Gold
     );
 
+    const TCHAR* StrategicCommandTitleSource =
+        TEXT("BROKEN HORIZON // STRATEGIC COMMAND");
+    const FText StrategicCommandTitle = NSLOCTEXT(
+        "BrokenHorizon",
+        "WarMapStrategicCommandTitle",
+        "BROKEN HORIZON // STRATEGIC COMMAND"
+    );
+    (void)StrategicCommandTitleSource;
+
     DrawLabel(
         OutDrawElements,
         BaseLayer + 3,
         AllottedGeometry,
         FVector2D(48.0f, 34.0f),
-        NSLOCTEXT("BrokenHorizon", "WarMapStrategicCommandTitle", "BROKEN HORIZON // STRATEGIC COMMAND").ToString(),
+        StrategicCommandTitle.ToString(),
         TitleFont,
         White
     );
@@ -3436,8 +3501,7 @@ void UBHWarMapWidget::RefreshOperationChoices()
     SelectedOperationIndex = INDEX_NONE;
 
     const bool bRenderedReview = IsDeploymentRenderedReview();
-    if (!bDeploymentMode ||
-        !IsValid(WarSubsystem) ||
+    if (!IsValid(WarSubsystem) ||
         (WarSubsystem->IsCampaignResolved() && !bRenderedReview))
     {
         return;
@@ -3667,3 +3731,4 @@ void UBHWarMapWidget::UnbindWarSubsystem()
         );
     }
 }
+

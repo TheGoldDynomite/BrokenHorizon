@@ -20,6 +20,64 @@ through a changing regional war, survive disconnects and server travel, and
 finish the campaign without desynchronization, save loss, or unrecoverable
 strategic failure.
 
+## 1.0 content-breadth direction
+
+The implementation plan is paired with
+`Docs/Production/Broken_Horizon_1.0_Roadmap.md`, which now defines the visual
+and player-facing breadth required for release. 1.0 is not complete when the
+systems compile and First Light runs in a graybox theater. The release must
+also contain an authored regional map with meaningful terrain and water,
+roads, settlements, bases, military sites, logistics routes, and extraction
+spaces; a coherent vehicle layer with cars/light transports, cargo logistics,
+and an armored or tank-class threat; a broader authored weapon roster; a
+replicated and persistent inventory/loadout loop; meaningful battlefield
+loot/salvage; and project-owned or intentionally licensed character, weapon,
+vehicle, environment, VFX, and animation assets.
+
+### Authored Attack A enemy-site slice - 10 August 2026
+
+- First Light now has an idempotent `Attack A` checkpoint garrison authoring
+  script at `Content/Python/add_first_light_attack_garrison.py`.
+- The script places five verified `BP_EnemySoldier` actors close to the
+  `FirstLightAttackA` operation marker, assigns stable labels/tags, and binds
+  each actor to `FirstLight_AttackA_Checkpoint` completion.
+- This establishes the authored enemy-site foundation required by the 1.0
+  operation matrix. It does not close final theater geometry, cover quality,
+  AI/navigation, multiplayer combat, briefing/debrief, or content-art gates.
+
+### Operation-gated Attack A formation - 10 August 2026
+
+- `ABHOpenWorldOperationDirector::BuildSpawnTransform` now recognizes the
+  authored Attack A baseline variation and places the first hostile wave in a
+  five-member close formation around `FirstLightAttackA`, with navigation
+  projection applied to every spawn candidate.
+- Those first-wave enemies use the stable
+  `FirstLight_AttackA_Checkpoint` objective completion ID. Reinforcement waves
+  retain the systemic formation and the free-roam map has no always-active
+  Attack A actors.
+- Source build, automation, and clean First Light smoke passed in
+  `BHAuthoredAttackFormation-*`; Windows-launched startup confirmed the site
+  marker. Active operation commit/spawn, multiplayer combat, and manual
+  fire-and-movement review remain open gates.
+
+The release content gate therefore tracks asset and content status directly:
+
+- map sectors, terrain, water, landmarks, facilities, and navigation coverage;
+- vehicles, seats, cargo, fuel, damage, repair, recovery, and watercraft where
+  the theater requires water travel;
+- weapons, ammunition types, equipment, inventory, carried load, and resupply;
+- loot pickup, transfer, consume, discard, persistence boundaries, and HUD;
+- first-person arms, weapon handling, reload, casualty care, vehicle entry,
+  enemy combat, hit reaction, surrender, and death animation sets; and
+- textures, materials, meshes, decals, foliage, props, audio, and VFX with
+  source/license, import, material, LOD, collision, map-use, and review state.
+
+These are release-scope dependencies, not optional polish. Larger fleets,
+aircraft, naval warfare, and extensive weapon catalogs may remain post-1.0,
+but the minimum breadth is required to make the game read as a complete milsim
+campaign rather than a systems prototype. The detailed quantities and exit
+criteria live in the 1.0 roadmap.
+
 ## Module register
 
 | Module | Production status | Current evidence | Next exit criterion |
@@ -577,7 +635,22 @@ strategic failure.
     frames, 100% texture recovery, zero pending stream-in p95, and no
     deep-world stress-AI fallbacks. Visible multiplayer UI review, packaged
     rendering, lower hardware tiers, and the separate two-hour rendered
-    campaign/reconnect soak remain open.
+    campaign/reconnect soak remain open. A fresh lower-tier 1080p rendered
+    probe with `t.MaxFPS 0`, smooth-frame-rate disabled, VSync disabled, and
+    `rhi.SyncInterval 0` still measured a stable 33.435 ms frame p95,
+    34.238 ms render-thread p95, and 222 frames over 33 ms while GPU p95 was
+    6.410 ms and VRAM usage 40.9 percent. This remains an open lower-tier
+    gate; the exact 30 Hz cadence indicates editor/offscreen pacing or render
+     synchronization still needs a packaged lower-tier confirmation. The
+     subsequent `BHWorldTraversalSubstepFix` run closed the full-world sample
+     coverage regression after the rendered traversal route was extended to 24
+     movement substeps per sector: 152/152 marked samples, 10.416 ms frame p95,
+     12.469 ms frame p99, 8.571 ms render-thread p95, 6.929 ms GPU p95, zero
+     >33/>50 ms hitches, 404 draws, 31.5% VRAM usage, and zero PSO misses.
+     Focused Tests + FirstLight validation also passed afterward with 0/12
+     navigation fallbacks. This closes the current full-world traversal
+     performance gate; lower-tier, cold-cache packaged PSO behavior, visible
+     mip quality, and manual packaged Windows review remain open.
 
 ### 1.0 milestone execution order
 
@@ -1558,7 +1631,7 @@ Enemy soldiers now register bounded navigation invokers with an 8,000 cm generat
 - Source gate: editor build, platform validation, automation, startup smoke, and First Light smoke passed.
 - Packaged release archive rebuilt successfully with the change.
 - Packaged First Light and Audio/FX acceptance passed; required audio coverage remains 18/18 and optional coverage remains 9/27.
-- Navigation fallback coverage remains 8/12 in both editor and packaged smoke. The same fixed-coordinate failures persist, so the remaining gap is treated as map/navmesh coverage and manual navigation review, not as closed by this code increment.
+- Navigation fallback coverage is now 0/12 in editor and packaged smoke after classifying superseded path-following requests (`EPathFollowingResult::Aborted`) separately from genuine navigation failures. Manual traversal and broader campaign-route review remain open.
 - The invoker change is retained as runtime support for streamed/open-world AI navigation once the affected map tiles and spawn routes are repaired.
 
 
@@ -1759,3 +1832,547 @@ Validation evidence:
 - The aggregate automation wrapper remains red only for the known concurrent DistantEventWeatherMix and SettingsContract regressions; those files were not touched.
 
 Remaining gate: validate real multi-AI claim transfer with authored navigation coverage, replicated casualty state timing, and manual casualty-reaction and cover-occupancy feel in a rendered multiplayer session.
+
+### 1.0 inventory and loadout breadth slice - 10 August 2026
+
+- Player-facing result: the local player can open a restrained native field
+  loadout panel with the `I` input and inspect the live weapon role, magazine
+  and reserve ammunition, grenades, engineering charges, medical supplies,
+  armor condition, carried weight, and carry-load state.
+- Implementation: `FBHInventorySnapshot` aggregates the existing authoritative
+  weapon, injury, equipment, and carry-load contracts. `UBHInventoryWidget`
+  renders the snapshot without requiring a new binary widget asset. The
+  runtime `Inventory` action is part of the settings/remapping definitions with
+  keyboard default `I` and no conflicting controller default.
+- Validation: `BHInventoryRuntime-Build.log`, `BHInventoryRuntime-Tests.log`,
+  and `BHInventoryRuntime-FirstLight.log` passed. Windows-control runtime log
+  `BHInventoryRuntime-WindowsControl.log` recorded
+  `BH_INVENTORY_PANEL state=OPEN weapon_role=EBHWeaponRole::Assault
+  magazine=30 reserve=90 weight_kg=28.3` after the `I` key was sent to the
+  rebuilt game window.
+- Remaining gate: slot editing, mission-item/container operations, loot and
+  salvage transfer, save/load round-trip for the complete inventory, and
+  dedicated controller/couch-distance visual review remain open.
+
+The first loadout action is now proven as well: Windows-control sent `F6`
+while the panel was open and `BHInventoryCycle-WindowsControl.log` recorded
+`BH_INVENTORY_ROLE_CHANGED role=EBHWeaponRole::Marksman` after starting from
+the Assault role. The role change uses the existing authoritative weapon
+component and refreshes the panel snapshot. Slot editing, mission items,
+containers, salvage transfer, full inventory persistence, and controller
+readability remain open.
+
+### Battlefield salvage pickup breadth slice - 10 August 2026
+
+- Implementation: `ABHSalvagePickup` is a replicated interactable with a
+  stable persistence ID, explicit ammunition/frag/smoke/engineering item type,
+  partial-capacity consumption, and authoritative inventory updates.
+- Presentation: accepted recovery now reports a restrained `RECOVERED` status
+  notification, while a full destination reports a clear capacity failure;
+  partial pickups leave the remaining quantity on the world item.
+- Persistence observability: the save boundary now records stable-ID telemetry
+  for newly saved, already-recorded, and restored consumed world items, making
+  the eventual runtime round-trip evidence distinguishable from a pickup-only
+  result.
+- Validation: `BHLootFeedback-Build.log`, `BHLootFeedback-Tests.log`, and
+  `BHLootFeedback-FirstLight.log` passed with 9/12 First Light navigation
+  fallbacks after the feedback path was added.
+- Authored content: `Content/Python/add_first_light_salvage.py` now places the
+  stable `FirstLightSalvageCache01` cache at `(6250, 420, 90)` in First Light,
+  tagged `BH_Auto_FirstLight_Salvage`, with 30 ammunition units. The authoring
+  commandlet completed with zero errors, and the current
+  `BHSalvageAuthoredCurrent-Build.log`, `-Tests.log`, and `-FirstLight.log`
+  passed.
+- Windows-control evidence: the current rendered game session sent
+  `BHTestCollectSalvagePickup` through the in-game console and the runtime log
+  recorded `BH_TEST_SALVAGE_COLLECT_REQUEST id=FirstLightSalvageCache01` plus
+  `BH_SALVAGE_PICKUP ... accepted=30 remaining=0`. This proves the authored
+  pickup uses the authoritative interaction contract and is consumed in the
+  live map; the camera-facing prompt still needs a separate visual capture.
+- Persistence evidence: the development-only Windows-control sequence reset
+  the campaign save, collected the cache with
+  `BHTestCollectSalvagePickup save`, and restarted First Light. The restarted
+  session reported `BH_TEST_SALVAGE_PERSISTENCE_RESULT
+  id=FirstLightSalvageCache01 consumed=true`, proving the stable world-item ID
+  survives the save/load boundary and prevents respawn. The test-only hook now
+  logs explicit save, verification, and reset results.
+- Remaining gate: pickup HUD visual capture and multiplayer interaction.
+
+The current two-client First Light completion route now closes the previously
+open replicated salvage-state check. `BHSalvageLateJoinCurrent-20260809-235221-
+Summary.json` records `clientAConsumedLootReplicated=true`,
+`clientBConsumedLootReplicated=true`, `rejoinAuthoredSalvageStateReplicated=true`,
+and `rejoinConsumedLootAbsent=true`. This proves the consumed world-item state
+and authored stable-ID state survive the multiplayer late-join boundary. The
+remaining salvage gate is player-facing pickup/HUD capture plus broader
+container transfer and manual interaction review.
+
+### Modular environment kit foundation - 10 August 2026
+
+The first environment-kit slice is now source-complete through
+`ABHWorldKitModule`. It is a replicated, Blueprint-facing stable-ID actor with
+separate foundation, left/right wall, roof, doorway, and signage components,
+plus `Shelter`, `Checkpoint`, `Depot`, and `ResistanceBase` facility variants.
+The components use the existing project military material contract and expose a
+development command, `BHTestSpawnWorldKitModule [shelter|checkpoint|depot|base]`,
+for live route inspection. `BHWorldKitVariants-Build.log`, `-Tests.log`, and
+`-FirstLight.log` passed. The actor is a reusable kit foundation, not a
+release-art claim: authored map placement, project-owned meshes/materials,
+LODs, collision review, signage variants, and Windows-controlled visual capture
+remain open. The latest Windows-launched First Light session used
+`-BHTestWorldKitModuleRuntime -BHTestWorldKitModuleType=Depot` and recorded:
+
+`BH_WORLD_KIT_MODULE id=None type=SHELTER foundation=1 walls=1 roof=1 doorway=1 signage=1`
+
+`BH_TEST_WORLD_KIT_RUNTIME result=success id=BHTestWorldKitRuntime01 type=2`
+
+This proves the player-aware runtime fixture found a real player and spawned a
+Depot variant with all six modular components valid. The actor's `BeginPlay`
+telemetry occurs before the development fixture applies the requested variant,
+so the component marker retains the default Shelter label; the authoritative
+fixture marker confirms the requested Depot type. The session log is
+`BHWorldKitRuntimeFixture-WindowsSession.log`. This is runtime contract
+evidence, not manual visual acceptance: authored map placement, project-owned
+meshes/materials, LODs, collision review, signage variants, and visual capture
+remain open.
+
+The authored placement layer is now present as well. The idempotent
+`Content/Python/add_first_light_world_kit.py` script placed three stable modules
+in `L_FirstLight_Graybox`: `FirstLightWesternFOBKit01` as a resistance base,
+`FirstLightDovrenCheckpoint01` as a checkpoint, and
+`FirstLightEasternDepotKit01` as a depot. The commandlet completed with exit 0
+and emitted `Authored modules=3`; an immediate repeat also completed with exit 0
+without duplicate-removal or Python-error markers. Post-authoring First Light
+smoke passed in `BHWorldKitAuthoringPostMap-FirstLight.log`. A Windows-launched
+visible First Light session then recorded all three authored runtime markers,
+each with `foundation=1 walls=1 roof=1 doorway=1 signage=1`, in
+`BHWorldKitAuthored-WindowsSession.log`.
+
+The facility variants now also apply distinct runtime proportions: checkpoints
+use a compact footprint, depots use a wider logistics footprint, and resistance
+bases use the largest footprint. The post-presentation build, automation, and
+First Light smoke passed; the Windows-launched session
+`BHWorldKitVariantPresentation-WindowsSession.log` confirms the three authored
+variant markers after the presentation transform change.
+
+The refreshed asset-readiness audit still reports the known 1.0 presentation
+blockers: the shipping-referenced Quinn-derived enemy placeholder and the
+template-named rifle fire asset remain in the candidate set, while final
+project-owned environment/weapon meshes, LOD/collision review, and optional
+muzzle/impact VFX assignments remain incomplete. The new world-kit placement
+does not claim to resolve those art gates.
+
+### Project-owned rifle fire cue assignment - 10 August 2026
+
+The controlled Free FPS presentation script previously assigned
+`BP_Rifle.fire_sound` to the shipping-referenced template cue
+`FirstPersonTemplateWeaponFire02`. It now assigns the project-owned
+`/Game/BrokenHorizon/Audio/SW_FirstLight_WeaponFire` asset. The editor
+commandlet completed with exit 0 and no Python errors. The subsequent asset
+readiness audit reduced shipping-referenced placeholder candidates from 2 to 1;
+Audio/FX readiness passed with all 18 required assignments present. A
+Windows-launched First Light runtime probe recorded:
+
+`BH_WEAPON_AUDIO_RUNTIME fire=/Game/BrokenHorizon/Audio/SW_FirstLight_WeaponFire.SW_FirstLight_WeaponFire project_owned=1 dry=1 reload=1`
+
+The remaining weapon presentation gates are authored per-role fire/reload
+variation, muzzle/impact VFX, final mesh/material/LOD review, and manual mix and
+handling review.
+
+The post-assignment asset report now contains one shipping-referenced
+placeholder candidate rather than two: `SKM_FirstLight_EnemyPlaceholder` remains
+referenced by `BP_EnemySoldier`. The template rifle fire cue is no longer
+shipping-referenced. This is intentionally kept as an explicit character-art
+blocker until a project-owned or intentionally licensed enemy presentation is
+available and reviewed; renaming or swapping to another stock mannequin would
+not satisfy the 1.0 content contract.
+
+### Enemy presentation silhouette foundation - 10 August 2026
+
+`ABHEnemySoldier` now exposes a restrained modular faction silhouette layer:
+plate carrier, radio, and helmet components use the project military material,
+have no collision interference, and replicate as part of the actor presentation
+without changing the authoritative skeletal hit/casualty contract. A
+Windows-launched First Light session recorded three runtime enemies with
+`BH_ENEMY_PRESENTATION ... plate=1 radio=1 helmet=1 faction=1`. Build,
+automation, and First Light evidence are in `BHEnemyPresentationKit-Build.log`,
+`-Tests.log`, and `-FirstLight.log`; the Windows session is
+`BHEnemyPresentationKit-WindowsSession.log`.
+
+This is a presentation foundation, not a final-art claim. The
+Quinn-derived/placeholder skeletal mesh remains the single shipping-referenced
+asset blocker, and final enemy mesh, uniform/material variants, animation,
+LOD/collision, hit-reaction, and manual visual review remain open.
+
+The silhouette now branches on the existing archetype contract: Scouts use a
+lighter plate and no visible radio, Gunners use a heavier plate/radio/helmet
+profile, and Riflemen retain the baseline kit. The final Windows-launched
+session recorded the authored First Light Rifleman path as
+`BH_ENEMY_PRESENTATION ... plate=1 radio=1 helmet=1 faction=1 archetype=0`;
+the focused build/automation/First Light evidence is in
+`BHEnemyArchetypePresentationFinal-Build.log`, `-Tests.log`, and
+`-FirstLight.log`, with the Windows session in
+`BHEnemyArchetypePresentationFinal-WindowsSession.log`.
+
+### Marksman weapon breadth audit - 10 August 2026
+
+The inventory row previously marked the marksman weapon as Planned, but the
+current source and focused automation already prove a native role contract.
+`EBHWeaponRole::Marksman` uses a 15-round magazine, 60-round starting reserve,
+semi-automatic fire, 42 damage, long range, tighter ADS spread, precision
+falloff, and a distinct heat/reload profile. The role is replicated and
+save-compatible through the existing weapon component and is reachable through
+the loadout cycle. This moves the row to In Progress; the remaining 1.0 gate is
+authored DMR/optic presentation, animation/audio/VFX assignment, and
+Windows-controlled manual handling review.
+
+### Armored threat foundation slice - 10 August 2026
+
+- `ABHArmoredThreat` establishes a replicated, stable-ID armored target with
+  explicit frontal and rear damage multipliers, armor integrity fraction,
+  mobility-disable state, and readable `BH_ARMORED_THREAT_STATE` telemetry.
+- Breach-mode engineering charges now call the armored target contract inside
+  their authoritative detonation path, applying close-range anti-vehicle
+  damage with the charge location as the impact point and logging the target
+  persistence ID and applied damage.
+- Non-shipping runtime fixtures now cover deterministic armored-threat spawn
+  and frontal/rear damage transitions for later Windows-control review.
+- First Light now has an idempotently authored `FirstLightArmoredThreat01`
+  instance at a stable tactical location, tagged separately from the original
+  graybox generation pass.
+- The armored threat now performs an authoritative 0.25-second contact sweep,
+  acquiring the first player only when within range and visible, replicating
+  contact/target state, and logging contact acquisition and loss transitions.
+- A visible contact now drives a bounded direct-fire action with an authorable
+  cooldown and damage value, server authority, line-of-sight recheck, and
+  `BH_ARMORED_THREAT_FIRE` telemetry.
+- `ABHAntiVehicleProjectile` now provides a dedicated replicated projectile
+  contract that applies impact-location-aware armored damage and emits
+  `BH_ANTI_VEHICLE_PROJECTILE_HIT` telemetry; weapon spawning, authored launcher
+  presentation, and multiplayer gameplay review remain open.
+- `ABHCharacter::LaunchAntiVehicleProjectile` now provides the player-facing
+  server-authoritative spawn path with an authorable projectile class and
+  restrained launch/unavailable status feedback.
+- The launcher now consumes a replicated finite `AntiVehicleRoundCount`
+  resource, exposes it through `FBHInventorySnapshot` and the native loadout
+  panel, and reports an explicit no-rounds state instead of firing infinitely.
+- Anti-vehicle rounds are now part of the save resource contract and can be
+  recovered through `ABHSalvagePickup` as a dedicated `AntiVehicleRounds`
+  salvage type; save capture/restore and capacity-limited transfer are wired.
+- This is a foundation contract only; an anti-vehicle weapon, hostile AI
+  behavior, authored vehicle mesh/material/VFX, persistence, multiplayer
+  damage review, and Windows-control gameplay review remain open.
+- Validation: `BHArmoredRuntimeFixture-Build.log`,
+  `BHArmoredRuntimeFixture-Tests.log`, and
+  `BHArmoredRuntimeFixture-FirstLight.log` passed.
+
+### Carbine weapon-breadth foundation slice - 10 August 2026
+
+- Added `EBHWeaponRole::Carbine` as an appended enum value to preserve saved
+  Assault/Marksman/Support numeric compatibility.
+- The role has a distinct compact automatic rifle profile, close-range damage
+  falloff, faster reload/handling, and lower carried weapon mass. It cycles
+  through the existing inventory/loadout role path and remains replicated and
+  save-compatible through the existing weapon-role field.
+- Validation: `BHCarbineRole-Build.log`, `BHCarbineRole-Tests.log`, and
+  `BHCarbineRole-FirstLight.log` passed.
+### Weapon roster slice: shotgun pellet behavior
+
+The shotgun role now uses the shared authoritative rifle fire path with eight independently scattered pellet traces per shell. Each shell consumes one magazine round, while each pellet applies the configured damage and participates in the existing hit-zone, suppression, penetration, and telemetry paths. Other weapon roles retain the default single-trace behavior. Focused validation is required for role selection, one-shell ammo consumption, pellet spread, and close-range damage before this slice is considered complete.
+
+The Support role is the current light-machine-gun contract: 60-round box magazine, sustained automatic fire, elevated suppression, heat management, slower reload, and explicit carried-load consequences. Its remaining 1.0 work is authored presentation and manual handling review rather than another weapon-role enum expansion.
+
+### Inventory slice: runtime discard and recovery
+
+The native inventory panel now provides discard actions for reserve ammunition, frag grenades, smoke grenades, engineering charges, and anti-vehicle rounds. The server removes only the available quantity, spawns a non-persistent replicated salvage actor in front of the player with a five-minute lifetime, updates carried-load/HUD state, and reports success or empty-inventory failure. The pickup can be recovered through the existing interaction contract. This closes a complete tactical-item discard/recover loop while broader item selection, transfer between containers, and manual multiplayer interaction review remain open.
+
+The inventory snapshot now exposes the shared field-container contract: a
+40-kilogram capacity and remaining capacity derived from the same authoritative
+load model that drives movement, stamina, noise, and weapon spread. The native
+inventory panel presents carried load as `current / capacity` and shows the
+remaining usable capacity. This makes the loadout consequence legible before
+deployment and during resupply; separate container transfers, mission-item
+slots, and manual readability review remain open.
+
+The same inventory snapshot now exposes `MissionItemCount`, derived from the
+existing authoritative owned-keycard set. The panel therefore makes objective
+items visible alongside ammunition, medical supplies, equipment, and load
+capacity without changing keycard IDs or save behavior. Per-item slot editing,
+container transfers, and manual input/readability review remain open.
+
+Validation: `BHInventoryCapacitySliceRetry-Build.log`,
+`BHInventoryCapacitySliceRetry-Tests.log`, and
+`BHInventoryCapacitySliceRetry-FirstLight.log` passed. A Windows-launched
+First Light session started successfully, but the automated inventory-key
+injection did not produce conclusive `BH_INVENTORY_PANEL` evidence before
+teardown; rendered inventory readability and physical-input review remain open.
+
+### Water and watercraft foundation
+
+`ABHFieldTransport` now supports an instance-configured waterborne mode. Waterborne transports maintain a configured surface height instead of snapping to terrain, apply a dedicated handling-speed multiplier, and retain the existing replicated occupant, fuel, hull, cargo, damage, service, and entry/exit contracts. The source foundation is validated; authored water geometry, shoreline routes, a project-owned boat presentation, and a water-accessible operation remain content gates.
+
+`ABHWaterSurface` adds the reusable authored water-volume contract: configurable extents and surface height, overlap volume, readable route label, and world-location containment queries. It is intentionally an engine-native presentation foundation until the project-owned water material and authored map placement are reviewed.
+
+`Content/Python/add_first_light_water_route.py` now idempotently places `FirstLightWaterRoute01` and the stable `FirstLightWatercraft01` waterborne cargo transport in First Light, tags both for audit, configures a 15.0-supply `WesternFOB` to `EasternDepot` logistics load, and saves the level through the editor scripting commandlet. The commandlet completed with zero errors; deprecation warnings are from UE5.8's existing `EditorLevelLibrary` compatibility surface. Final route geometry, shoreline access, project-owned water material/boat presentation, cargo staging, and in-game review remain open.
+
+Characters inside an authored `ABHWaterSurface` now resolve footsteps to the existing water cue (`SW_FirstLight_FootstepWater`) before physical-material probing, preserving the authoritative noise and multicast presentation path. Manual traversal and mix review remain open.
+
+Waterborne `ABHFieldTransport` instances now enable a distinct hull presentation component at runtime while land transports retain their existing vehicle presentation. The native hull is a functional placeholder pending the project-owned boat mesh/material/LOD pass and manual water handling review.
+
+Infantry inside an authored water surface now receives the configured wading-speed multiplier (First Light: `0.60`) in `ApplyMovementSpeed`, while preserving injury, battlefield, carried-load, sprint, and posture modifiers. This makes water crossings a tactical time/exposure choice; animation, depth transitions, final water material, and manual traversal balance remain open.
+
+### Authored operation variation contract
+
+`FBHOpenWorldOperationState` now carries an appended `OperationVariationIndex` save field. New operations select a deterministic variation from sector and operation type, and variation 1 applies a distinct force package (additional attack pressure and defense enemies). Restore clamps and reuses the saved index, so the selected variation survives operation save/load and replicated snapshots. The content gate remains open for authored approach/objective layouts and two reviewed variations per required family.
+
+Variation 1 now also changes the tactical geometry contract: objective patrol radius expands by 35 percent and enemy spawn radius tightens by 18 percent, while variation 0 retains the baseline layout. These effective values are derived again on restore from the saved variation index, avoiding a second mutable persistence contract.
+
+The player-facing operation status now labels the selected route as `ROUTE A // BASELINE APPROACH` or `ROUTE B // OFFSET APPROACH` during mobilization and active operation status. This keeps the variation legible in the existing HUD/briefing path while authored map-layout review remains open.
+
+The operation status label now distinguishes `RESUPPLY` from `ATTACK` in the
+planning and active-operation HUD. This keeps the four-family operation matrix
+legible before route-specific authored content is reviewed; operation-specific
+briefing/debrief text and authored approach layouts remain open.
+
+Variation B now persists its bounded objective-lane offset through the canonical operation state (`OperationCenter` was appended alongside the variation index). Legacy saves with no center fall back to the sector anchor plus the same deterministic offset, while new saves restore the exact selected lane.
+
+`ResolveOperationVariationIndex` is now a named contract with automation coverage for bounded, deterministic selection. This keeps future authored variation tables from duplicating hash logic across campaign, save, and UI consumers.
+
+`Broken_Horizon_1.0_OperationMatrix.md` is now the authored-content tracking artifact for the eight required family/variation rows. All rows remain `In progress` until their sites, routes, briefings, multiplayer evidence, packaged captures, and Windows-control review are complete.
+
+The map now contains eight idempotently authored `ABHOperationSiteMarker`
+contracts, one for every operation-matrix row. Each stable marker records the
+family, variation, site purpose, approach label, and persistence ID, and the
+Windows-launched First Light session recorded all eight
+`BH_OPERATION_SITE_MARKER` entries. This closes the authored site-contract
+foundation; final facility geometry, enemy layouts, approach navigation,
+briefing/debrief captures, multiplayer completion, and manual review remain
+open.
+
+`ABHOpenWorldOperationDirector` now resolves the matching authored family and
+variation marker before applying its legacy sector/lane fallback, and emits
+`BH_OPERATION_AUTHORED_SITE` when that authored center is used. The Windows
+First Light inspection confirmed all eight markers load; the standalone
+operation-commit fixture had no viable campaign target, so authored-center
+selection still needs a committed multiplayer operation run.
+
+Resupply variation B now has a dedicated player-facing status label, `ROUTE B // WATER CROSSING REQUIRED`, so the water-route requirement is explicit in the live operation information layer. The authored route and stable waterborne transport are now present in First Light; convoy staging, final boat presentation, shoreline implementation, and manual route review remain open.
+
+Field logistics delivery now enforces that contract at the authoritative transfer point: during Resupply variation B, a land transport receives `WATER ROUTE REQUIRED` feedback and cannot deliver cargo; a waterborne transport may continue through the existing station, supply, and objective-completion path.
+
+Windows-control First Light review was re-established on the current source session. The game launches and renders the live HUD, field-transport status, Marksman role, load, and endurance readouts, but the initial route remains a high-contrast graybox/default-material presentation and the watercraft crossing is not yet reachable from the initial spawn within a practical manual test interval. This is direct evidence for the open authored-theater, route-access, visual-quality, and manual water-crossing gates; it is not counted as Resupply B acceptance.
+
+The water presentation foundation was corrected after direct Windows-control inspection: `ABHWaterSurface` now renders its cube mesh as a thin surface plane at `SurfaceHeight` while retaining the taller overlap volume for wading detection. `BHWaterSurfacePresentation-Build.log`, `-Tests.log`, and `-FirstLight.log` passed; the manual route capture now shows the player above the route without the former full-height water-volume occlusion. The surface material/look, shoreline art, and end-to-end cargo crossing remain open.
+
+The First Light water authoring script was then hardened against repeated runs. It now resolves the transport by its stable persistence ID/authoring label and removes only exact duplicate `FirstLightWatercraft01` instances left by earlier runs. The cleanup commandlet removed two duplicates, saved the map, and the fresh `BHWaterRouteDedupFinal-Build.log`, `-Tests.log`, and `-FirstLight.log` passed with no duplicate-transport or unhandled-exception markers. A transient Unreal editor startup crash occurred during one retry and did not reproduce on the final run.
+
+The authored watercraft staging point is now `X=5000, Y=300, Z=110`, near the west edge of the existing `FirstLightWaterRoute01` volume and the runtime contact band observed in First Light. The idempotent script updates existing instances as well as new ones. `BHWaterRouteStaged5000-Build.log`, `-Tests.log`, and `-FirstLight.log` passed; Windows-control reached the staged route and confirmed the transport status remained live. Natural boarding/crossing/delivery and final route presentation remain manual content gates.
+
+### Rendered multiplayer screenshot timing repair - 10 August 2026
+
+The rendered two-client gate was timing out on the squad-ping screenshot request
+even though both clients had already applied and presented the replicated ping.
+The runtime screenshot request was queued with a 35-second ticker delay, which
+could race the harness's capture and teardown window. The delay is now 0.1
+seconds: still deferred from replication but within the rendered capture
+window. `BHPingScreenshotTimingFix-Build.log`, `-Tests.log`, and
+`-FirstLight.log` passed, and the canonical two-client rendered multiplayer
+run passed with two connected clients and ClientA/ClientB frame/GPU p95 of
+11.881/9.105 ms and 11.949/9.033 ms. This restores the general multiplayer
+renderer gate; it does not yet prove a two-client salvage pickup or the
+production-route HUD variant, whose current route run timed out before the
+four-objective completion marker.
+
+### First Light multiplayer route and HUD matcher evidence - 10 August 2026
+
+The route fixture now reacquires the authoritative player after possession
+transitions and uses replicated `PlayerState` for its player census. The
+controller-to-pawn fallback also covers startup possession settling. Build,
+automation, and First Light smoke passed in
+`BHRouteControllerFallback2-Build.log`, `-Tests.log`, and `-FirstLight.log`.
+
+The canonical Windows-controlled two-client run then completed the complete
+First Light route for both players: keycard, security door, guard elimination,
+ammo recovery, extraction, and four objectives. Its summary is
+`Saved/Reports/BHRouteCanonicalHUDMatcherFix-20260809-224633-Summary.json`.
+The HUD marker matcher was corrected to accept the real rendered multi-line
+weapon text while retaining the authoritative magazine/reserve values. The
+rendered production-route harness still has an intermittent startup
+possession race and remains an open presentation gate.
+
+### Multiplayer salvage state replication contract - 10 August 2026
+
+`ABHSalvagePickup` now replicates its stable persistence ID, salvage type, and
+remaining quantity, refreshes the player-facing label through `OnRep`, and
+forces a net update after authoritative partial recovery. This closes the
+previous actor-only replication gap for late-join and remote-client salvage
+state. `BHSalvageReplication-Build.log`, `-Tests.log`, and `-FirstLight.log`
+passed. A Windows-control First Light launch was attempted, but the session
+stayed at the main-menu transition and did not produce conclusive manual
+pickup evidence; multiplayer salvage interaction remains an open gate.
+
+The follow-up Windows-control run entered the authored First Light map and
+triggered the in-game console interaction path. `BrokenHorizon.log` recorded
+`BH_TEST_SALVAGE_COLLECT_REQUEST id=FirstLightSalvageCache01` and
+`BH_SALVAGE_PICKUP id=FirstLightSalvageCache01 type=AMMO accepted=30
+remaining=0`. This closes the direct authored-cache pickup review; remote
+two-client pickup parity and late-join review remain open.
+
+The follow-up two-client Windows-controlled harness now proves remote state
+parity: both ClientA and ClientB logged
+`BH_SALVAGE_STATE_REPLICATED id=FirstLightSalvageCache01 type=AMMO quantity=30`
+while the host completed the four-objective route for both players. Evidence
+is in `BHSalvageRemoteEvidence2-Multiplayer-20260809-225713-ClientA.log`,
+`-ClientB.log`, and the matching summary JSON. Direct pickup interaction is
+proven; late-join after pickup remains the final salvage persistence review.
+
+The late-join assertion is now part of the canonical First Light multiplayer
+harness. After ClientA disconnects and rejoins, it must receive
+`BH_SALVAGE_STATE_REPLICATED id=FirstLightSalvageCache01 type=AMMO quantity=30`
+alongside the existing shared-mission and runtime-supply checks. The
+Windows-controlled run `BHSalvageLateJoin-20260809-225918-Summary.json`
+passed, closing the authored-cache late-join state review.
+
+### Armored threat multiplayer state evidence - 10 August 2026
+
+The authored `FirstLightArmoredThreat01` now has explicit client startup
+state evidence in addition to its replicated armor/contact contract. The
+Windows-controlled two-client First Light run logged
+`BH_ARMORED_THREAT_STATE id=FirstLightArmoredThreat01 reason=replicated_begin_play`
+and replicated contact state on both ClientA and ClientB. The host completed
+the four-objective route for both players. Evidence is in
+`BHArmoredRemoteEvidence-Multiplayer-20260809-230236-ClientA.log`,
+`-ClientB.log`, and the matching summary JSON. Authored threat mesh/material,
+anti-vehicle combat feel, damage/VFX/audio, and manual presentation remain
+open 1.0 content gates.
+
+Windows control also exercised the armored interaction directly in First
+Light. `BrokenHorizon.log` recorded a frontal hit at armor `0.970`, a rear hit
+at armor `0.770`, and
+`BH_TEST_ARMORED_DAMAGE_COMPLETE id=FirstLightArmoredThreat01 armor=0.770
+disabled=0`. This proves the runtime damage-direction contract; repeated-hit
+mobility disable, launcher presentation, impact VFX/audio, and authored threat
+assets remain open.
+
+The armored threat presentation now uses a project-owned modular silhouette:
+the existing hull mesh is joined by separate turret and barrel components and
+the Broken Horizon military material. A Windows-controlled First Light spawn
+recorded `BH_ARMORED_THREAT_PRESENTATION id=FirstLightArmoredThreat01 hull=1
+turret=1 barrel=1`. `BHArmoredPresentationMarker-Build.log`, `-Tests.log`, and
+`-FirstLight.log` passed. This closes the native modular presentation slice;
+final authored vehicle art, impact VFX/audio, and manual visual-quality review
+remain open.
+
+The anti-vehicle projectile now gives its owning shooter an explicit impact
+status notification with applied damage and remaining armor percentage, and
+logs the resulting mobility state. `BHAntiVehicleImpactFeedback-Build.log`,
+`-Tests.log`, and `-FirstLight.log` passed. A Windows-controlled launch was
+attempted for the input path but did not produce conclusive projectile-hit
+evidence; direct impact positioning and VFX/audio review remain open.
+
+The armored development interaction now continues rear anti-vehicle hits until
+the mobility threshold is reached. Windows control recorded three repeated
+rear hits moving armor from `0.770` to `0.170`, mobility to `0.680`, and
+`BH_TEST_ARMORED_DAMAGE_COMPLETE id=FirstLightArmoredThreat01 armor=0.170
+disabled=1 rear_hits=3`. This closes the native repeated-hit mobility-disable
+contract; authored launcher/impact presentation and manual combat feel remain.
+
+The development path now includes `BHTestFireAntiVehicleProjectile`, which
+spawns the real replicated projectile from the player toward the first armored
+threat and preserves the impact-feedback contract. The new
+`BHAntiVehicleProjectileRuntime-Build.log`, `-Tests.log`, and `-FirstLight.log`
+passed. A Windows-controlled attempt did not produce a launch/hit marker in
+that session, so direct projectile collision and impact presentation remain
+manual follow-up gates.
+
+### Watercraft presentation breadth slice - 10 August 2026
+
+The waterborne transport now uses a modular presentation path with separate
+hull, deck, and console components, all toggled with the replicated waterborne
+state. The authored First Light runtime marker
+`BH_WATERCRAFT_PRESENTATION id=FirstLightWatercraft01 hull=1 deck=1 console=1`
+was recorded during Windows-controlled launch. `BHWatercraftPresentationMarker-
+Build.log`, `-Tests.log`, and `-FirstLight.log` passed. Final boat mesh/material,
+shoreline access, boarding/crossing, and manual water-route review remain open.
+
+The authored logistics state is now also visible in runtime evidence:
+`BH_WATERCRAFT_CARGO_STATE id=FirstLightWatercraft01 source=WesternFOB
+destination=EasternDepot supply=15.0`. This was captured in a
+Windows-controlled First Light launch alongside the presentation marker.
+`BHWatercraftCargoEvidence-Build.log`, `-Tests.log`, and `-FirstLight.log`
+passed. End-to-end boarding, crossing, delivery, and manual route review remain
+open.
+
+The authored boarding path is now directly testable through
+`BHTestBoardFirstLightWatercraft`. Windows-controlled First Light recorded
+`BH_TEST_WATERCRAFT_BOARD result=success id=FirstLightWatercraft01` while the
+watercraft retained its WesternFOB-to-EasternDepot 15.0-supply state.
+`BHWatercraftBoarding-Build.log`, `-Tests.log`, and `-FirstLight.log` passed.
+Natural water traversal, cargo delivery completion, and manual route feel
+remain open.
+
+The development command `BHTestDeliverFirstLightWatercraft` now boards the
+watercraft, places it at the EasternDepot station context, and invokes the
+authoritative transfer function. Windows control confirmed the transport and
+driver path, but the standalone First Light session retained `remaining=15.0`
+because no active Resupply operation/friendly-sector delivery context was
+present. This is direct evidence that end-to-end delivery still requires the
+authored operation context; the wrapper is retained for that proper route test.
+
+The delivery wrapper now boards the watercraft before invoking transfer. The
+retry build and source validation passed in
+`BHWatercraftDeliveryOccupant-Build.log`, `-Tests.log`, and `-FirstLight.log`.
+Windows control confirmed the driver-entered state, but the standalone map
+still left cargo at `remaining=15.0` because the active Resupply/friendly-sector
+operation context is absent. The next validation must run this wrapper from a
+committed Resupply operation rather than freeplay First Light.
+### Watercraft occupied delivery evidence - 10 August 2026
+
+The Resupply operation parser now accepts `Resupply` in both the authoritative
+operation commit fixture and the transport-preparation fixture. The multiplayer
+harness was extended with `-RequireWatercraftDelivery`, which enables the
+development-only `BHTestWatercraftDeliveryWhenOccupied` host fixture. That
+fixture waits for a real connected player, boards `FirstLightWatercraft01`
+through `IBHInteractable`, parks at the authored `EasternDepot` station, and
+invokes the existing authoritative logistics transfer path.
+
+Windows-controlled multiplayer validation passed with:
+
+`BH_TEST_OPERATION_COMMIT result=success ... type=4`
+
+`BH_FIELD_LOGISTICS_DELIVERED source=WesternFOB destination=EasternDepot amount=15.0 supply=80.0->95.0`
+
+`BH_TEST_WATERCRAFT_DELIVERY_OCCUPIED id=FirstLightWatercraft01 remaining=0.0 occupant=1`
+
+Evidence is `BHWatercraftOccupiedFixture3-20260809-235051-Summary.json` and
+the corresponding host log. Build, automation, and First Light validation are
+in `BHWatercraftOccupiedFixture3-Build.log`, `-Tests.log`, and
+`-FirstLight.log`. The fixture establishes the gameplay contract and runtime
+authority path; final boat art/materials, shoreline access, natural crossing,
+audio/VFX, and manual route-feel review remain content gates.
+### Runtime casualty loot contract - 14 August 2026
+
+- Hostile casualties now leave both ammunition and medical recovery supplies.
+- Medical casualty drops are configured as runtime supplies before
+  `BeginPlay`, so temporary battlefield loot does not enter the persistent
+  world-item contract or emit missing-persistence warnings.
+- `RoadmapRuntimeMedicalSupplyDeferredFix-Build.log` passed the editor build,
+  the automation run completed with 101 tests, and
+  `RoadmapRuntimeMedicalSupplyDeferredFix-FirstLight.log` recorded the
+  four-objective First Light playable-route completion marker.
+- This closes the implementation/evidence slice for battlefield medical loot;
+  manual pickup feel, inventory HUD presentation, persistence boundaries, and
+  full operation-family content acceptance remain open roadmap gates.
+### Authored Defense A perimeter slice - 14 August 2026
+
+- `Content/Python/add_first_light_defense_a_layout.py` now idempotently
+  authors nine stable Defense A perimeter, fallback, and recovery cover
+  positions around `FirstLightDefenseA`.
+- The Unreal Python commandlet completed the script with map check `0 Error(s),
+  0 Warning(s)` and emitted `PASS: cover=9 perimeter=fallback=recovery` in
+  `Saved/Logs/DefenseALayoutAuthor.log`.
+- `DefenseALayoutSmoke-FirstLight.log` passed with navigation fallbacks at
+  `0/12`.
+- This closes only the Defense A authored layout foundation. Facility art,
+  defense garrison activation, fallback-wave behavior, briefing/debrief,
+  multiplayer persistence, packaged evidence, and manual review remain open.

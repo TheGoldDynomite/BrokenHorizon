@@ -1,6 +1,7 @@
 #include "BHEngineeringCharge.h"
 
 #include "BHCharacter.h"
+#include "BHArmoredThreat.h"
 #include "BHBattlefieldConditions.h"
 #include "BHDoor.h"
 #include "BHRaidSabotageTarget.h"
@@ -8,6 +9,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
 #include "GameFramework/DamageType.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
@@ -144,6 +146,30 @@ bool ABHEngineeringCharge::Detonate(ABHCharacter* RequestingCharacter)
         Cast<ABHRaidSabotageTarget>(AttachedTarget))
     {
         Target->SabotageByEngineeringCharge(RequestingCharacter, this);
+    }
+
+    if (ChargeMode == EBHEngineeringChargeMode::Breach)
+    {
+        const float AntiVehicleRadius = GetOuterDamageRadius(ChargeMode);
+        for (TActorIterator<ABHArmoredThreat> It(GetWorld()); It; ++It)
+        {
+            ABHArmoredThreat* Threat = *It;
+            if (!IsValid(Threat) ||
+                FVector::DistSquared(Threat->GetActorLocation(), GetActorLocation()) >
+                    FMath::Square(AntiVehicleRadius))
+            {
+                continue;
+            }
+
+            const float AppliedDamage = Threat->ApplyAntiVehicleDamage(
+                GetMaximumDamage(ChargeMode),
+                GetActorLocation(),
+                this
+            );
+            UE_LOG(LogTemp, Display,
+                TEXT("BH_ENGINEERING_CHARGE armored_target=%s damage=%.1f"),
+                *Threat->GetPersistenceID().ToString(), AppliedDamage);
+        }
     }
 
     TArray<AActor*> IgnoredActors;

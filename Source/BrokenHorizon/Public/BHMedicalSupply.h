@@ -12,6 +12,8 @@ class BROKENHORIZON_API ABHMedicalSupply : public ABHSupplyBase
 public:
     ABHMedicalSupply();
 
+    void ConfigureRuntimePickup();
+
 protected:
     virtual bool TryApplyToCharacter(
         ABHCharacter* Character

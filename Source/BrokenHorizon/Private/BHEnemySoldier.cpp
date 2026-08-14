@@ -4,6 +4,7 @@
 
 #include "BHCharacter.h"
 #include "BHAmmoSupply.h"
+#include "BHMedicalSupply.h"
 #include "BHEnemyAIController.h"
 #include "BHFragGrenade.h"
 #include "BHHealthComponent.h"
@@ -23,6 +24,7 @@
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/DamageEvents.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -310,6 +312,46 @@ ABHEnemySoldier::ABHEnemySoldier()
     ArchetypeLabel->SetWorldSize(18.0f);
     ArchetypeLabel->SetHiddenInGame(true);
 
+    EnemyPlateMesh = CreateDefaultSubobject<UStaticMeshComponent>(
+        TEXT("EnemyPlateMesh")
+    );
+    EnemyRadioMesh = CreateDefaultSubobject<UStaticMeshComponent>(
+        TEXT("EnemyRadioMesh")
+    );
+    EnemyHelmetMesh = CreateDefaultSubobject<UStaticMeshComponent>(
+        TEXT("EnemyHelmetMesh")
+    );
+    const ConstructorHelpers::FObjectFinder<UStaticMesh> EnemyPresentationCube(
+        TEXT("/Engine/BasicShapes/Cube.Cube")
+    );
+    const ConstructorHelpers::FObjectFinder<UMaterialInterface>
+        EnemyPresentationMaterial(
+            TEXT("/Game/BrokenHorizon/Environment/WorldKit/Materials/M_BH_Military.M_BH_Military")
+        );
+    for (UStaticMeshComponent* Component : {
+             EnemyPlateMesh,
+             EnemyRadioMesh,
+             EnemyHelmetMesh})
+    {
+        Component->SetupAttachment(GetRootComponent());
+        Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Component->SetCastShadow(true);
+        if (EnemyPresentationCube.Succeeded())
+        {
+            Component->SetStaticMesh(EnemyPresentationCube.Object);
+        }
+        if (EnemyPresentationMaterial.Succeeded())
+        {
+            Component->SetMaterial(0, EnemyPresentationMaterial.Object);
+        }
+    }
+    EnemyPlateMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 92.0f));
+    EnemyPlateMesh->SetRelativeScale3D(FVector(0.32f, 0.52f, 0.48f));
+    EnemyRadioMesh->SetRelativeLocation(FVector(-28.0f, -20.0f, 130.0f));
+    EnemyRadioMesh->SetRelativeScale3D(FVector(0.16f, 0.12f, 0.36f));
+    EnemyHelmetMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 178.0f));
+    EnemyHelmetMesh->SetRelativeScale3D(FVector(0.34f, 0.34f, 0.16f));
+
     MuzzlePoint = CreateDefaultSubobject<USceneComponent>(
         TEXT("MuzzlePoint")
     );
@@ -391,7 +433,59 @@ void ABHEnemySoldier::BeginPlay()
 
     CaptureArchetypeBaseline();
     ApplyCombatantArchetype(false);
+    if (IsValid(EnemyPlateMesh) && IsValid(EnemyRadioMesh) &&
+        IsValid(EnemyHelmetMesh))
+    {
+        switch (CombatantArchetype)
+        {
+        case EBHCombatantArchetype::Scout:
+            EnemyPlateMesh->SetRelativeScale3D(
+                FVector(0.24f, 0.42f, 0.38f));
+            EnemyRadioMesh->SetVisibility(false, true);
+            EnemyHelmetMesh->SetRelativeScale3D(
+                FVector(0.30f, 0.30f, 0.14f));
+            break;
+        case EBHCombatantArchetype::Gunner:
+            EnemyPlateMesh->SetRelativeScale3D(
+                FVector(0.38f, 0.60f, 0.54f));
+            EnemyRadioMesh->SetRelativeScale3D(
+                FVector(0.20f, 0.16f, 0.42f));
+            EnemyHelmetMesh->SetRelativeScale3D(
+                FVector(0.38f, 0.38f, 0.18f));
+            break;
+        case EBHCombatantArchetype::Rifleman:
+        default:
+            break;
+        }
+    }
     UpdateCombatFactionTags();
+    if (CombatFaction == EBHCombatFaction::Hostile)
+    {
+        // Authored Blueprint instances may override these EditDefaultsOnly
+        // values. Keep the player-facing hostile casualty contract explicit so
+        // every enemy leaves readable battlefield recovery and a visible body.
+        bDropAmmoOnDeath = true;
+        MaximumDroppedAmmo = FMath::Max(MaximumDroppedAmmo, 30);
+        CorpseLifeSpan = FMath::Max(CorpseLifeSpan, 120.0f);
+        if (!BattlefieldAmmoSupplyClass)
+        {
+            BattlefieldAmmoSupplyClass = ABHAmmoSupply::StaticClass();
+        }
+    }
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_ENEMY_PRESENTATION id=%s plate=%d radio=%d helmet=%d "
+            "faction=%d archetype=%d"
+        ),
+        *FieldOperativeID.ToString(),
+        IsValid(EnemyPlateMesh) ? 1 : 0,
+        IsValid(EnemyRadioMesh) ? 1 : 0,
+        IsValid(EnemyHelmetMesh) ? 1 : 0,
+        static_cast<int32>(CombatFaction)
+        ,static_cast<int32>(CombatantArchetype)
+    );
     GetCharacterMovement()->MaxWalkSpeed =
         GetNormalMovementSpeed();
     RefillAmmunition();
@@ -1573,6 +1667,13 @@ float ABHEnemySoldier::GetRetreatMovementSpeed() const
     return FMath::Max(0.0f, RetreatMovementSpeed);
 }
 
+void ABHEnemySoldier::ConfigureOperationCombatPacing()
+{
+    RetreatDistance = FMath::Min(RetreatDistance, 1200.0f);
+    RetreatDuration = FMath::Max(RetreatDuration, 18.0f);
+    RetreatMovementSpeed = FMath::Min(RetreatMovementSpeed, 260.0f);
+}
+
 float ABHEnemySoldier::GetAllyCasualtyMoraleRadius() const
 {
     return FMath::Max(0.0f, AllyCasualtyMoraleRadius);
@@ -2412,21 +2513,80 @@ void ABHEnemySoldier::BeginReload(float CurrentTime)
     );
 }
 
+void ABHEnemySoldier::DropMedicalSupplies()
+{
+    UWorld* World = GetWorld();
+    if (!IsValid(World))
+    {
+        return;
+    }
+
+    const FTransform DropTransform(
+        FRotator::ZeroRotator,
+        GetActorLocation() + FVector(18.0f, 0.0f, 12.0f)
+    );
+    ABHMedicalSupply* MedicalDrop =
+        World->SpawnActorDeferred<ABHMedicalSupply>(
+        ABHMedicalSupply::StaticClass(),
+        DropTransform,
+        nullptr,
+        nullptr,
+        ESpawnActorCollisionHandlingMethod::AlwaysSpawn
+    );
+    if (IsValid(MedicalDrop))
+    {
+        MedicalDrop->ConfigureRuntimePickup();
+        UGameplayStatics::FinishSpawningActor(
+            MedicalDrop,
+            DropTransform
+        );
+    }
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_ENEMY_MEDICAL_DROP soldier=%s"),
+        *GetName()
+    );
+}
+
 ABHAmmoSupply* ABHEnemySoldier::DropRemainingAmmunition()
 {
+    if (!BattlefieldAmmoSupplyClass)
+    {
+        BattlefieldAmmoSupplyClass = ABHAmmoSupply::StaticClass();
+    }
+
     if (bAmmoDropSpawned ||
         !bDropAmmoOnDeath ||
-        CombatFaction != EBHCombatFaction::Hostile ||
         !BattlefieldAmmoSupplyClass)
     {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT(
+                "BH_ENEMY_AMMO_DROP_SKIPPED soldier=%s spawned=%d enabled=%d "
+                "faction=%d class=%s"
+            ),
+            *GetName(),
+            bAmmoDropSpawned ? 1 : 0,
+            bDropAmmoOnDeath ? 1 : 0,
+            static_cast<int32>(CombatFaction),
+            *GetNameSafe(BattlefieldAmmoSupplyClass)
+        );
         return nullptr;
     }
 
     const int32 RemainingRounds =
         GetCurrentMagazineAmmo() + GetCurrentReserveAmmo();
-    const int32 DroppedRounds = FMath::Min(
-        FMath::Max(1, MaximumDroppedAmmo),
-        RemainingRounds
+    // A hostile casualty must leave a recoverable battlefield brick even if
+    // the AI was empty when it died.  The player's recovery contract is a
+    // fixed salvage amount, not a reflection of an internal AI ammo edge case.
+    const int32 DroppedRounds = FMath::Max(
+        1,
+        FMath::Min(
+            FMath::Max(1, MaximumDroppedAmmo),
+            FMath::Max(RemainingRounds, FMath::Max(1, MaximumDroppedAmmo))
+        )
     );
     UWorld* World = GetWorld();
 
@@ -2570,6 +2730,7 @@ void ABHEnemySoldier::HandleDeath(AActor* DamageCauser)
         SaveSubsystem->RecordDefeatedEnemy(this);
     }
     DropRemainingAmmunition();
+    DropMedicalSupplies();
     SetCanBeDamaged(false);
     GetCharacterMovement()->DisableMovement();
     GetCapsuleComponent()->SetCollisionEnabled(

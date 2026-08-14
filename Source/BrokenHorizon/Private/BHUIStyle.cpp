@@ -314,7 +314,7 @@ void StyleProgressBar(
     ))
     {
         ProgressBar.SetFillColorAndOpacity(
-            FLinearColor(0.88f, 0.61f, 0.12f, 1.0f)
+            FLinearColor(0.68f, 0.54f, 0.22f, 1.0f)
         );
     }
     else
@@ -329,6 +329,17 @@ void BHUIStyle::Apply(
     EBHUIStyleContext Context
 )
 {
+    // Gameplay widgets can call Apply from high-frequency state setters.
+    // Avoid rebuilding their complete widget-tree style on every health,
+    // stamina, or ammo update; RefreshAll invalidates this entry when user
+    // settings change and a full restyle is actually required.
+    if (const EBHUIStyleContext* AppliedContext = StyledWidgets.Find(&Widget))
+    {
+        if (*AppliedContext == Context)
+        {
+            return;
+        }
+    }
     StyledWidgets.Add(&Widget, Context);
 
     float HUDScale = 1.0f;
@@ -515,6 +526,7 @@ void BHUIStyle::RefreshAll(UWorld& World)
     {
         if (UUserWidget* Widget = Entry.Key.Get())
         {
+            StyledWidgets.Remove(Widget);
             Apply(*Widget, Entry.Value);
         }
     }

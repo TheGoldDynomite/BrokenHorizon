@@ -308,11 +308,15 @@ private:
     void RunRenderedTraversalTest();
     void RunRenderedUIReviewTest();
     void RunFirstLightPlayableRouteTest();
+    void RunInventoryTransferRuntimeTest();
+    void RunWeaponRoleRuntimeTest();
     FTimerHandle NetworkBudgetTelemetryTestTimer;
     FTimerHandle NetworkCombatDensityClientVerificationTimer;
     FTimerHandle RenderedTraversalTestTimer;
     FTimerHandle RenderedUIReviewTestTimer;
     FTimerHandle FirstLightPlayableRouteTestTimer;
+    FTimerHandle InventoryTransferRuntimeTestTimer;
+    FTimerHandle WeaponRoleRuntimeTestTimer;
     int32 NetworkBudgetTelemetrySampleCount = 0;
     int32 NetworkBudgetTelemetryRequiredConnections = 2;
     int32 NetworkCombatDensityHostileCount = 12;

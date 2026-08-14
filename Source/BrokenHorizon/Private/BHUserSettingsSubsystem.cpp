@@ -1,6 +1,7 @@
-#include "BHUserSettingsSubsystem.h"
+﻿#include "BHUserSettingsSubsystem.h"
 
 #include "BHGameShellSettings.h"
+#include "AudioDevice.h"
 #include "BHPlaytestTelemetrySubsystem.h"
 #include "BHUIStyle.h"
 #include "BHUserSettingsSaveGame.h"
@@ -28,7 +29,6 @@ FBHInputBindingDefinition MakeBinding(
     Definition.DefaultGamepadKey = GamepadKey;
     return Definition;
 }
-
 FString GetCompactInputKeyLabel(const FKey& Key)
 {
     const TPair<FKey, const TCHAR*> CompactLabels[] = {
@@ -166,6 +166,8 @@ UBHUserSettingsSubsystem::GetDefaultInputBindingDefinitions()
         MakeBinding(TEXT("Aim"), TEXT("Aim"), EKeys::RightMouseButton, EKeys::Gamepad_LeftTrigger),
         MakeBinding(TEXT("Reload"), TEXT("Reload"), EKeys::R, EKeys::Gamepad_FaceButton_Left),
         MakeBinding(TEXT("Pause"), TEXT("Pause"), EKeys::Escape, EKeys::Gamepad_Special_Right),
+        MakeBinding(TEXT("Inventory"), TEXT("Inventory / Loadout"), EKeys::I, FKey()),
+        MakeBinding(TEXT("InventoryCycle"), TEXT("Cycle Loadout Role"), EKeys::F6, FKey()),
         MakeBinding(TEXT("WarMap"), TEXT("War Map"), EKeys::M, EKeys::Gamepad_Special_Left),
         MakeBinding(TEXT("Grenade"), TEXT("Throw Grenade"), EKeys::G, EKeys::Gamepad_RightShoulder),
         MakeBinding(TEXT("SmokeGrenade"), TEXT("Throw Smoke Grenade"), EKeys::K, FKey()),
@@ -174,6 +176,7 @@ UBHUserSettingsSubsystem::GetDefaultInputBindingDefinitions()
         MakeBinding(TEXT("FieldObservation"), TEXT("Field Observation"), EKeys::O, FKey()),
         MakeBinding(TEXT("ControlledBreathing"), TEXT("Controlled Breathing"), EKeys::LeftAlt, FKey()),
         MakeBinding(TEXT("Engineering"), TEXT("Engineering Charge / Detonate"), EKeys::V, FKey()),
+        MakeBinding(TEXT("AntiVehicle"), TEXT("Anti-Vehicle Launcher"), EKeys::Y, FKey()),
         MakeBinding(TEXT("SquadOrder"), TEXT("Squad Follow / Hold"), EKeys::C, EKeys::Gamepad_DPad_Left),
         MakeBinding(TEXT("ContextAction"), TEXT("Squad Context Action"), EKeys::X, EKeys::Gamepad_DPad_Right),
         MakeBinding(TEXT("SquadPing"), TEXT("Squad Ping"), EKeys::MiddleMouseButton, EKeys::Gamepad_DPad_Up),
@@ -1072,6 +1075,11 @@ void UBHUserSettingsSubsystem::ApplyAudioSettings() const
 
     if (!IsValid(SoundMix) || !IsValid(SoundClass))
     {
+        if (FAudioDeviceHandle AudioDevice = World->GetAudioDevice())
+        {
+            AudioDevice->SetTransientPrimaryVolume(SettingsData->MasterVolume);
+        }
+
         UE_LOG(
             LogTemp,
             Verbose,

@@ -261,9 +261,11 @@ public:
 
     static constexpr float DefaultMouseSensitivity = 1.0f;
     static constexpr float DefaultADSSensitivityMultiplier = 0.75f;
-    static constexpr float DefaultMasterVolume = 1.0f;
+    // A restrained baseline keeps gunfire and ambient layers from dominating on typical headphones while leaving room for player preference.
+    static constexpr float DefaultMasterVolume = 0.80f;
     static constexpr int32 DefaultWindowModeIndex = 1;
     static constexpr int32 DefaultGraphicsQuality = 3;
+    // Keep gameplay readouts available without making the screen feel instrument-panel heavy at the default safe-frame distance.
     static constexpr float DefaultHUDScale = 1.0f;
 
 private:

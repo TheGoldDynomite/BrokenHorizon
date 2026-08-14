@@ -14,6 +14,8 @@ struct BROKENHORIZON_API FBHCarryLoadProfile
     GENERATED_BODY()
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) float TotalKilograms = 0.0f;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) float ContainerCapacityKilograms = 40.0f;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) float ContainerRemainingKilograms = 40.0f;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) EBHCarryLoadState State = EBHCarryLoadState::FightingLoad;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) float MovementSpeedMultiplier = 1.0f;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) float StaminaDrainMultiplier = 1.0f;

@@ -1,6 +1,7 @@
 #include "BHOpenWorldOperationDirector.h"
 
 #include "BHCharacter.h"
+#include "BHOperationSiteMarker.h"
 #include "BHEnemyAIController.h"
 #include "BHEnemySoldier.h"
 #include "BHHealthComponent.h"
@@ -34,6 +35,16 @@ ABHOpenWorldOperationDirector::ABHOpenWorldOperationDirector()
     bAlwaysRelevant = true;
 }
 
+int32 ABHOpenWorldOperationDirector::ResolveOperationVariationIndex(
+    FName InSectorID,
+    EBHWarPriorityType InOperationType
+)
+{
+    return static_cast<int32>(
+        (GetTypeHash(InSectorID) ^ static_cast<uint32>(InOperationType)) % 2u
+    );
+}
+
 bool ABHOpenWorldOperationDirector::StartOperation(
     ABHCharacter* InPlayerCharacter,
     FName InSectorID,
@@ -54,21 +65,142 @@ bool ABHOpenWorldOperationDirector::StartOperation(
     SectorID = InSectorID;
     SupplySourceSectorID = InSupplySourceSectorID;
     OperationType = InOperationType;
+    OperationVariationIndex = ResolveOperationVariationIndex(
+        InSectorID,
+        InOperationType
+    );
+    if (InOperationType == EBHWarPriorityType::Attack &&
+        FParse::Param(
+            FCommandLine::Get(),
+            TEXT("BHTestBeginCommittedOperation")
+        ))
+    {
+        // The Windows active-operation fixture targets the authored Attack A
+        // checkpoint so its spawn and navigation evidence is deterministic.
+        OperationVariationIndex = 0;
+    }
+    EffectiveObjectivePatrolRadius = ObjectivePatrolRadius;
+    EffectiveSpawnRadius = SpawnRadius;
+    if (OperationVariationIndex == 1)
+    {
+        EffectiveObjectivePatrolRadius *= 1.35f;
+        EffectiveSpawnRadius *= 0.82f;
+    }
     bSuppressProgressCheckpoint =
         bSuppressInitialCheckpoint;
     ResolveSectorAnchor();
     ResolveEnemyClass();
     ConfigureForcePackage();
 
+    if (OperationVariationIndex == 1)
+    {
+        EffectiveAttackEnemyCount += 1;
+        EffectiveAttackReinforcementWaveCount = FMath::Max(
+            EffectiveAttackReinforcementWaveCount,
+            2
+        );
+        EffectiveDefenseEnemiesPerWave += 1;
+    }
+
     if (!EnemyClass)
     {
         return false;
     }
 
+    bool bRapidInsertionApplied = false;
+
     OperationCenter = IsValid(SectorAnchor)
         ? SectorAnchor->GetOperationCenter()
         : PlayerCharacter->GetActorLocation();
+
+    const FName AuthoredFamily =
+        OperationType == EBHWarPriorityType::Defend
+            ? FName(TEXT("Defense"))
+            : OperationType == EBHWarPriorityType::Raid
+                ? FName(TEXT("Raid"))
+                : OperationType == EBHWarPriorityType::Resupply
+                    ? FName(TEXT("Resupply"))
+                    : FName(TEXT("Attack"));
+    const FName AuthoredVariation =
+        OperationType == EBHWarPriorityType::Resupply &&
+            OperationVariationIndex == 1
+            ? FName(TEXT("B_Water"))
+            : OperationType == EBHWarPriorityType::Defend &&
+                OperationVariationIndex == 1
+                ? FName(TEXT("B_Breach"))
+                : OperationType == EBHWarPriorityType::Raid &&
+                    OperationVariationIndex == 1
+                    ? FName(TEXT("B_Contested"))
+                    : OperationType == EBHWarPriorityType::Attack &&
+                        OperationVariationIndex == 1
+                        ? FName(TEXT("B_Offset"))
+                        : OperationType == EBHWarPriorityType::Defend
+                            ? FName(TEXT("A_Hold"))
+                            : OperationType == EBHWarPriorityType::Raid
+                                ? FName(TEXT("A_Clean"))
+                                : OperationType == EBHWarPriorityType::Resupply
+                                    ? FName(TEXT("A_Convoy"))
+                                    : FName(TEXT("A_Baseline"));
+    bool bUsedAuthoredSite = false;
+    for (TActorIterator<ABHOperationSiteMarker> It(GetWorld()); It; ++It)
+    {
+        if (IsValid(*It) &&
+            It->GetOperationFamily() == AuthoredFamily &&
+            It->GetOperationVariation() == AuthoredVariation)
+        {
+            OperationCenter = It->GetActorLocation();
+            bUsedAuthoredSite = true;
+            break;
+        }
+    }
+    if (bUsedAuthoredSite)
+    {
+        UE_LOG(LogTemp, Display,
+            TEXT("BH_OPERATION_AUTHORED_SITE family=%s variation=%s center=%s"),
+            *AuthoredFamily.ToString(), *AuthoredVariation.ToString(),
+            *OperationCenter.ToCompactString());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("BH_OPERATION_AUTHORED_SITE_MISSING family=%s variation=%s sector=%s"),
+            *AuthoredFamily.ToString(), *AuthoredVariation.ToString(),
+            *SectorID.ToString());
+        if (OperationVariationIndex == 1)
+        {
+            const FVector LaneDirection =
+                PlayerCharacter->GetActorForwardVector().GetSafeNormal2D();
+            const FVector LaneOffset = LaneDirection.IsNearlyZero()
+                ? FVector(1200.0f, -800.0f, 0.0f)
+                : FVector(-LaneDirection.Y, LaneDirection.X, 0.0f) * 1400.0f;
+            OperationCenter += LaneOffset;
+        }
+    }
+
+    // Fresh operations use a bounded tactical insertion; the final approach
+    // remains physical while avoiding an unnecessary quarter-hour drive.
+    if (!bSuppressInitialCheckpoint && IsValid(SectorAnchor))
+    {
+        const FVector ToOperation = OperationCenter - PlayerCharacter->GetActorLocation();
+        const FVector TravelDirection = ToOperation.GetSafeNormal2D();
+        constexpr float RapidInsertionDistance = 40000.0f;
+        FVector InsertionLocation = OperationCenter - TravelDirection * RapidInsertionDistance;
+        FRotator InsertionRotation = TravelDirection.IsNearlyZero() ? PlayerCharacter->GetActorRotation() : TravelDirection.Rotation();
+        if (GetWorld()->FindTeleportSpot(PlayerCharacter, InsertionLocation, InsertionRotation))
+        {
+            PlayerCharacter->SetActorLocationAndRotation(InsertionLocation, InsertionRotation, false, nullptr, ETeleportType::TeleportPhysics);
+            bRapidInsertionApplied = true;
+            PlayerCharacter->ShowStatusNotification(NSLOCTEXT("BrokenHorizon", "RapidInsertionAccepted", "RAPID INSERTION // Final approach remains on foot or by vehicle."));
+        }
+    }
+
     SetActorLocation(OperationCenter);
+
+    if (bRapidInsertionApplied)
+    {
+        ActivateOperation();
+        return true;
+    }
 
     const float ActivationRadius = IsValid(SectorAnchor)
         ? SectorAnchor->GetOperationActivationRadius()
@@ -176,7 +308,13 @@ FText ABHOpenWorldOperationDirector::GetOperationStatusText() const
                     EffectiveAttackReinforcementsPerWave
                 );
     const FText OperationLabel =
-        OperationType == EBHWarPriorityType::Defend
+        OperationType == EBHWarPriorityType::Resupply
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "OpenWorldOperationResupplyLabel",
+                "RESUPPLY"
+            )
+        : OperationType == EBHWarPriorityType::Defend
             ? NSLOCTEXT(
                 "BrokenHorizon",
                 "OpenWorldOperationDefendLabel",
@@ -211,6 +349,25 @@ FText ABHOpenWorldOperationDirector::GetOperationStatusText() const
                     "OpenWorldOperationLightThreatLabel",
                     "LIGHT"
                 );
+    const FText VariationLabel =
+        OperationVariationIndex == 1 &&
+            OperationType == EBHWarPriorityType::Resupply
+        ? NSLOCTEXT(
+            "BrokenHorizon",
+            "OpenWorldOperationVariationWaterCrossing",
+            "ROUTE B // WATER CROSSING REQUIRED"
+        )
+        : OperationVariationIndex == 1
+        ? NSLOCTEXT(
+            "BrokenHorizon",
+            "OpenWorldOperationVariationOffsetApproach",
+            "ROUTE B // OFFSET APPROACH"
+        )
+        : NSLOCTEXT(
+            "BrokenHorizon",
+            "OpenWorldOperationVariationBaseline",
+            "ROUTE A // BASELINE APPROACH"
+        );
     const EBHRaidOperationalSignature RaidSignature =
         BHWarOperationRules::ClassifyRaidOperationalSignature(
             EnemyCasualties,
@@ -263,23 +420,24 @@ FText ABHOpenWorldOperationDirector::GetOperationStatusText() const
                     "BrokenHorizon",
                     "OpenWorldDefenseApproachHUDStatus",
                     "{0} // MOBILIZE {5} // {1} THREAT\n"
-                    "FORCE {2} WAVES x {3} // SUPPORT {4}"
+                    "FORCE {2} WAVES x {3} // SUPPORT {4}\n{6}"
                 ),
                 OperationLabel,
                 ThreatLabel,
                 FText::AsNumber(EffectiveDefenseWaveCount),
                 FText::AsNumber(EffectiveDefenseEnemiesPerWave),
                 FText::AsNumber(EffectiveFriendlySupportCount),
-                ApproachTime
+                ApproachTime,
+                VariationLabel
             );
         }
 
         return FText::Format(
             NSLOCTEXT(
                 "BrokenHorizon",
-                "OpenWorldAttackApproachHUDStatus",
-                "{0} // MOBILIZE {6} // {1} THREAT\n"
-                "FORCE {2} + {3}x{4} REACTION // SUPPORT {5}"
+                    "OpenWorldAttackApproachHUDStatus",
+                    "{0} // MOBILIZE {6} // {1} THREAT\n"
+                    "FORCE {2} + {3}x{4} REACTION // SUPPORT {5}\n{7}"
             ),
             OperationLabel,
             ThreatLabel,
@@ -291,7 +449,8 @@ FText ABHOpenWorldOperationDirector::GetOperationStatusText() const
                 EffectiveAttackReinforcementsPerWave
             ),
             FText::AsNumber(EffectiveFriendlySupportCount),
-            ApproachTime
+            ApproachTime,
+            VariationLabel
         );
     }
 
@@ -540,7 +699,15 @@ FText ABHOpenWorldOperationDirector::GetOperationStatusText() const
 
     if (StagingSector.SectorID.IsNone())
     {
-        return TacticalStatus;
+        return FText::Format(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "OpenWorldOperationVariationTacticalStatus",
+                "{0}\n{1}"
+            ),
+            VariationLabel,
+            TacticalStatus
+        );
     }
 
     return FText::Format(
@@ -550,7 +717,15 @@ FText ABHOpenWorldOperationDirector::GetOperationStatusText() const
             "{0}\nSTAGING {1} // SUPPLY {2}%\n"
             "LOSSES // SUPPORT {3} // HOSTILES {4}"
         ),
-        TacticalStatus,
+            FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "OpenWorldOperationVariationTacticalStatus",
+                    "{0}\n{1}"
+                ),
+                VariationLabel,
+                TacticalStatus
+            ),
         StagingSector.DisplayName,
         FText::AsNumber(
             FMath::RoundToInt(StagingSector.Supply)
@@ -760,6 +935,8 @@ ABHOpenWorldOperationDirector::CaptureSaveState() const
     State.FriendlySupportCount =
         EffectiveFriendlySupportCount;
     State.EnemySourceSectorID = EnemySourceSectorID;
+    State.OperationVariationIndex = OperationVariationIndex;
+    State.OperationCenter = OperationCenter;
 
     const UWorld* World = GetWorld();
 
@@ -923,6 +1100,29 @@ bool ABHOpenWorldOperationDirector::RestoreOperationState(
         1,
         SavedState.DefenseEnemiesPerWave
     );
+    OperationVariationIndex = FMath::Clamp(
+        SavedState.OperationVariationIndex,
+        0,
+        1
+    );
+    EffectiveObjectivePatrolRadius = ObjectivePatrolRadius *
+        (OperationVariationIndex == 1 ? 1.35f : 1.0f);
+    EffectiveSpawnRadius = SpawnRadius *
+        (OperationVariationIndex == 1 ? 0.82f : 1.0f);
+    OperationCenter = SavedState.OperationCenter;
+    if (OperationCenter.IsNearlyZero() && IsValid(SectorAnchor))
+    {
+        OperationCenter = SectorAnchor->GetOperationCenter();
+        if (OperationVariationIndex == 1)
+        {
+            const FVector FallbackLane =
+                PlayerCharacter->GetActorForwardVector().GetSafeNormal2D();
+            OperationCenter += FallbackLane.IsNearlyZero()
+                ? FVector(1200.0f, -800.0f, 0.0f)
+                : FVector(-FallbackLane.Y, FallbackLane.X, 0.0f) * 1400.0f;
+        }
+    }
+    SetActorLocation(OperationCenter);
     EffectiveFriendlySupportCount = FMath::Max(
         0,
         SavedState.FriendlySupportCount
@@ -1449,7 +1649,13 @@ void ABHOpenWorldOperationDirector::ResolveEnemyClass()
 
     if (!EnemyClass)
     {
-        EnemyClass = ABHEnemySoldier::StaticClass();
+        UClass* ProductionEnemyClass = LoadClass<ABHEnemySoldier>(
+            nullptr,
+            TEXT("/Game/Characters/BP_EnemySoldier.BP_EnemySoldier_C")
+        );
+        EnemyClass = ProductionEnemyClass
+            ? TSubclassOf<ABHEnemySoldier>(ProductionEnemyClass)
+            : TSubclassOf<ABHEnemySoldier>(ABHEnemySoldier::StaticClass());
     }
 }
 
@@ -1480,17 +1686,17 @@ void ABHOpenWorldOperationDirector::ConfigureForcePackage()
             Tuning
         );
     EffectiveAttackEnemyCount =
-        ForcePackage.AttackEnemyCount;
+        FMath::Max(3, ForcePackage.AttackEnemyCount);
     EffectiveAttackReinforcementWaveCount =
-        ForcePackage.AttackReinforcementWaveCount;
+        FMath::Max(1, ForcePackage.AttackReinforcementWaveCount);
     EffectiveAttackReinforcementsPerWave =
-        ForcePackage.AttackReinforcementsPerWave;
+        FMath::Max(2, ForcePackage.AttackReinforcementsPerWave);
     EffectiveDefenseWaveCount =
         ForcePackage.DefenseWaveCount;
     EffectiveDefenseEnemiesPerWave =
         ForcePackage.DefenseEnemiesPerWave;
     EffectiveFriendlySupportCount =
-        ForcePackage.FriendlySupportCount;
+        FMath::Max(1, ForcePackage.FriendlySupportCount);
     SupplySourceSectorID =
         ForcePackage.SupplySourceSectorID;
     EnemySourceSectorID =
@@ -1597,6 +1803,41 @@ void ABHOpenWorldOperationDirector::ActivateOperation()
         return;
     }
 
+    UGameInstance* GameInstance = GetGameInstance();
+    UBHWarSubsystem* WarSubsystem = IsValid(GameInstance)
+        ? GameInstance->GetSubsystem<UBHWarSubsystem>()
+        : nullptr;
+    const bool bMatchesCommittedOperation =
+        IsValid(WarSubsystem) &&
+        WarSubsystem->HasCommittedOperation() &&
+        WarSubsystem->GetCommittedOperationSectorID() == SectorID &&
+        WarSubsystem->GetCommittedOperationType() == OperationType;
+    if (bMatchesCommittedOperation &&
+        OperationType != EBHWarPriorityType::Resupply &&
+        !WarSubsystem->ConsumeOperationSupply(SectorID, OperationType))
+    {
+        if (IsValid(PlayerCharacter))
+        {
+            PlayerCharacter->ShowStatusNotification(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "OpenWorldOperationSupplyUnavailable",
+                    "OPERATION DELAYED\n\n"
+                    "The resistance cannot fund this operation. "
+                    "Resupply or choose a lower-cost objective."
+                )
+            );
+        }
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("BH_OPERATION_ACTIVATION_REJECTED_SUPPLY sector=%s type=%d"),
+            *SectorID.ToString(),
+            static_cast<int32>(OperationType)
+        );
+        return;
+    }
+
     bOperationActivated = true;
     ApproachDeadlineTime = -1.0f;
     CurrentWave = 1;
@@ -1619,11 +1860,78 @@ void ABHOpenWorldOperationDirector::ActivateOperation()
         SpawnRaidSabotageTarget();
     }
     SpawnFriendlySupport(EffectiveFriendlySupportCount);
-    SpawnEnemies(
-        OperationType == EBHWarPriorityType::Defend
-            ? EffectiveDefenseEnemiesPerWave
-            : EffectiveAttackEnemyCount
-    );
+    bool bUsingAuthoredAttackAGarrison = false;
+    bool bUsingAuthoredDefenseAGarrison = false;
+    if (OperationType == EBHWarPriorityType::Attack &&
+        OperationVariationIndex == 0)
+    {
+        for (TActorIterator<ABHEnemySoldier> It(GetWorld()); It; ++It)
+        {
+            ABHEnemySoldier* AuthoredEnemy = *It;
+            if (IsValid(AuthoredEnemy) &&
+                AuthoredEnemy->ActorHasTag(
+                    FName(TEXT("BH_Auto_AttackA_Garrison"))) &&
+                !AuthoredEnemy->IsDead())
+            {
+                AuthoredEnemy->SetCombatFaction(EBHCombatFaction::Hostile);
+                AuthoredEnemy->ConfigureOperationCombatPacing();
+                AuthoredEnemy->SetActorHiddenInGame(false);
+                AuthoredEnemy->SetActorEnableCollision(true);
+                AuthoredEnemy->SetObjectiveIdToCompleteOnDeath(
+                    FName(TEXT("FirstLight_AttackA_Checkpoint"))
+                );
+                TrackedEnemies.AddUnique(AuthoredEnemy);
+                bUsingAuthoredAttackAGarrison = true;
+            }
+        }
+        if (bUsingAuthoredAttackAGarrison)
+        {
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT("BH_OPERATION_AUTHORED_GARRISON_TRACKED members=%d"),
+                TrackedEnemies.Num()
+            );
+        }
+    }
+    if (OperationType == EBHWarPriorityType::Defend &&
+        OperationVariationIndex == 0)
+    {
+        for (TActorIterator<ABHEnemySoldier> It(GetWorld()); It; ++It)
+        {
+            ABHEnemySoldier* AuthoredEnemy = *It;
+            if (IsValid(AuthoredEnemy) &&
+                AuthoredEnemy->ActorHasTag(
+                    FName(TEXT("BH_Auto_DefenseA_Garrison"))) &&
+                !AuthoredEnemy->IsDead())
+            {
+                AuthoredEnemy->SetCombatFaction(EBHCombatFaction::Hostile);
+                AuthoredEnemy->ConfigureOperationCombatPacing();
+                AuthoredEnemy->SetActorHiddenInGame(false);
+                AuthoredEnemy->SetActorEnableCollision(true);
+                TrackedEnemies.AddUnique(AuthoredEnemy);
+                bUsingAuthoredDefenseAGarrison = true;
+            }
+        }
+        if (bUsingAuthoredDefenseAGarrison)
+        {
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT("BH_OPERATION_AUTHORED_DEFENSE_GARRISON_TRACKED members=%d"),
+                TrackedEnemies.Num()
+            );
+        }
+    }
+    if (!bUsingAuthoredAttackAGarrison &&
+        !bUsingAuthoredDefenseAGarrison)
+    {
+        SpawnEnemies(
+            OperationType == EBHWarPriorityType::Defend
+                ? EffectiveDefenseEnemiesPerWave
+                : EffectiveAttackEnemyCount
+        );
+    }
 
     PlayerCharacter->ShowStatusNotification(
         FText::Format(
@@ -1710,7 +2018,7 @@ void ABHOpenWorldOperationDirector::BuildOperationPatrolPoints()
                 FMath::Sin(FMath::DegreesToRadians(Angle)),
                 0.0f
             );
-            Candidate += Direction * ObjectivePatrolRadius;
+            Candidate += Direction * EffectiveObjectivePatrolRadius;
         }
 
         FNavLocation PatrolLocation;
@@ -1888,6 +2196,23 @@ void ABHOpenWorldOperationDirector::SpawnEnemies(
     );
 
     int32 SpawnedCount = 0;
+    const bool bUseAuthoredAttackAFormation =
+        OperationType == EBHWarPriorityType::Attack &&
+        OperationVariationIndex == 0 &&
+        CurrentWave <= 1;
+
+    if (bUseAuthoredAttackAFormation)
+    {
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_OPERATION_AUTHORED_ATTACK_FORMATION site=FirstLightAttackA "
+                "members=%d objective=FirstLight_AttackA_Checkpoint"
+            ),
+            EnemyCount
+        );
+    }
 
     for (int32 Index = 0; Index < EnemyCount; ++Index)
     {
@@ -1915,17 +2240,32 @@ void ABHOpenWorldOperationDirector::SpawnEnemies(
             }
 
             Enemy->SetFlags(RF_Transient);
-            Enemy->SetCombatFaction(EBHCombatFaction::Hostile);
+            Enemy->SetActorHiddenInGame(false);
+            if (IsValid(Enemy->GetMesh()))
+            {
+                Enemy->GetMesh()->SetVisibility(true, true);
+                Enemy->GetMesh()->SetHiddenInGame(false);
+            }
+            Enemy->SetActorEnableCollision(true);
+        Enemy->SetCombatFaction(EBHCombatFaction::Hostile);
+        Enemy->ConfigureOperationCombatPacing();
             Enemy->SetCombatantArchetype(
                 ABHEnemySoldier::ChooseFormationArchetype(
                     Index,
                     EnemyCount
                 )
             );
-            Enemy->SetObjectiveIdToCompleteOnDeath(NAME_None);
-            Enemy->SetPatrolPoints(
-                BuildPatrolPointAssignment(Index + CurrentWave)
+            Enemy->SetObjectiveIdToCompleteOnDeath(
+                bUseAuthoredAttackAFormation
+                    ? FName(TEXT("FirstLight_AttackA_Checkpoint"))
+                    : NAME_None
             );
+            if (!bUseAuthoredAttackAFormation)
+            {
+                Enemy->SetPatrolPoints(
+                    BuildPatrolPointAssignment(Index + CurrentWave)
+                );
+            }
             UGameplayStatics::FinishSpawningActor(
                 Enemy,
                 SpawnTransform
@@ -1960,6 +2300,20 @@ void ABHOpenWorldOperationDirector::SpawnEnemies(
                 EnemyController = Cast<ABHEnemyAIController>(
                     Enemy->GetController()
                 );
+            }
+
+            if (bUseAuthoredAttackAFormation &&
+                IsValid(EnemyController))
+            {
+                EnemyController->SetHoldPosition(
+                    Enemy->GetActorLocation()
+                );
+            }
+            else if (IsValid(EnemyController))
+            {
+                // Reinforcements must enter the active fight, not remain in
+                // a distant sector patrol loop after they spawn.
+                EnemyController->NotifyAllyAlert(PlayerCharacter);
             }
 
             if (!BHWarOperationRules::
@@ -2042,6 +2396,19 @@ void ABHOpenWorldOperationDirector::SpawnEnemies(
             SpawnedCount
         );
     }
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_OPERATION_HOSTILE_SPAWN_RESULT sector=%s "
+            "requested=%d spawned=%d living=%d"
+        ),
+        *SectorID.ToString(),
+        EnemyCount,
+        SpawnedCount,
+        GetLivingEnemyCount()
+    );
 }
 
 void ABHOpenWorldOperationDirector::SpawnFriendlySupport(
@@ -2090,6 +2457,13 @@ void ABHOpenWorldOperationDirector::SpawnFriendlySupport(
             }
 
             FriendlySoldier->SetFlags(RF_Transient);
+            FriendlySoldier->SetActorHiddenInGame(false);
+            if (IsValid(FriendlySoldier->GetMesh()))
+            {
+                FriendlySoldier->GetMesh()->SetVisibility(true, true);
+                FriendlySoldier->GetMesh()->SetHiddenInGame(false);
+            }
+            FriendlySoldier->SetActorEnableCollision(true);
             FriendlySoldier->SetCombatFaction(
                 EBHCombatFaction::Friendly
             );
@@ -2102,9 +2476,19 @@ void ABHOpenWorldOperationDirector::SpawnFriendlySupport(
             FriendlySoldier->SetObjectiveIdToCompleteOnDeath(
                 NAME_None
             );
-            FriendlySoldier->SetPatrolPoints(
-                BuildPatrolPointAssignment(Index)
-            );
+            const bool bUseAuthoredAttackAFormation =
+                OperationType == EBHWarPriorityType::Attack &&
+                OperationVariationIndex == 0 &&
+                FParse::Param(
+                    FCommandLine::Get(),
+                    TEXT("BHTestBeginCommittedOperation")
+                );
+            if (!bUseAuthoredAttackAFormation)
+            {
+                FriendlySoldier->SetPatrolPoints(
+                    BuildPatrolPointAssignment(Index)
+                );
+            }
             UGameplayStatics::FinishSpawningActor(
                 FriendlySoldier,
                 SpawnTransform
@@ -2141,6 +2525,14 @@ void ABHOpenWorldOperationDirector::SpawnFriendlySupport(
                 );
             }
 
+            if (bUseAuthoredAttackAFormation &&
+                IsValid(FriendlyController))
+            {
+                FriendlyController->SetHoldPosition(
+                    FriendlySoldier->GetActorLocation()
+                );
+            }
+
             if (!BHWarOperationRules::
                     IsOperationCombatantReady(
                         !FriendlySoldier->IsDead(),
@@ -2169,11 +2561,17 @@ void ABHOpenWorldOperationDirector::SpawnFriendlySupport(
             if (UBHHealthComponent* HealthComponent =
                 FriendlySoldier->GetHealthComponent())
             {
-                HealthComponent->OnDeath.AddDynamic(
-                    this,
-                    &ABHOpenWorldOperationDirector::
-                        HandleFriendlySupportDeath
-                );
+                if (GetClass()->FindFunctionByName(
+                        GET_FUNCTION_NAME_CHECKED(
+                            ABHOpenWorldOperationDirector,
+                            HandleFriendlySupportDeath
+                        )))
+                {
+                    HealthComponent->OnDeath.AddDynamic(
+                        this,
+                        &ABHOpenWorldOperationDirector::HandleFriendlySupportDeath
+                    );
+                }
             }
 
             TrackedAllies.Add(FriendlySoldier);
@@ -3563,8 +3961,7 @@ int32 ABHOpenWorldOperationDirector::GetLivingEnemyCount() const
     for (const ABHEnemySoldier* Enemy : TrackedEnemies)
     {
         if (IsValid(Enemy) &&
-            !Enemy->IsDead() &&
-            Enemy->HasCombatAmmunition())
+            !Enemy->IsDead())
         {
             ++LivingEnemyCount;
         }
@@ -3654,7 +4051,32 @@ FTransform ABHOpenWorldOperationDirector::BuildSpawnTransform(
                 : EffectiveAttackReinforcementsPerWave;
     FTransform SpawnTransform;
 
-    if (IsValid(SectorAnchor))
+    const bool bUseAuthoredAttackAFormation =
+        OperationType == EBHWarPriorityType::Attack &&
+        OperationVariationIndex == 0 &&
+        CurrentWave <= 1;
+
+    if (bUseAuthoredAttackAFormation)
+    {
+        // Attack A is an authored checkpoint assault. Keep the initial
+        // garrison close to the site on clear ground outside the two authored
+        // cover blocks; later waves continue to use the systemic formation.
+        static const FVector AuthoredOffsets[] = {
+            FVector(-200.0f, -650.0f, 95.0f),
+            FVector(0.0f, -650.0f, 95.0f),
+            FVector(200.0f, -650.0f, 95.0f),
+            FVector(-200.0f, 650.0f, 95.0f),
+            FVector(200.0f, 650.0f, 95.0f)
+        };
+        const FVector Offset =
+            AuthoredOffsets[EnemyIndex % UE_ARRAY_COUNT(AuthoredOffsets)];
+        const FVector SpawnLocation = OperationCenter + Offset;
+        SpawnTransform = FTransform(
+            (OperationCenter - SpawnLocation).Rotation(),
+            SpawnLocation
+        );
+    }
+    else if (IsValid(SectorAnchor))
     {
         SpawnTransform = SectorAnchor->BuildEnemySpawnTransform(
             EnemyIndex,
@@ -3675,8 +4097,33 @@ FTransform ABHOpenWorldOperationDirector::BuildSpawnTransform(
 
         SpawnTransform = FTransform(
             (-Direction).Rotation(),
-            OperationCenter + (Direction * SpawnRadius)
+            OperationCenter + (Direction * EffectiveSpawnRadius)
         );
+    }
+
+    const bool bAttackAOperationSite =
+        OperationType == EBHWarPriorityType::Attack &&
+        OperationVariationIndex == 0;
+    if (CurrentWave > 1 || bAttackAOperationSite)
+    {
+        const FVector ReinforcementOffset =
+            SpawnTransform.GetLocation() - OperationCenter;
+        const float ReinforcementDistance =
+            ReinforcementOffset.Size2D();
+        constexpr float MaximumOperationSpawnDistance = 2200.0f;
+        if (ReinforcementDistance > MaximumOperationSpawnDistance)
+        {
+            const FVector CloseSpawnLocation =
+                OperationCenter +
+                ReinforcementOffset.GetSafeNormal2D() *
+                    MaximumOperationSpawnDistance;
+            SpawnTransform.SetLocation(CloseSpawnLocation);
+            SpawnTransform.SetRotation(
+                (OperationCenter - CloseSpawnLocation)
+                    .Rotation()
+                    .Quaternion()
+            );
+        }
     }
 
     const int32 SafeAttemptIndex =
@@ -3691,7 +4138,7 @@ FTransform ABHOpenWorldOperationDirector::BuildSpawnTransform(
         if (SpawnDistance <= KINDA_SMALL_NUMBER)
         {
             SpawnOffset = FVector::ForwardVector;
-            SpawnDistance = FMath::Max(500.0f, SpawnRadius);
+        SpawnDistance = FMath::Max(500.0f, EffectiveSpawnRadius);
         }
 
         const int32 AttemptPair =
@@ -3733,11 +4180,35 @@ FTransform ABHOpenWorldOperationDirector::BuildSpawnTransform(
         );
     FNavLocation ProjectedLocation;
 
-    if (IsValid(NavigationSystem) &&
+    if (bAttackAOperationSite)
+    {
+        const FVector FinalOffset =
+            SpawnTransform.GetLocation() - OperationCenter;
+        if (FinalOffset.Size2D() > 2200.0f)
+        {
+            const FVector FinalLocation =
+                OperationCenter +
+                FinalOffset.GetSafeNormal2D() * 2200.0f;
+            SpawnTransform.SetLocation(FinalLocation);
+            SpawnTransform.SetRotation(
+                (OperationCenter - FinalLocation)
+                    .Rotation()
+                    .Quaternion()
+            );
+        }
+    }
+
+    const FVector RequestedSpawnLocation = SpawnTransform.GetLocation();
+    if (!bUseAuthoredAttackAFormation &&
+        IsValid(NavigationSystem) &&
         NavigationSystem->ProjectPointToNavigation(
-            SpawnTransform.GetLocation(),
+            RequestedSpawnLocation,
             ProjectedLocation,
-            FVector(3000.0f, 3000.0f, 20000.0f)))
+            FVector(3000.0f, 3000.0f, 20000.0f)) &&
+        FVector::DistSquared2D(
+            RequestedSpawnLocation,
+            ProjectedLocation.Location
+        ) <= FMath::Square(1000.0f))
     {
         SpawnTransform.SetLocation(ProjectedLocation.Location);
         const FVector FacingDirection =
@@ -3762,28 +4233,37 @@ ABHOpenWorldOperationDirector::BuildFriendlySpawnTransform(
 ) const
 {
     FVector InsertionDirection = IsValid(PlayerCharacter)
-        ? (PlayerCharacter->GetActorLocation() - OperationCenter)
-            .GetSafeNormal2D()
+        ? (PlayerCharacter->GetActorLocation() - OperationCenter).GetSafeNormal2D()
         : FVector::ForwardVector;
-
     if (InsertionDirection.IsNearlyZero())
     {
         InsertionDirection = FVector::ForwardVector;
     }
-
-    const FVector SideDirection(
-        -InsertionDirection.Y,
-        InsertionDirection.X,
-        0.0f
-    );
+    const FVector SideDirection(-InsertionDirection.Y, InsertionDirection.X, 0.0f);
     const float SideOffset =
-        (FriendlyIndex -
-            ((EffectiveFriendlySupportCount - 1) * 0.5f)) *
-        350.0f;
+        (FriendlyIndex - ((EffectiveFriendlySupportCount - 1) * 0.5f)) * 350.0f;
+    const FVector SquadLocation = IsValid(PlayerCharacter)
+        ? PlayerCharacter->GetActorLocation()
+        : OperationCenter;
     FVector SpawnLocation =
-        OperationCenter +
-        (InsertionDirection * 8000.0f) +
-        (SideDirection * SideOffset);
+        SquadLocation + InsertionDirection * 500.0f + SideDirection * SideOffset;
+
+    const bool bUseAuthoredAttackAFormation =
+        OperationType == EBHWarPriorityType::Attack &&
+        OperationVariationIndex == 0 &&
+        FParse::Param(
+            FCommandLine::Get(),
+            TEXT("BHTestBeginCommittedOperation")
+        );
+    if (bUseAuthoredAttackAFormation)
+    {
+        // The active-operation fixture starts before the player has traveled
+        // to the authored site. Keep support with the checkpoint formation
+        // instead of spawning it at the map origin.
+        SpawnLocation = OperationCenter +
+            FVector((FriendlyIndex - 0.5f) * 700.0f, 0.0f, 95.0f);
+    }
+
     const int32 SafeAttemptIndex =
         FMath::Max(0, AttemptIndex);
 
@@ -3812,7 +4292,8 @@ ABHOpenWorldOperationDirector::BuildFriendlySpawnTransform(
         );
     FNavLocation ProjectedLocation;
 
-    if (IsValid(NavigationSystem) &&
+    if (!bUseAuthoredAttackAFormation &&
+        IsValid(NavigationSystem) &&
         NavigationSystem->ProjectPointToNavigation(
             SpawnLocation,
             ProjectedLocation,
@@ -3826,3 +4307,15 @@ ABHOpenWorldOperationDirector::BuildFriendlySpawnTransform(
         SpawnLocation
     );
 }
+
+
+
+
+
+
+
+
+
+
+
+

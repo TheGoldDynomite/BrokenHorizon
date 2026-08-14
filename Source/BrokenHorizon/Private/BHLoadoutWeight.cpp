@@ -23,6 +23,21 @@ FBHCarryLoadProfile UBHLoadoutWeight::BuildCarryLoadProfile(
         WeaponKilograms = 8.2f;
         RoundKilograms = 0.013f;
     }
+    else if (WeaponRole == EBHWeaponRole::Carbine)
+    {
+        WeaponKilograms = 3.4f;
+        RoundKilograms = 0.010f;
+    }
+    else if (WeaponRole == EBHWeaponRole::Pistol)
+    {
+        WeaponKilograms = 1.1f;
+        RoundKilograms = 0.008f;
+    }
+    else if (WeaponRole == EBHWeaponRole::Shotgun)
+    {
+        WeaponKilograms = 4.0f;
+        RoundKilograms = 0.028f;
+    }
 
     FBHCarryLoadProfile Profile;
     Profile.TotalKilograms = 16.0f + WeaponKilograms +
@@ -32,6 +47,10 @@ FBHCarryLoadProfile UBHLoadoutWeight::BuildCarryLoadProfile(
         FMath::Max(0, EngineeringCharges) * 1.80f +
         FMath::Max(0, Medkits) * 0.75f +
         FMath::Max(0, FieldDressings) * 0.20f;
+    Profile.ContainerCapacityKilograms = 40.0f;
+    Profile.ContainerRemainingKilograms = FMath::Max(
+        0.0f,
+        Profile.ContainerCapacityKilograms - Profile.TotalKilograms);
     const float BurdenAlpha = FMath::GetMappedRangeValueClamped(
         FVector2D(24.0f, 40.0f), FVector2D(0.0f, 1.0f),
         Profile.TotalKilograms);

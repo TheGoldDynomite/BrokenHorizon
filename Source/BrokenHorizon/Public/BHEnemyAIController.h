@@ -253,6 +253,7 @@ private:
     bool bWithdrawingForAmmunition = false;
     bool bHoldingPosition = false;
     bool bHasHoldFacingYaw = false;
+    int32 LastMoveResultCode = 0;
     int32 ConsecutiveHoldMoveFailures = 0;
     float AmmunitionWithdrawalEndTime = -BIG_NUMBER;
     TWeakObjectPtr<ABHCoverPoint> ClaimedCoverPoint;

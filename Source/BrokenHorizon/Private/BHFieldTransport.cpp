@@ -6,6 +6,7 @@
 #include "BHSaveSubsystem.h"
 #include "BHSectorResupplyStation.h"
 #include "BHWarSubsystem.h"
+#include "BHWarGameState.h"
 #include "Camera/CameraComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -13,14 +14,133 @@
 #include "Engine/CollisionProfile.h"
 #include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/DamageEvents.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputCoreTypes.h"
+#include "HAL/IConsoleManager.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
+
+#if !UE_BUILD_SHIPPING
+namespace
+{
+static FAutoConsoleCommandWithWorldAndArgs GBoardFirstLightWatercraftCommand(
+    TEXT("BHTestBoardFirstLightWatercraft"),
+    TEXT("Boards the authored First Light watercraft with the local player."),
+    FConsoleCommandWithWorldAndArgsDelegate::CreateLambda(
+        [](const TArray<FString>&, UWorld* World)
+        {
+            if (!IsValid(World))
+            {
+                return;
+            }
+            APlayerController* PC = World->GetFirstPlayerController();
+            ABHCharacter* Character = IsValid(PC)
+                ? Cast<ABHCharacter>(PC->GetPawn())
+                : nullptr;
+            for (TActorIterator<ABHFieldTransport> It(World); It; ++It)
+            {
+                ABHFieldTransport* Transport = *It;
+                if (IsValid(Transport) &&
+                    Transport->GetPersistenceID() ==
+                        FName(TEXT("FirstLightWatercraft01")))
+                {
+                    if (IsValid(Character))
+                    {
+                        IBHInteractable::Execute_Interact(Transport, Character);
+                        UE_LOG(LogTemp, Display,
+                            TEXT("BH_TEST_WATERCRAFT_BOARD result=%s id=%s"),
+                            Transport->GetOccupant() == Character
+                                ? TEXT("success")
+                                : TEXT("failure"),
+                            *Transport->GetPersistenceID().ToString());
+                    }
+                    return;
+                }
+            }
+            UE_LOG(LogTemp, Warning,
+                TEXT("BH_TEST_WATERCRAFT_BOARD no_target"));
+        }
+    )
+);
+
+static FAutoConsoleCommandWithWorldAndArgs GDeliverFirstLightWatercraftCommand(
+    TEXT("BHTestDeliverFirstLightWatercraft"),
+    TEXT("Runs the authored First Light watercraft delivery at EasternDepot."),
+    FConsoleCommandWithWorldAndArgsDelegate::CreateLambda(
+        [](const TArray<FString>&, UWorld* World)
+        {
+            if (!IsValid(World))
+            {
+                return;
+            }
+            ABHFieldTransport* Transport = nullptr;
+            for (TActorIterator<ABHFieldTransport> It(World); It; ++It)
+            {
+                if (IsValid(*It) && (*It)->GetPersistenceID() ==
+                    FName(TEXT("FirstLightWatercraft01")))
+                {
+                    Transport = *It;
+                    break;
+                }
+            }
+            ABHSectorResupplyStation* Station = nullptr;
+            for (TActorIterator<ABHSectorResupplyStation> It(World); It; ++It)
+            {
+                if (IsValid(*It) && (*It)->GetSectorID() ==
+                    FName(TEXT("EasternDepot")))
+                {
+                    Station = *It;
+                    break;
+                }
+            }
+            if (!IsValid(Transport) || !IsValid(Station))
+            {
+                if (!IsValid(Transport))
+                {
+                    UE_LOG(LogTemp, Warning,
+                        TEXT("BH_TEST_WATERCRAFT_DELIVERY no_transport"));
+                    return;
+                }
+                Station = World->SpawnActor<ABHSectorResupplyStation>(
+                    ABHSectorResupplyStation::StaticClass(),
+                    Transport->GetActorLocation(),
+                    FRotator::ZeroRotator
+                );
+                if (IsValid(Station))
+                {
+                    Station->ConfigureStation(FName(TEXT("EasternDepot")));
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Warning,
+                        TEXT("BH_TEST_WATERCRAFT_DELIVERY station_spawn_failed"));
+                    return;
+                }
+            }
+            Transport->SetActorLocation(
+                Station->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f));
+            if (APlayerController* PC = World->GetFirstPlayerController())
+            {
+                if (ABHCharacter* Character = Cast<ABHCharacter>(PC->GetPawn()))
+                {
+                    IBHInteractable::Execute_Interact(Transport, Character);
+                }
+            }
+            Transport->ExecuteLogisticsTransferForTesting();
+            UE_LOG(LogTemp, Display,
+                TEXT("BH_TEST_WATERCRAFT_DELIVERY id=%s remaining=%.1f"),
+                *Transport->GetPersistenceID().ToString(),
+                Transport->GetCargoSupply());
+        }
+    )
+);
+}
+#endif
 
 ABHFieldTransport::ABHFieldTransport()
 {
@@ -71,11 +191,47 @@ ABHFieldTransport::ABHFieldTransport()
     HoodMesh->SetRelativeLocation(FVector(110.0f, 0.0f, 48.0f));
     HoodMesh->SetRelativeScale3D(FVector(1.8f, 1.9f, 0.35f));
 
+    WatercraftHullMesh = CreateDefaultSubobject<UStaticMeshComponent>(
+        TEXT("WatercraftHullMesh")
+    );
+    WatercraftHullMesh->SetupAttachment(VehicleCollision);
+    WatercraftHullMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    WatercraftHullMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 12.0f));
+    WatercraftHullMesh->SetRelativeScale3D(FVector(4.0f, 1.35f, 0.24f));
+    WatercraftHullMesh->SetVisibility(false, true);
+
+    WatercraftDeckMesh = CreateDefaultSubobject<UStaticMeshComponent>(
+        TEXT("WatercraftDeckMesh"));
+    WatercraftDeckMesh->SetupAttachment(VehicleCollision);
+    WatercraftDeckMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    WatercraftDeckMesh->SetRelativeLocation(FVector(-20.0f, 0.0f, 32.0f));
+    WatercraftDeckMesh->SetRelativeScale3D(FVector(2.1f, 1.05f, 0.12f));
+    WatercraftDeckMesh->SetVisibility(false, true);
+
+    WatercraftConsoleMesh = CreateDefaultSubobject<UStaticMeshComponent>(
+        TEXT("WatercraftConsoleMesh"));
+    WatercraftConsoleMesh->SetupAttachment(WatercraftDeckMesh);
+    WatercraftConsoleMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    WatercraftConsoleMesh->SetRelativeLocation(FVector(-55.0f, 0.0f, 42.0f));
+    WatercraftConsoleMesh->SetRelativeScale3D(FVector(0.55f, 0.7f, 0.5f));
+    WatercraftConsoleMesh->SetVisibility(false, true);
+
     if (CubeFinder.Succeeded())
     {
         ChassisMesh->SetStaticMesh(CubeFinder.Object);
         CabMesh->SetStaticMesh(CubeFinder.Object);
         HoodMesh->SetStaticMesh(CubeFinder.Object);
+        WatercraftHullMesh->SetStaticMesh(CubeFinder.Object);
+        WatercraftDeckMesh->SetStaticMesh(CubeFinder.Object);
+        WatercraftConsoleMesh->SetStaticMesh(CubeFinder.Object);
+    }
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> WatercraftMaterialFinder(
+        TEXT("/Game/BrokenHorizon/Environment/Materials/M_BH_WatercraftSurface.M_BH_WatercraftSurface"));
+    if (WatercraftMaterialFinder.Succeeded())
+    {
+        WatercraftHullMesh->SetMaterial(0, WatercraftMaterialFinder.Object);
+        WatercraftDeckMesh->SetMaterial(0, WatercraftMaterialFinder.Object);
+        WatercraftConsoleMesh->SetMaterial(0, WatercraftMaterialFinder.Object);
     }
 
     const FVector WheelLocations[] = {
@@ -259,6 +415,16 @@ float ABHFieldTransport::CalculateCargoControlMultiplier(
     );
 }
 
+float ABHFieldTransport::CalculateWaterSpeedMultiplier(
+    bool bWaterborne,
+    float ConfiguredMultiplier
+)
+{
+    return bWaterborne
+        ? FMath::Clamp(ConfiguredMultiplier, 0.1f, 1.0f)
+        : 1.0f;
+}
+
 float ABHFieldTransport::CalculateCollisionDamage(
     float ImpactSpeed,
     float DamageSpeedThreshold,
@@ -305,6 +471,45 @@ void ABHFieldTransport::GetLifetimeReplicatedProps(
 void ABHFieldTransport::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (IsValid(WatercraftHullMesh))
+    {
+        WatercraftHullMesh->SetVisibility(bWaterborneTransport, true);
+    }
+    if (IsValid(WatercraftDeckMesh))
+    {
+        WatercraftDeckMesh->SetVisibility(bWaterborneTransport, true);
+    }
+    if (IsValid(WatercraftConsoleMesh))
+    {
+        WatercraftConsoleMesh->SetVisibility(bWaterborneTransport, true);
+    }
+    if (bWaterborneTransport)
+    {
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_WATERCRAFT_PRESENTATION id=%s hull=%d deck=%d console=%d"
+            ),
+            *PersistenceID.ToString(),
+            IsValid(WatercraftHullMesh) ? 1 : 0,
+            IsValid(WatercraftDeckMesh) ? 1 : 0,
+            IsValid(WatercraftConsoleMesh) ? 1 : 0
+        );
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_WATERCRAFT_CARGO_STATE id=%s source=%s destination=%s "
+                "supply=%.1f"
+            ),
+            *PersistenceID.ToString(),
+            *CargoSourceSectorID.ToString(),
+            *CargoDestinationSectorID.ToString(),
+            CurrentCargoSupply
+        );
+    }
     CurrentFuel = FMath::Clamp(
         CurrentFuel,
         0.0f,
@@ -329,7 +534,14 @@ void ABHFieldTransport::BeginPlay()
     }
 
     UpdateTransportLabel();
-    UpdateGroundPosition(1.0f);
+    if (bWaterborneTransport)
+    {
+        UpdateWaterPosition(1.0f);
+    }
+    else
+    {
+        UpdateGroundPosition(1.0f);
+    }
 }
 
 void ABHFieldTransport::Tick(float DeltaTime)
@@ -360,7 +572,14 @@ void ABHFieldTransport::Tick(float DeltaTime)
     }
 
     UpdateMovement(DeltaTime);
-    UpdateGroundPosition(DeltaTime);
+    if (bWaterborneTransport)
+    {
+        UpdateWaterPosition(DeltaTime);
+    }
+    else
+    {
+        UpdateGroundPosition(DeltaTime);
+    }
 }
 
 float ABHFieldTransport::CalculatePassengerDamage(
@@ -478,6 +697,11 @@ void ABHFieldTransport::SetPersistenceIDForTesting(FName InPersistenceID)
 ABHCharacter* ABHFieldTransport::GetOccupant() const
 {
     return Occupant;
+}
+
+void ABHFieldTransport::ExecuteLogisticsTransferForTesting()
+{
+    TryTransferFieldLogistics();
 }
 
 void ABHFieldTransport::ForceExitOccupantForRespawn(
@@ -829,6 +1053,29 @@ float ABHFieldTransport::LoadRecoveredMilitarySupply(
     return LoadedSupply;
 }
 
+void ABHFieldTransport::ConfigureAuthoredCargo(
+    float Supply,
+    FName SourceSectorID,
+    FName DestinationSectorID
+)
+{
+    CurrentCargoSupply = FMath::Clamp(
+        Supply,
+        0.0f,
+        GetCargoCapacity()
+    );
+    CargoSourceSectorID =
+        CurrentCargoSupply > KINDA_SMALL_NUMBER
+            ? SourceSectorID
+            : NAME_None;
+    CargoDestinationSectorID =
+        CurrentCargoSupply > KINDA_SMALL_NUMBER
+            ? DestinationSectorID
+            : NAME_None;
+    CargoType = EBHWarConvoyCargoType::MilitarySupply;
+    OnRep_TransportState();
+}
+
 bool ABHFieldTransport::ServiceVehicle()
 {
     if (!HasAuthority())
@@ -865,7 +1112,9 @@ bool ABHFieldTransport::RecoverAndService(
         ETeleportType::TeleportPhysics
     );
     ServiceVehicle();
-    UpdateGroundPosition(1.0f);
+    bWaterborneTransport
+        ? UpdateWaterPosition(1.0f)
+        : UpdateGroundPosition(1.0f);
     ForceNetUpdate();
 
     UE_LOG(
@@ -944,7 +1193,9 @@ void ABHFieldTransport::RestorePersistentState(
     bOutOfFuelWarningIssued = CurrentFuel <= KINDA_SMALL_NUMBER;
     bHullDisabledWarningIssued = CurrentHull <= KINDA_SMALL_NUMBER;
     UpdateTransportLabel();
-    UpdateGroundPosition(1.0f);
+    bWaterborneTransport
+        ? UpdateWaterPosition(1.0f)
+        : UpdateGroundPosition(1.0f);
     ForceNetUpdate();
 
     if (bRestoreDriver &&
@@ -975,7 +1226,11 @@ FText ABHFieldTransport::GetInteractionText_Implementation() const
 {
     return IsValid(Occupant)
         ? FText::FromString(TEXT("Field transport occupied"))
-        : FText::FromString(TEXT("Press [F] to drive field transport"));
+        : (IsWaterborne()
+            ? FText::FromString(
+                TEXT("Press [F] to board waterborne cargo transport")
+            )
+            : FText::FromString(TEXT("Press [F] to drive field transport")));
 }
 
 void ABHFieldTransport::EnterVehicle(
@@ -1376,6 +1631,29 @@ void ABHFieldTransport::TryTransferFieldLogistics()
     if (!IsValid(Occupant))
     {
         return;
+    }
+
+    if (IsValid(GetWorld()))
+    {
+        if (const ABHWarGameState* WarGameState =
+                GetWorld()->GetGameState<ABHWarGameState>())
+        {
+            const FBHActiveOperationSnapshot OperationSnapshot =
+                WarGameState->GetActiveOperationSnapshot();
+            if (OperationSnapshot.OperationType ==
+                    EBHWarPriorityType::Resupply &&
+                OperationSnapshot.OperationState.OperationVariationIndex == 1 &&
+                !bWaterborneTransport)
+            {
+                NotifyDriver(
+                    TEXT(
+                        "WATER ROUTE REQUIRED // "
+                        "USE A WATERBORNE TRANSPORT FOR THIS DELIVERY"
+                    )
+                );
+                return;
+            }
+        }
     }
 
     if (CurrentCargoSupply > KINDA_SMALL_NUMBER &&
@@ -1916,11 +2194,16 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
         0.0f,
         1.0f
     );
+    const float WaterHandlingMultiplier = CalculateWaterSpeedMultiplier(
+        bWaterborneTransport,
+        WaterSpeedMultiplier
+    );
     const float CargoControlMultiplier =
         GetCargoControlMultiplier();
     const float ForwardLimit =
         (bBoostInput ? BoostForwardSpeed : MaximumForwardSpeed) *
         TractionMultiplier *
+        WaterHandlingMultiplier *
         GetCargoSpeedMultiplier() *
         GetHullMobilityMultiplier();
     float TargetSpeed = 0.0f;
@@ -1933,6 +2216,7 @@ void ABHFieldTransport::UpdateMovement(float DeltaTime)
     {
         TargetSpeed = MaximumReverseSpeed *
             TractionMultiplier *
+            WaterHandlingMultiplier *
             GetCargoSpeedMultiplier() *
             GetHullMobilityMultiplier() *
             ThrottleInput;
@@ -2142,6 +2426,11 @@ float ABHFieldTransport::GetHullMobilityMultiplier() const
     );
 }
 
+bool ABHFieldTransport::IsWaterborne() const
+{
+    return bWaterborneTransport;
+}
+
 float ABHFieldTransport::GetHullFuelBurnMultiplier() const
 {
     return CalculateHullFuelBurnMultiplier(
@@ -2201,6 +2490,14 @@ void ABHFieldTransport::UpdateGroundPosition(float DeltaTime)
             FollowSpeed
         )
     );
+}
+
+void ABHFieldTransport::UpdateWaterPosition(float DeltaTime)
+{
+    (void)DeltaTime;
+    FVector SurfaceLocation = GetActorLocation();
+    SurfaceLocation.Z = WaterSurfaceZ;
+    SetActorLocation(SurfaceLocation, false, nullptr, ETeleportType::None);
 }
 
 void ABHFieldTransport::UpdateTransportLabel()

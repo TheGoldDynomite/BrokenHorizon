@@ -13,7 +13,10 @@ enum class EBHWeaponRole : uint8
 {
     Assault,
     Marksman,
-    Support
+    Support,
+    Carbine,
+    Pistol,
+    Shotgun
 };
 
 USTRUCT(BlueprintType)

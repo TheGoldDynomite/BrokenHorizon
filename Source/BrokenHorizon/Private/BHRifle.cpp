@@ -137,6 +137,28 @@ void ABHRifle::BeginPlay()
 {
     Super::BeginPlay();
 #if !UE_BUILD_SHIPPING
+    if (GetOwner() && GetOwner()->HasAuthority() &&
+        FParse::Param(FCommandLine::Get(), TEXT("BHTestWeaponAudioRuntime")))
+    {
+        const FString FireSoundPath = IsValid(FireSound)
+            ? FireSound->GetPathName()
+            : FString();
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_WEAPON_AUDIO_RUNTIME fire=%s project_owned=%d "
+                "dry=%d reload=%d"
+            ),
+            *FireSoundPath,
+            FireSoundPath.StartsWith(TEXT("/Game/BrokenHorizon/Audio/"))
+                ? 1
+                : 0,
+            IsValid(DryFireSound) ? 1 : 0,
+            IsValid(ReloadSound) ? 1 : 0
+        );
+    }
+
     if (!bBHBallisticsRuntimeProbeCompleted &&
         GetOwner() && GetOwner()->HasAuthority() &&
         FParse::Param(FCommandLine::Get(), TEXT("BHTestBallisticsRuntime")))

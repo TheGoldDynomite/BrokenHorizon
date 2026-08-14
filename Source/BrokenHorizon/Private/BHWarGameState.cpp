@@ -20,6 +20,9 @@
 #include "BHObjectiveNotificationWidget.h"
 #include "BHPauseMenuWidget.h"
 #include "BHSaveSubsystem.h"
+#include "BHSectorResupplyStation.h"
+#include "BHWorldKitModule.h"
+#include "BHSalvagePickup.h"
 #include "BHSectorAnchor.h"
 #include "BHWarSubsystem.h"
 #include "BHWarMapWidget.h"
@@ -59,6 +62,10 @@ bool bBHTestRestoreCrashRecovery = false;
 bool bBHTestRenderedTraversalIssued = false;
 bool bBHTestRenderedUIReviewIssued = false;
 bool bBHTestSquadPingScreenshotIssued = false;
+bool bBHTestWatercraftDeliveryIssued = false;
+bool bBHTestInventoryTransferIssued = false;
+bool bBHTestWeaponRoleRuntimeIssued = false;
+bool bBHTestWorldKitModuleIssued = false;
 FName BHTestTransportPersistenceID = NAME_None;
 }
 #endif
@@ -228,6 +235,255 @@ void ABHWarGameState::BeginPlay()
                 &ABHWarGameState::HandleWarStateChanged
             );
 #if !UE_BUILD_SHIPPING
+            if (FParse::Param(
+                    FCommandLine::Get(),
+                    TEXT("BHTestWorldKitModuleRuntime")))
+            {
+                FTimerHandle WorldKitModuleTimer;
+                GetWorldTimerManager().SetTimer(
+                    WorldKitModuleTimer,
+                    FTimerDelegate::CreateWeakLambda(
+                        this,
+                        [this]()
+                        {
+                            if (bBHTestWorldKitModuleIssued)
+                            {
+                                return;
+                            }
+
+                            ABHCharacter* Player = nullptr;
+                            for (TActorIterator<ABHCharacter> It(GetWorld());
+                                 It;
+                                 ++It)
+                            {
+                                if (It->HasAuthority() &&
+                                    It->IsPlayerControlled())
+                                {
+                                    Player = *It;
+                                    break;
+                                }
+                            }
+                            if (!IsValid(Player))
+                            {
+                                return;
+                            }
+
+                            EBHWorldKitModuleType ModuleType =
+                                EBHWorldKitModuleType::Shelter;
+                            FString RequestedType;
+                            FParse::Value(
+                                FCommandLine::Get(),
+                                TEXT("BHTestWorldKitModuleType="),
+                                RequestedType
+                            );
+                            if (RequestedType.Equals(
+                                    TEXT("Checkpoint"),
+                                    ESearchCase::IgnoreCase))
+                            {
+                                ModuleType =
+                                    EBHWorldKitModuleType::Checkpoint;
+                            }
+                            else if (RequestedType.Equals(
+                                         TEXT("Depot"),
+                                         ESearchCase::IgnoreCase))
+                            {
+                                ModuleType = EBHWorldKitModuleType::Depot;
+                            }
+                            else if (RequestedType.Equals(
+                                         TEXT("Base"),
+                                         ESearchCase::IgnoreCase))
+                            {
+                                ModuleType =
+                                    EBHWorldKitModuleType::ResistanceBase;
+                            }
+
+                            const FVector SpawnLocation =
+                                Player->GetActorLocation() +
+                                Player->GetActorForwardVector() * 900.0f;
+                            ABHWorldKitModule* Module =
+                                GetWorld()->SpawnActor<ABHWorldKitModule>(
+                                    ABHWorldKitModule::StaticClass(),
+                                    SpawnLocation,
+                                    Player->GetActorRotation()
+                                );
+                            if (IsValid(Module))
+                            {
+                                Module->SetPersistenceIDForTesting(
+                                    FName(TEXT("BHTestWorldKitRuntime01"))
+                                );
+                                Module->SetModuleTypeForTesting(ModuleType);
+                                bBHTestWorldKitModuleIssued = true;
+                            }
+                            UE_LOG(
+                                LogTemp,
+                                Display,
+                                TEXT(
+                                    "BH_TEST_WORLD_KIT_RUNTIME result=%s "
+                                    "id=%s type=%d"
+                                ),
+                                IsValid(Module) ? TEXT("success") : TEXT("failure"),
+                                IsValid(Module)
+                                    ? *Module->GetPersistenceID().ToString()
+                                    : TEXT("None"),
+                                IsValid(Module)
+                                    ? static_cast<int32>(ModuleType)
+                                    : -1
+                            );
+                        }
+                    ),
+                    0.5f,
+                    true
+                );
+            }
+
+            if (FParse::Param(
+                    FCommandLine::Get(),
+                    TEXT("BHTestWatercraftDeliveryWhenOccupied")))
+            {
+                FTimerHandle WatercraftDeliveryTimer;
+                GetWorldTimerManager().SetTimer(
+                    WatercraftDeliveryTimer,
+                    FTimerDelegate::CreateWeakLambda(
+                        this,
+                        [this]()
+                        {
+                            if (bBHTestWatercraftDeliveryIssued)
+                            {
+                                return;
+                            }
+
+                            ABHCharacter* Player = nullptr;
+                            for (TActorIterator<ABHCharacter> It(GetWorld());
+                                 It;
+                                 ++It)
+                            {
+                                if (It->HasAuthority() &&
+                                    It->IsPlayerControlled())
+                                {
+                                    Player = *It;
+                                    break;
+                                }
+                            }
+
+                            ABHFieldTransport* Transport = nullptr;
+                            for (TActorIterator<ABHFieldTransport> It(
+                                     GetWorld());
+                                 It;
+                                 ++It)
+                            {
+                                if (IsValid(*It) &&
+                                    It->GetPersistenceID() ==
+                                        FName(TEXT("FirstLightWatercraft01")))
+                                {
+                                    Transport = *It;
+                                    break;
+                                }
+                            }
+
+                            ABHSectorResupplyStation* Station = nullptr;
+                            for (TActorIterator<ABHSectorResupplyStation> It(
+                                     GetWorld());
+                                 It;
+                                 ++It)
+                            {
+                                if (IsValid(*It) &&
+                                    It->GetSectorID() ==
+                                        FName(TEXT("EasternDepot")))
+                                {
+                                    Station = *It;
+                                    break;
+                                }
+                            }
+
+                            if (!IsValid(Player) || !IsValid(Transport))
+                            {
+                                return;
+                            }
+
+                            if (!IsValid(Station))
+                            {
+                                Station = GetWorld()->SpawnActor<
+                                    ABHSectorResupplyStation>(
+                                    ABHSectorResupplyStation::StaticClass(),
+                                    Transport->GetActorLocation(),
+                                    FRotator::ZeroRotator
+                                );
+                                if (IsValid(Station))
+                                {
+                                    Station->ConfigureStation(
+                                        FName(TEXT("EasternDepot"))
+                                    );
+                                }
+                            }
+
+                            if (!IsValid(Station))
+                            {
+                                return;
+                            }
+
+                            BoundWarSubsystem->SetSectorOwnerForTesting(
+                                FName(TEXT("EasternDepot")),
+                                EBHWarFaction::Friendly
+                            );
+                            BoundWarSubsystem->SetSectorSupplyForTesting(
+                                FName(TEXT("EasternDepot")),
+                                80.0f
+                            );
+
+                            IBHInteractable::Execute_Interact(
+                                Transport,
+                                Player
+                            );
+                            Transport->SetActorLocation(
+                                Station->GetActorLocation() +
+                                FVector(0.0f, 0.0f, 40.0f)
+                            );
+                            Transport->ExecuteLogisticsTransferForTesting();
+                            bBHTestWatercraftDeliveryIssued = true;
+                            UE_LOG(
+                                LogTemp,
+                                Display,
+                                TEXT(
+                                    "BH_TEST_WATERCRAFT_DELIVERY_OCCUPIED "
+                                    "id=%s remaining=%.1f occupant=%d"
+                                ),
+                                *Transport->GetPersistenceID().ToString(),
+                                Transport->GetCargoSupply(),
+                                IsValid(Transport->GetOccupant()) ? 1 : 0
+                            );
+                        }
+                    ),
+                    0.5f,
+                    true
+                );
+            }
+
+            if (FParse::Param(
+                    FCommandLine::Get(),
+                    TEXT("BHTestInventoryTransferRuntime")))
+            {
+                GetWorldTimerManager().SetTimer(
+                    InventoryTransferRuntimeTestTimer,
+                    this,
+                    &ABHWarGameState::RunInventoryTransferRuntimeTest,
+                    0.5f,
+                    true
+                );
+            }
+
+            if (FParse::Param(
+                    FCommandLine::Get(),
+                    TEXT("BHTestWeaponRoleRuntime")))
+            {
+                GetWorldTimerManager().SetTimer(
+                    WeaponRoleRuntimeTestTimer,
+                    this,
+                    &ABHWarGameState::RunWeaponRoleRuntimeTest,
+                    0.5f,
+                    true
+                );
+            }
+
             if (FParse::Param(
                     FCommandLine::Get(),
                     TEXT("BHTestNavigationGrenade")))
@@ -532,11 +788,17 @@ void ABHWarGameState::BeginPlay()
             if (FParse::Param(
                     FCommandLine::Get(),
                     TEXT("BHTestCommitPriorityOperation")) &&
-                !FParse::Param(
-                    FCommandLine::Get(),
-                    TEXT("BHTestTransportTravelPersistence")) &&
                 !BoundWarSubsystem->HasCommittedOperation())
             {
+                if (FParse::Param(
+                        FCommandLine::Get(),
+                        TEXT("BHTestWatercraftDeliveryWhenOccupied")))
+                {
+                    BoundWarSubsystem->SetSectorOwnerForTesting(
+                        FName(TEXT("EasternDepot")),
+                        EBHWarFaction::Friendly
+                    );
+                }
                 FString RequestedOperationType;
                 FParse::Value(
                     FCommandLine::Get(),
@@ -550,6 +812,26 @@ void ABHWarGameState::BeginPlay()
                         ESearchCase::IgnoreCase))
                 {
                     OperationType = EBHWarPriorityType::Attack;
+                    if (FParse::Param(
+                            FCommandLine::Get(),
+                            TEXT("BHTestForceAttackTarget")))
+                    {
+                        // NorthPass is the canonical First Light checkpoint;
+                        // keep Dovren as its friendly supply source for the
+                        // isolated active-operation fixture.
+                        BoundWarSubsystem->SetSectorOwnerForTesting(
+                            FName(TEXT("NorthPass")),
+                            EBHWarFaction::Enemy
+                        );
+                        BoundWarSubsystem->SetSectorOwnerForTesting(
+                            FName(TEXT("DovrenVillage")),
+                            EBHWarFaction::Friendly
+                        );
+                        BoundWarSubsystem->SetSectorSupplyForTesting(
+                            FName(TEXT("DovrenVillage")),
+                            80.0f
+                        );
+                    }
                 }
                 else if (RequestedOperationType.Equals(
                              TEXT("Defend"),
@@ -562,6 +844,12 @@ void ABHWarGameState::BeginPlay()
                              ESearchCase::IgnoreCase))
                 {
                     OperationType = EBHWarPriorityType::Raid;
+                }
+                else if (RequestedOperationType.Equals(
+                             TEXT("Resupply"),
+                             ESearchCase::IgnoreCase))
+                {
+                    OperationType = EBHWarPriorityType::Resupply;
                 }
                 else if (RequestedOperationType.Equals(
                              TEXT("Recon"),
@@ -586,6 +874,14 @@ void ABHWarGameState::BeginPlay()
                             break;
                         }
                     }
+                    if (OperationSectorID.IsNone() &&
+                        FParse::Param(
+                            FCommandLine::Get(),
+                            TEXT("BHTestForceAttackTarget")) &&
+                        OperationType == EBHWarPriorityType::Attack)
+                    {
+                        OperationSectorID = FName(TEXT("NorthPass"));
+                    }
                 }
                 const bool bCommitted =
                     BoundWarSubsystem->SetCommittedOperation(
@@ -606,6 +902,101 @@ void ABHWarGameState::BeginPlay()
                     *OperationSectorID.ToString(),
                     static_cast<int32>(OperationType)
                 );
+
+                if (bCommitted &&
+                    FParse::Param(
+                        FCommandLine::Get(),
+                        TEXT("BHTestBeginCommittedOperation")))
+                {
+                    // BeginOperationInWorld owns the real deployment commit;
+                    // release the fixture commit first so the character path
+                    // can perform its normal viability and supply checks.
+                    BoundWarSubsystem->ClearCommittedOperation();
+                    ABHCharacter* TestCharacter = nullptr;
+                    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+                    {
+                        if (It->HasAuthority() && It->IsPlayerControlled())
+                        {
+                            TestCharacter = *It;
+                            break;
+                        }
+                    }
+                    if (IsValid(TestCharacter))
+                    {
+                        TestCharacter->PrepareDeploymentModeForTest();
+                    }
+                    const bool bStarted =
+                        IsValid(TestCharacter) &&
+                        TestCharacter->BeginOperationInWorld(
+                            OperationSectorID,
+                            OperationType
+                        );
+                    UE_LOG(
+                        LogTemp,
+                        Display,
+                        TEXT(
+                            "BH_TEST_BEGIN_COMMITTED_OPERATION result=%s "
+                            "sector=%s type=%d"
+                        ),
+                        bStarted ? TEXT("success") : TEXT("failure"),
+                        *OperationSectorID.ToString(),
+                        static_cast<int32>(OperationType)
+                    );
+                    if (!bStarted)
+                    {
+                        FTimerHandle BeginOperationRetryTimer;
+                        GetWorldTimerManager().SetTimer(
+                            BeginOperationRetryTimer,
+                            FTimerDelegate::CreateWeakLambda(
+                                this,
+                                [this, OperationSectorID, OperationType]()
+                                {
+                                    ABHCharacter* RetryCharacter = nullptr;
+                                    for (TActorIterator<ABHCharacter> It(
+                                             GetWorld());
+                                         It;
+                                         ++It)
+                                    {
+                                        if (It->HasAuthority() &&
+                                            It->IsPlayerControlled())
+                                        {
+                                            RetryCharacter = *It;
+                                            break;
+                                        }
+                                    }
+                                    const bool bRetryStarted =
+                                        IsValid(RetryCharacter) &&
+                                        (RetryCharacter->SetActorLocation(
+                                             FVector(6100.0f, 0.0f, 100.0f),
+                                             false,
+                                             nullptr,
+                                             ETeleportType::TeleportPhysics
+                                         ),
+                                         RetryCharacter->PrepareDeploymentModeForTest(),
+                                         RetryCharacter->BeginOperationInWorld(
+                                             OperationSectorID,
+                                             OperationType
+                                         ));
+                                    UE_LOG(
+                                        LogTemp,
+                                        Display,
+                                        TEXT(
+                                            "BH_TEST_BEGIN_COMMITTED_OPERATION_RETRY "
+                                            "result=%s sector=%s type=%d"
+                                        ),
+                                        bRetryStarted
+                                            ? TEXT("success")
+                                            : TEXT("failure"),
+                                        *OperationSectorID.ToString(),
+                                        static_cast<int32>(OperationType)
+                                    );
+                                }
+                            ),
+                            6.0f,
+                            false
+                        );
+                    }
+                }
             }
 
             float TestTravelDelaySeconds = 0.0f;
@@ -616,8 +1007,14 @@ void ABHWarGameState::BeginPlay()
                     TestTravelDelaySeconds) &&
                 TestTravelDelaySeconds > 0.0f)
             {
-                const FString TravelMap =
+                const FString CurrentMap =
                     GetWorld()->GetOutermost()->GetName();
+                const FString TravelMap =
+                    FParse::Param(
+                        FCommandLine::Get(),
+                        TEXT("BHTestTransportTravelPersistence"))
+                        ? TEXT("/Game/BrokenHorizon/Maps/L_BrokenHorizon_World")
+                        : CurrentMap;
                 FTimerHandle TestTravelTimer;
                 GetWorldTimerManager().SetTimer(
                     TestTravelTimer,
@@ -767,6 +1164,13 @@ void ABHWarGameState::BeginPlay()
                                 {
                                     TestOperationType =
                                         EBHWarPriorityType::Raid;
+                                }
+                                else if (RequestedOperationType.Equals(
+                                             TEXT("Resupply"),
+                                             ESearchCase::IgnoreCase))
+                                {
+                                    TestOperationType =
+                                        EBHWarPriorityType::Resupply;
                                 }
                                 else if (RequestedOperationType.Equals(
                                              TEXT("Recon"),
@@ -1972,7 +2376,7 @@ void ABHWarGameState::RunRenderedTraversalTest()
     }
     ++RenderedTraversalTestSubstep;
     const float SegmentAlpha = FMath::Clamp(
-        static_cast<float>(RenderedTraversalTestSubstep) / 20.0f,
+        static_cast<float>(RenderedTraversalTestSubstep) / 24.0f,
         0.0f,
         1.0f
     );
@@ -1995,7 +2399,7 @@ void ABHWarGameState::RunRenderedTraversalTest()
         Controller->SetControlRotation(ViewRotation);
     }
 
-    if (RenderedTraversalTestSubstep < 20)
+    if (RenderedTraversalTestSubstep < 24)
     {
         return;
     }
@@ -2545,6 +2949,128 @@ void ABHWarGameState::VerifyNetworkCombatDensityReplicationTest()
     );
 }
 
+void ABHWarGameState::RunInventoryTransferRuntimeTest()
+{
+    if (bBHTestInventoryTransferIssued || !HasAuthority())
+    {
+        return;
+    }
+
+    ABHCharacter* Source = nullptr;
+    ABHCharacter* Recipient = nullptr;
+    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+    {
+        ABHCharacter* Candidate = *It;
+        if (!IsValid(Candidate) || !Candidate->HasAuthority() ||
+            !Candidate->IsPlayerControlled())
+        {
+            continue;
+        }
+        if (!IsValid(Source))
+        {
+            Source = Candidate;
+        }
+        else if (Candidate != Source)
+        {
+            Recipient = Candidate;
+            break;
+        }
+    }
+
+    if (!IsValid(Source) || !IsValid(Recipient))
+    {
+        return;
+    }
+
+    Source->SetActorLocation(Recipient->GetActorLocation() + FVector(100.0f, 0.0f, 0.0f));
+    const int32 SourceBefore = IsValid(Source->GetWeaponComponent())
+        ? Source->GetWeaponComponent()->GetReserveAmmo()
+        : 0;
+    const int32 RecipientBefore = IsValid(Recipient->GetWeaponComponent())
+        ? Recipient->GetWeaponComponent()->GetReserveAmmo()
+        : 0;
+    const bool bTransferred = Source->TransferInventoryItemTo(
+        Recipient,
+        EBHSalvagePickupType::Ammunition,
+        1
+    );
+    bBHTestInventoryTransferIssued = true;
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_TEST_INVENTORY_TRANSFER_RUNTIME result=%s "
+            "source_before=%d source_after=%d recipient_before=%d "
+            "recipient_after=%d"
+        ),
+        bTransferred ? TEXT("success") : TEXT("failure"),
+        SourceBefore,
+        IsValid(Source->GetWeaponComponent())
+            ? Source->GetWeaponComponent()->GetReserveAmmo()
+            : 0,
+        RecipientBefore,
+        IsValid(Recipient->GetWeaponComponent())
+            ? Recipient->GetWeaponComponent()->GetReserveAmmo()
+            : 0
+    );
+    GetWorldTimerManager().ClearTimer(InventoryTransferRuntimeTestTimer);
+}
+
+void ABHWarGameState::RunWeaponRoleRuntimeTest()
+{
+    if (bBHTestWeaponRoleRuntimeIssued || !HasAuthority())
+    {
+        return;
+    }
+
+    ABHCharacter* Player = nullptr;
+    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+    {
+        if (IsValid(*It) && (*It)->HasAuthority() &&
+            (*It)->IsPlayerControlled())
+        {
+            Player = *It;
+            break;
+        }
+    }
+
+    UBHWeaponComponent* Weapon = IsValid(Player)
+        ? Player->GetWeaponComponent()
+        : nullptr;
+    if (!IsValid(Weapon))
+    {
+        return;
+    }
+
+    const bool bMarksman = Weapon->EquipWeaponRole(EBHWeaponRole::Marksman, true);
+    const bool bSupport = Weapon->EquipWeaponRole(EBHWeaponRole::Support, true);
+    const bool bCarbine = Weapon->EquipWeaponRole(EBHWeaponRole::Carbine, true);
+    const bool bPistol = Weapon->EquipWeaponRole(EBHWeaponRole::Pistol, true);
+    const bool bShotgun = Weapon->EquipWeaponRole(EBHWeaponRole::Shotgun, true);
+    const FBHRifleConfig* Config = IsValid(Weapon->GetEquippedRifle())
+        ? &Weapon->GetEquippedRifle()->GetConfig()
+        : nullptr;
+    const bool bPassed = bMarksman && bSupport && bCarbine && bPistol && bShotgun &&
+        Weapon->GetWeaponRole() == EBHWeaponRole::Shotgun && Config &&
+        Config->MagazineSize == 8 && !Config->bAutomatic &&
+        Weapon->GetMagazineAmmo() == 8 && Weapon->GetReserveAmmo() == 48;
+    bBHTestWeaponRoleRuntimeIssued = true;
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_TEST_WEAPON_ROLE_RUNTIME result=%s role=%d magazine=%d "
+            "reserve=%d automatic=%d"
+        ),
+        bPassed ? TEXT("success") : TEXT("failure"),
+        static_cast<int32>(Weapon->GetWeaponRole()),
+        Weapon->GetMagazineAmmo(),
+        Weapon->GetReserveAmmo(),
+        Config && Config->bAutomatic ? 1 : 0
+    );
+    GetWorldTimerManager().ClearTimer(WeaponRoleRuntimeTestTimer);
+}
+
 void ABHWarGameState::RunFirstLightPlayableRouteTest()
 {
     UWorld* World = GetWorld();
@@ -2579,10 +3105,28 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
         ABHExtractionZone* Extraction = nullptr;
         for (TActorIterator<ABHCharacter> It(World); It; ++It)
         {
-            if (It->HasAuthority() && It->IsPlayerControlled())
+            if (It->HasAuthority() &&
+                IsValid(It->GetPlayerState()))
             {
                 Player = *It;
                 break;
+            }
+        }
+        if (!IsValid(Player))
+        {
+            for (FConstPlayerControllerIterator It =
+                     World->GetPlayerControllerIterator(); It; ++It)
+            {
+                APlayerController* Controller = It->Get();
+                ABHCharacter* PossessedPlayer = IsValid(Controller)
+                    ? Cast<ABHCharacter>(Controller->GetPawn())
+                    : nullptr;
+                if (IsValid(PossessedPlayer) &&
+                    PossessedPlayer->HasAuthority())
+                {
+                    Player = PossessedPlayer;
+                    break;
+                }
             }
         }
         for (TActorIterator<ABHKeycard> It(World); It; ++It)
@@ -2600,11 +3144,34 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
             break;
         }
 
-        if (!IsValid(Player) || !IsValid(Keycard) ||
-            !IsValid(Extraction) ||
+        if (!IsValid(Player))
+        {
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT("BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE waiting_for_player")
+            );
+            return;
+        }
+
+        if (!IsValid(Keycard) || !IsValid(Extraction) ||
             Player->GetCurrentObjectiveID() !=
                 BHObjectiveIds::FindRedKeycard)
         {
+            UE_LOG(
+                LogTemp,
+                Warning,
+                TEXT(
+                    "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE_DIAGNOSTIC "
+                    "player=%s keycard=%s extraction=%s objective=%s"
+                ),
+                IsValid(Player) ? TEXT("true") : TEXT("false"),
+                IsValid(Keycard) ? TEXT("true") : TEXT("false"),
+                IsValid(Extraction) ? TEXT("true") : TEXT("false"),
+                IsValid(Player)
+                    ? *Player->GetCurrentObjectiveID().ToString()
+                    : TEXT("none")
+            );
             FailTest(TEXT("route_actors_or_initial_objective"));
             return;
         }
@@ -2631,6 +3198,18 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
     else if (FirstLightPlayableRouteTestPhase == 1)
     {
         ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
+        if (!IsValid(Player))
+        {
+            for (TActorIterator<ABHCharacter> It(World); It; ++It)
+            {
+                if (It->HasAuthority() && IsValid(It->GetPlayerState()))
+                {
+                    Player = *It;
+                    FirstLightPlayableRouteTestPlayer = Player;
+                    break;
+                }
+            }
+        }
         ABHDoor* Door = nullptr;
         for (TActorIterator<ABHDoor> It(World); It; ++It)
         {
@@ -2666,6 +3245,18 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
     else if (FirstLightPlayableRouteTestPhase == 2)
     {
         ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
+        if (!IsValid(Player))
+        {
+            for (TActorIterator<ABHCharacter> It(World); It; ++It)
+            {
+                if (It->HasAuthority() && IsValid(It->GetPlayerState()))
+                {
+                    Player = *It;
+                    FirstLightPlayableRouteTestPlayer = Player;
+                    break;
+                }
+            }
+        }
         TArray<ABHEnemySoldier*> ObjectiveGuards;
         for (TActorIterator<ABHEnemySoldier> It(World); It; ++It)
         {
@@ -2730,6 +3321,18 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
     else if (FirstLightPlayableRouteTestPhase == 3)
     {
         ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
+        if (!IsValid(Player))
+        {
+            for (TActorIterator<ABHCharacter> It(World); It; ++It)
+            {
+                if (It->HasAuthority() && IsValid(It->GetPlayerState()))
+                {
+                    Player = *It;
+                    FirstLightPlayableRouteTestPlayer = Player;
+                    break;
+                }
+            }
+        }
         ABHAmmoSupply* RuntimeAmmoDrop = nullptr;
         for (TActorIterator<ABHAmmoSupply> It(World); It; ++It)
         {
@@ -2796,6 +3399,18 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
     else if (FirstLightPlayableRouteTestPhase == 4)
     {
         ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
+        if (!IsValid(Player))
+        {
+            for (TActorIterator<ABHCharacter> It(World); It; ++It)
+            {
+                if (It->HasAuthority() && IsValid(It->GetPlayerState()))
+                {
+                    Player = *It;
+                    FirstLightPlayableRouteTestPlayer = Player;
+                    break;
+                }
+            }
+        }
         ABHExtractionZone* Extraction =
             FirstLightPlayableRouteTestExtraction.Get();
         if (!IsValid(Player) || !IsValid(Extraction) ||
@@ -2814,6 +3429,18 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
     else if (FirstLightPlayableRouteTestPhase == 5)
     {
         ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
+        if (!IsValid(Player))
+        {
+            for (TActorIterator<ABHCharacter> It(World); It; ++It)
+            {
+                if (It->HasAuthority() && IsValid(It->GetPlayerState()))
+                {
+                    Player = *It;
+                    FirstLightPlayableRouteTestPlayer = Player;
+                    break;
+                }
+            }
+        }
         ABHExtractionZone* Extraction =
             FirstLightPlayableRouteTestExtraction.Get();
         if (!IsValid(Player) || !IsValid(Extraction) ||
@@ -2832,11 +3459,23 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
     else
     {
         ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
+        if (!IsValid(Player))
+        {
+            for (TActorIterator<ABHCharacter> It(World); It; ++It)
+            {
+                if (It->HasAuthority() && IsValid(It->GetPlayerState()))
+                {
+                    Player = *It;
+                    FirstLightPlayableRouteTestPlayer = Player;
+                    break;
+                }
+            }
+        }
         TArray<ABHCharacter*> Players;
         int32 CompletedPlayerCount = 0;
         for (TActorIterator<ABHCharacter> It(World); It; ++It)
         {
-            if (It->HasAuthority() && It->IsPlayerControlled())
+            if (It->HasAuthority() && IsValid(It->GetPlayerState()))
             {
                 Players.Add(*It);
                 if (It->IsMissionComplete() &&
@@ -3390,7 +4029,7 @@ void ABHWarGameState::OnRep_SquadPingSnapshot()
                     return false;
                 }
             ),
-            35.0f
+            0.1f
         );
     }
 #endif

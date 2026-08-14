@@ -115,7 +115,7 @@ public:
     float UISafeAreaScale = 0.95f;
 
     UPROPERTY(SaveGame)
-    float MasterVolume = 1.0f;
+    float MasterVolume = 0.80f;
 
     UPROPERTY(SaveGame)
     int32 WindowModeIndex = 1;

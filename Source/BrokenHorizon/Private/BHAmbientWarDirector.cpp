@@ -290,8 +290,8 @@ float ABHAmbientWarDirector::CalculateWarBedVolume(
     switch (AudioState)
     {
         case EBHAmbientAudioState::Tense: return 0.28f;
-        case EBHAmbientAudioState::Frontline: return 0.58f;
-        case EBHAmbientAudioState::Combat: return 0.82f;
+        case EBHAmbientAudioState::Frontline: return 0.48f;
+        case EBHAmbientAudioState::Combat: return 0.68f;
         default: return 0.08f;
     }
 }
@@ -303,7 +303,11 @@ float ABHAmbientWarDirector::CalculateDistantEventVolume(
 )
 {
     const float BaseVolume =
-        AudioState == EBHAmbientAudioState::Combat ? 0.75f : 0.55f;
+        AudioState == EBHAmbientAudioState::Combat
+            ? 0.75f
+            : AudioState == EBHAmbientAudioState::Frontline
+                ? 0.55f
+                : 0.45f;
     const float SafeWind = FMath::Clamp(WindIntensity, 0.0f, 1.0f);
     const float SafeRain = FMath::Clamp(RainIntensity, 0.0f, 1.0f);
     const float WeatherMask = FMath::Clamp(

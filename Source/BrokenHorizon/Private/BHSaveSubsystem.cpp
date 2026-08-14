@@ -1,4 +1,4 @@
-#include "BHSaveSubsystem.h"
+﻿#include "BHSaveSubsystem.h"
 
 #include "BHCharacter.h"
 #include "BHAmbientWarDirector.h"
@@ -339,6 +339,8 @@ void CapturePlayerResourceState(
         Character->IsTacticalFlashlightOn();
     SaveData->SavedEngineeringChargeCount =
         Character->GetEngineeringChargeCount();
+    SaveData->SavedAntiVehicleRoundCount =
+        Character->GetAntiVehicleRoundCount();
 }
 
 void CaptureWarState(
@@ -714,6 +716,61 @@ bool UBHSaveSubsystem::SaveProgressForCharacter(
         Character->GetLivingFieldSquadCount();
     SaveData->FieldSquadMemberStates =
         Character->GetFieldSquadMemberStates();
+
+    SaveData->ResistanceForce.Operators.Reset();
+    SaveData->ResistanceForce.AvailableOperatorCount = 0;
+    float TotalOperatorReadiness = 0.0f;
+    for (const FBHFieldSquadMemberState& MemberState :
+         SaveData->FieldSquadMemberStates)
+    {
+        FBHResistanceOperatorState& OperatorState =
+            SaveData->ResistanceForce.Operators.AddDefaulted_GetRef();
+        OperatorState.OperatorID = MemberState.MemberID;
+        OperatorState.bInjured =
+            MemberState.bIncapacitated ||
+            MemberState.bRequiresMedicalEvacuation ||
+            (MemberState.Health >= 0.0f && MemberState.Health < 100.0f);
+        OperatorState.bAvailable = !OperatorState.bInjured;
+        if (OperatorState.bAvailable)
+        {
+            ++SaveData->ResistanceForce.AvailableOperatorCount;
+        }
+        TotalOperatorReadiness +=
+            OperatorState.bAvailable ?
+                FMath::Clamp(MemberState.CombatReadiness, 0.0f, 1.0f) :
+                0.0f;
+    }
+
+    SaveData->ResistanceForce.Readiness =
+        SaveData->ResistanceForce.Operators.IsEmpty()
+            ? 0.0f
+            : TotalOperatorReadiness /
+                static_cast<float>(SaveData->ResistanceForce.Operators.Num());
+    SaveData->ResistanceForce.LastOperationID =
+        SaveData->AssignedWarSectorID;
+    SaveData->ResistanceForce.bLastOperationSucceeded =
+        SaveData->bMissionComplete && !SaveData->bMissionFailed;
+    SaveData->ResistanceForce.Deployments.Reset();
+    if (!SaveData->AssignedWarSectorID.IsNone())
+    {
+        FBHResistanceDeploymentState& Deployment =
+            SaveData->ResistanceForce.Deployments.AddDefaulted_GetRef();
+        Deployment.DeploymentID = FName(
+            *FString::Printf(
+                TEXT("Deployment_%s"),
+                *SaveData->AssignedWarSectorID.ToString()
+            )
+        );
+        Deployment.OperationID = SaveData->AssignedWarSectorID;
+        for (const FBHResistanceOperatorState& OperatorState :
+             SaveData->ResistanceForce.Operators)
+        {
+            if (OperatorState.bAvailable)
+            {
+                Deployment.OperatorIDs.Add(OperatorState.OperatorID);
+            }
+        }
+    }
     SaveData->bFieldSquadHolding =
         Character->IsFieldSquadHolding();
     SaveData->bFieldSquadHasCommandLocation =
@@ -820,6 +877,40 @@ bool UBHSaveSubsystem::SaveProgressForCharacter(
         SaveData->FieldTransportStates.Add(TransportState);
     }
 
+    SaveData->ResistanceForce.Vehicles.Reset();
+    SaveData->ResistanceForce.OperationalVehicleCount = 0;
+    for (const FBHFieldTransportSaveState& TransportState :
+         SaveData->FieldTransportStates)
+    {
+        if (TransportState.PersistenceID.IsNone())
+        {
+            continue;
+        }
+
+        FBHResistanceVehicleState& VehicleState =
+            SaveData->ResistanceForce.Vehicles.AddDefaulted_GetRef();
+        VehicleState.VehicleID = TransportState.PersistenceID;
+        VehicleState.VehicleType = TEXT("FieldTransport");
+        VehicleState.SectorID = !TransportState.CargoDestinationSectorID.IsNone()
+            ? TransportState.CargoDestinationSectorID
+            : TransportState.CargoSourceSectorID;
+        VehicleState.Condition = FMath::Clamp(
+            FMath::Min(
+                TransportState.FuelFraction,
+                TransportState.HullFraction
+            ),
+            0.0f,
+            1.0f
+        );
+        VehicleState.bReady =
+            TransportState.FuelFraction > KINDA_SMALL_NUMBER &&
+            TransportState.HullFraction > KINDA_SMALL_NUMBER;
+        if (VehicleState.bReady)
+        {
+            ++SaveData->ResistanceForce.OperationalVehicleCount;
+        }
+    }
+
     for (TActorIterator<ABHFieldFortification> FortificationIt(World);
         FortificationIt;
         ++FortificationIt)
@@ -855,6 +946,78 @@ bool UBHSaveSubsystem::SaveProgressForCharacter(
             Fortification->GetObservationProgress();
         SaveData->FieldFortificationStates.Add(FortificationState);
     }
+
+    SaveData->ResistanceForce.Facilities.Reset();
+    for (const FBHFieldFortificationSaveState& FortificationState :
+         SaveData->FieldFortificationStates)
+    {
+        if (FortificationState.PersistenceID.IsNone())
+        {
+            continue;
+        }
+
+        FBHResistanceFacilityState& FacilityState =
+            SaveData->ResistanceForce.Facilities.AddDefaulted_GetRef();
+        FacilityState.FacilityID = FortificationState.PersistenceID;
+        FacilityState.FacilityType = TEXT("Fortification");
+        FacilityState.SectorID = FortificationState.SectorID;
+        FacilityState.SupplyCacheCharges =
+            FMath::Max(0, FortificationState.SupplyCacheCharges);
+        FacilityState.bOperational =
+            FortificationState.bConstructed &&
+            FortificationState.HealthFraction > KINDA_SMALL_NUMBER &&
+            !FortificationState.bDismantleWork;
+    }
+
+    SaveData->ResistanceForce.AmmunitionSupply = 0.0f;
+    for (const FBHFieldSquadMemberState& MemberState :
+         SaveData->FieldSquadMemberStates)
+    {
+        SaveData->ResistanceForce.AmmunitionSupply +=
+            FMath::Max(0, MemberState.MagazineAmmo) +
+            FMath::Max(0, MemberState.ReserveAmmo);
+    }
+
+    SaveData->ResistanceForce.FuelSupply = 0.0f;
+    for (const FBHFieldTransportSaveState& TransportState :
+         SaveData->FieldTransportStates)
+    {
+        SaveData->ResistanceForce.FuelSupply +=
+            FMath::Clamp(TransportState.FuelFraction, 0.0f, 1.0f);
+    }
+
+    SaveData->ResistanceForce.MedicalSupply =
+        FMath::Max(0, SaveData->SavedMedkitCount) +
+        FMath::Max(0, SaveData->SavedFieldDressingCount);
+
+    const float OperatorReadiness = SaveData->ResistanceForce.Operators.IsEmpty()
+        ? 0.0f
+        : FMath::Clamp(
+            SaveData->ResistanceForce.Readiness,
+            0.0f,
+            1.0f
+        );
+    const float VehicleReadiness = SaveData->ResistanceForce.Vehicles.IsEmpty()
+        ? 0.0f
+        : static_cast<float>(SaveData->ResistanceForce.OperationalVehicleCount) /
+            static_cast<float>(SaveData->ResistanceForce.Vehicles.Num());
+    int32 OperationalFacilityCount = 0;
+    for (const FBHResistanceFacilityState& FacilityState :
+         SaveData->ResistanceForce.Facilities)
+    {
+        if (FacilityState.bOperational)
+        {
+            ++OperationalFacilityCount;
+        }
+    }
+    const float FacilityReadiness = SaveData->ResistanceForce.Facilities.IsEmpty()
+        ? 0.0f
+        : static_cast<float>(OperationalFacilityCount) /
+            static_cast<float>(SaveData->ResistanceForce.Facilities.Num());
+    SaveData->ResistanceForce.Readiness =
+        OperatorReadiness *
+        (SaveData->ResistanceForce.Vehicles.IsEmpty() ? 1.0f : VehicleReadiness) *
+        (SaveData->ResistanceForce.Facilities.IsEmpty() ? 1.0f : FacilityReadiness);
 
     for (TActorIterator<ABHSupplyConvoyTarget> ConvoyIt(World);
         ConvoyIt;
@@ -1539,6 +1702,12 @@ void UBHSaveSubsystem::RecordDefeatedEnemy(ABHEnemySoldier* Enemy)
 
     if (RuntimeConsumedWorldItemIDs.Contains(PersistenceID))
     {
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT("BH_CONSUMED_ITEM_ALREADY_RECORDED item=%s"),
+            *PersistenceID.ToString()
+        );
         return true;
     }
 
@@ -1587,6 +1756,13 @@ void UBHSaveSubsystem::RecordDefeatedEnemy(ABHEnemySoldier* Enemy)
     }
 
     ClearPendingWarAutosave(World);
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_CONSUMED_ITEM_SAVED item=%s schema=%d"),
+        *PersistenceID.ToString(),
+        SaveData->SchemaVersion
+    );
     return true;
 }
 
@@ -1594,8 +1770,18 @@ bool UBHSaveSubsystem::IsWorldItemConsumed(
     FName PersistenceID
 ) const
 {
-    return !PersistenceID.IsNone() &&
+    const bool bConsumed = !PersistenceID.IsNone() &&
         RuntimeConsumedWorldItemIDs.Contains(PersistenceID);
+    if (bConsumed)
+    {
+        UE_LOG(
+            LogTemp,
+            Verbose,
+            TEXT("BH_CONSUMED_ITEM_RESTORED item=%s"),
+            *PersistenceID.ToString()
+        );
+    }
+    return bConsumed;
 }
 
 ABHCharacter* UBHSaveSubsystem::FindPlayerCharacter(
@@ -2631,6 +2817,14 @@ bool UBHSaveSubsystem::ApplySaveData(
         );
     }
 
+    if (!bFreshOperation &&
+        SaveData->SavedAntiVehicleRoundCount >= 0)
+    {
+        Character->RestoreAntiVehicleRoundCount(
+            SaveData->SavedAntiVehicleRoundCount
+        );
+    }
+
     int32 RestoredEnemyCombatStateCount = 0;
     int32 RestoredSurrenderedEnemyCount = 0;
     if (bSurrenderLevelMatches)
@@ -2922,6 +3116,27 @@ void UBHSaveSubsystem::ApplyPendingSave(UWorld* LoadedWorld)
             TEXT("Checkpoint state could not be applied.")
         );
         return;
+    }
+
+    if (!PlayerDeathAttritionSectorID.IsNone())
+    {
+        FTimerHandle RapidRedeployTimer;
+        LoadedWorld->GetTimerManager().SetTimer(
+            RapidRedeployTimer,
+            FTimerDelegate::CreateWeakLambda(
+                this,
+                [this, LoadedWorld]()
+                {
+                    if (ABHCharacter* RedeployedCharacter =
+                            FindPlayerCharacter(LoadedWorld))
+                    {
+                        RedeployedCharacter->ApplyRapidOperationRedeployment();
+                    }
+                }
+            ),
+            1.0f,
+            false
+        );
     }
 
     if (PlayerDeathAttritionSectorID.IsNone())
@@ -3289,3 +3504,5 @@ bool UBHSaveSubsystem::ShouldDeferCrashRecoveryAutosave() const
     return false;
 #endif
 }
+
+

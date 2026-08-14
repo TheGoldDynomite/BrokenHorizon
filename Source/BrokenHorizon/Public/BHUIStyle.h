@@ -29,39 +29,39 @@ namespace BHUIStyle
         0.96f
     );
     inline const FLinearColor Gold(
-        0.92f,
-        0.66f,
-        0.18f,
+        0.68f,
+        0.62f,
+        0.36f,
         1.0f
     );
     inline const FLinearColor White(
-        0.90f,
-        0.94f,
-        0.93f,
+        0.82f,
+        0.84f,
+        0.80f,
         1.0f
     );
     inline const FLinearColor Muted(
-        0.51f,
-        0.59f,
-        0.58f,
+        0.46f,
+        0.52f,
+        0.49f,
         1.0f
     );
     inline const FLinearColor Friendly(
-        0.16f,
-        0.78f,
-        0.43f,
+        0.34f,
+        0.60f,
+        0.48f,
         1.0f
     );
     inline const FLinearColor Warning(
-        1.0f,
-        0.52f,
-        0.08f,
+        0.78f,
+        0.58f,
+        0.20f,
         1.0f
     );
     inline const FLinearColor Danger(
-        0.92f,
-        0.10f,
-        0.07f,
+        0.72f,
+        0.18f,
+        0.13f,
         1.0f
     );
 

@@ -13,6 +13,11 @@ ABHMedicalSupply::ABHMedicalSupply()
     );
 }
 
+void ABHMedicalSupply::ConfigureRuntimePickup()
+{
+    MarkAsRuntimeSupply();
+}
+
 bool ABHMedicalSupply::TryApplyToCharacter(
     ABHCharacter* Character
 )

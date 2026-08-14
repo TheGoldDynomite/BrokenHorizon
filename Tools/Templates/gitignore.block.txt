@@ -1,0 +1,28 @@
+# Unreal generated output
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+.vs/
+
+# Generated IDE files
+*.sln
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
+*.suo
+*.user
+*.userprefs
+.vscode/
+.idea/
+
+# Local packaging and kit backups
+Packaged/
+CodexKitBackup-*/
+AgentSetupBackup-*/
+
+# Local OS/editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store

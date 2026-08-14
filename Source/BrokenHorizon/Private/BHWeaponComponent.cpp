@@ -31,6 +31,113 @@ FBHWeaponRoleProfile UBHWeaponComponent::BuildWeaponRoleProfile(
 
     switch (Role)
     {
+    case EBHWeaponRole::Shotgun:
+        Profile.DisplayName = NSLOCTEXT("BrokenHorizon", "WeaponRoleShotgun", "SHOTGUN");
+        Profile.TacticalDescription = NSLOCTEXT(
+            "BrokenHorizon", "WeaponRoleShotgunDescription",
+            "Breaching fire // high close-range impact // deliberate reload");
+        Profile.RifleConfig.MagazineSize = 8;
+        Profile.RifleConfig.StartingReserveAmmo = 32;
+        Profile.RifleConfig.ReloadDuration = 2.35f;
+        Profile.RifleConfig.RoundsPerMinute = 75.0f;
+        Profile.RifleConfig.bAutomatic = false;
+        Profile.RifleConfig.PelletCount = 8;
+        Profile.RifleConfig.PelletSpreadDegrees = 4.0f;
+        Profile.RifleConfig.Damage = 12.0f;
+        Profile.RifleConfig.Range = 18000.0f;
+        Profile.RifleConfig.MuzzleVelocity = 42000.0f;
+        Profile.RifleConfig.DamageFalloffStartDistance = 3500.0f;
+        Profile.RifleConfig.DamageFalloffEndDistance = 15000.0f;
+        Profile.RifleConfig.MinimumDamageRetention = 0.20f;
+        Profile.RifleConfig.HipSpreadDegrees = 3.8f;
+        Profile.RifleConfig.ADSSpreadDegrees = 2.2f;
+        Profile.RifleConfig.SpreadPerShotDegrees = 0.0f;
+        Profile.RifleConfig.MaxSpreadBloomDegrees = 3.8f;
+        Profile.RifleConfig.SpreadRecoveryDelay = 0.30f;
+        Profile.RifleConfig.SpreadRecoverySpeed = 1.0f;
+        Profile.RifleConfig.RecoilPitch = 1.4f;
+        Profile.RifleConfig.RecoilYaw = 0.32f;
+        Profile.RifleConfig.ADSRecoilMultiplier = 0.88f;
+        Profile.RifleConfig.ADSFieldOfView = 62.0f;
+        Profile.RifleConfig.FOVInterpSpeed = 8.0f;
+        Profile.RifleConfig.NoiseLoudness = 1.4f;
+        Profile.RifleConfig.NoiseRange = 5200.0f;
+        Profile.RifleConfig.SuppressionRadius = 380.0f;
+        Profile.RifleConfig.SuppressionAmount = 0.48f;
+        Profile.MaximumReserveAmmo = 48;
+        Profile.HeatPerShot = 0.12f;
+        Profile.HeatCoolingPerSecond = 0.35f;
+        break;
+    case EBHWeaponRole::Pistol:
+        Profile.DisplayName = NSLOCTEXT("BrokenHorizon", "WeaponRolePistol", "PISTOL");
+        Profile.TacticalDescription = NSLOCTEXT(
+            "BrokenHorizon", "WeaponRolePistolDescription",
+            "Emergency sidearm // fast draw // limited reach");
+        Profile.RifleConfig.MagazineSize = 15;
+        Profile.RifleConfig.StartingReserveAmmo = 45;
+        Profile.RifleConfig.ReloadDuration = 1.25f;
+        Profile.RifleConfig.RoundsPerMinute = 420.0f;
+        Profile.RifleConfig.bAutomatic = false;
+        Profile.RifleConfig.Damage = 30.0f;
+        Profile.RifleConfig.Range = 30000.0f;
+        Profile.RifleConfig.MuzzleVelocity = 52000.0f;
+        Profile.RifleConfig.DamageFalloffStartDistance = 5000.0f;
+        Profile.RifleConfig.DamageFalloffEndDistance = 22000.0f;
+        Profile.RifleConfig.MinimumDamageRetention = 0.35f;
+        Profile.RifleConfig.HipSpreadDegrees = 1.05f;
+        Profile.RifleConfig.ADSSpreadDegrees = 0.08f;
+        Profile.RifleConfig.SpreadPerShotDegrees = 0.18f;
+        Profile.RifleConfig.MaxSpreadBloomDegrees = 1.1f;
+        Profile.RifleConfig.SpreadRecoveryDelay = 0.16f;
+        Profile.RifleConfig.SpreadRecoverySpeed = 2.6f;
+        Profile.RifleConfig.RecoilPitch = 0.65f;
+        Profile.RifleConfig.RecoilYaw = 0.20f;
+        Profile.RifleConfig.ADSRecoilMultiplier = 0.78f;
+        Profile.RifleConfig.ADSFieldOfView = 60.0f;
+        Profile.RifleConfig.FOVInterpSpeed = 10.0f;
+        Profile.RifleConfig.NoiseLoudness = 0.85f;
+        Profile.RifleConfig.NoiseRange = 3000.0f;
+        Profile.RifleConfig.SuppressionRadius = 180.0f;
+        Profile.RifleConfig.SuppressionAmount = 0.24f;
+        Profile.MaximumReserveAmmo = 60;
+        Profile.HeatPerShot = 0.045f;
+        Profile.HeatCoolingPerSecond = 0.30f;
+        break;
+    case EBHWeaponRole::Carbine:
+        Profile.DisplayName = NSLOCTEXT("BrokenHorizon", "WeaponRoleCarbine", "CARBINE");
+        Profile.TacticalDescription = NSLOCTEXT(
+            "BrokenHorizon", "WeaponRoleCarbineDescription",
+            "Close-range control // fast handling // compact magazine");
+        Profile.RifleConfig.MagazineSize = 30;
+        Profile.RifleConfig.StartingReserveAmmo = 120;
+        Profile.RifleConfig.ReloadDuration = 1.55f;
+        Profile.RifleConfig.RoundsPerMinute = 780.0f;
+        Profile.RifleConfig.bAutomatic = true;
+        Profile.RifleConfig.Damage = 24.0f;
+        Profile.RifleConfig.Range = 42000.0f;
+        Profile.RifleConfig.MuzzleVelocity = 72000.0f;
+        Profile.RifleConfig.DamageFalloffStartDistance = 6500.0f;
+        Profile.RifleConfig.DamageFalloffEndDistance = 30000.0f;
+        Profile.RifleConfig.MinimumDamageRetention = 0.45f;
+        Profile.RifleConfig.HipSpreadDegrees = 0.82f;
+        Profile.RifleConfig.ADSSpreadDegrees = 0.10f;
+        Profile.RifleConfig.SpreadPerShotDegrees = 0.12f;
+        Profile.RifleConfig.MaxSpreadBloomDegrees = 1.35f;
+        Profile.RifleConfig.SpreadRecoveryDelay = 0.20f;
+        Profile.RifleConfig.SpreadRecoverySpeed = 2.2f;
+        Profile.RifleConfig.RecoilPitch = 0.42f;
+        Profile.RifleConfig.RecoilYaw = 0.14f;
+        Profile.RifleConfig.ADSRecoilMultiplier = 0.72f;
+        Profile.RifleConfig.ADSFieldOfView = 62.0f;
+        Profile.RifleConfig.FOVInterpSpeed = 9.0f;
+        Profile.RifleConfig.NoiseLoudness = 1.05f;
+        Profile.RifleConfig.NoiseRange = 4200.0f;
+        Profile.RifleConfig.SuppressionRadius = 320.0f;
+        Profile.RifleConfig.SuppressionAmount = 0.38f;
+        Profile.MaximumReserveAmmo = 150;
+        Profile.HeatPerShot = 0.026f;
+        Profile.HeatCoolingPerSecond = 0.20f;
+        break;
     case EBHWeaponRole::Marksman:
         Profile.DisplayName = NSLOCTEXT(
             "BrokenHorizon",
@@ -147,6 +254,12 @@ EBHWeaponRole UBHWeaponComponent::GetNextWeaponRole(
     case EBHWeaponRole::Marksman:
         return EBHWeaponRole::Support;
     case EBHWeaponRole::Support:
+        return EBHWeaponRole::Carbine;
+    case EBHWeaponRole::Carbine:
+        return EBHWeaponRole::Pistol;
+    case EBHWeaponRole::Pistol:
+        return EBHWeaponRole::Shotgun;
+    case EBHWeaponRole::Shotgun:
     default:
         return EBHWeaponRole::Assault;
     }
@@ -223,58 +336,6 @@ void UBHWeaponComponent::BeginPlay()
 
     EquipDefaultRifle();
 
-#if !UE_BUILD_SHIPPING
-    if (HasWeaponAuthority() &&
-        FParse::Param(
-            FCommandLine::Get(),
-            TEXT("BHTestWeaponRoleRuntime")))
-    {
-        const bool bEquipped = EquipWeaponRole(
-            EBHWeaponRole::Marksman,
-            true
-        );
-        const FBHRifleConfig* ActiveConfig = IsValid(EquippedRifle)
-            ? &EquippedRifle->GetConfig()
-            : nullptr;
-        const bool bPassed = bEquipped &&
-            WeaponRole == EBHWeaponRole::Marksman &&
-            ActiveConfig &&
-            ActiveConfig->MagazineSize == 15 &&
-            !ActiveConfig->bAutomatic &&
-            MagazineAmmo == 15 &&
-            ReserveAmmo == 90;
-        if (bPassed)
-        {
-            UE_LOG(
-                LogTemp,
-                Display,
-                TEXT(
-                    "BH_WEAPON_ROLE_RUNTIME result=success role=%d "
-                    "magazine=%d reserve=%d automatic=%d"
-                ),
-                static_cast<int32>(WeaponRole),
-                MagazineAmmo,
-                ReserveAmmo,
-                ActiveConfig && ActiveConfig->bAutomatic ? 1 : 0
-            );
-        }
-        else
-        {
-            UE_LOG(
-                LogTemp,
-                Error,
-                TEXT(
-                    "BH_WEAPON_ROLE_RUNTIME result=failure role=%d "
-                    "magazine=%d reserve=%d automatic=%d"
-                ),
-                static_cast<int32>(WeaponRole),
-                MagazineAmmo,
-                ReserveAmmo,
-                ActiveConfig && ActiveConfig->bAutomatic ? 1 : 0
-            );
-        }
-    }
-#endif
 }
 
 void UBHWeaponComponent::EndPlay(
@@ -787,7 +848,7 @@ bool UBHWeaponComponent::EquipWeaponRole(
 {
     if (!IsValid(EquippedRifle) ||
         static_cast<uint8>(NewRole) >
-            static_cast<uint8>(EBHWeaponRole::Support))
+            static_cast<uint8>(EBHWeaponRole::Shotgun))
     {
         return false;
     }
@@ -1101,6 +1162,18 @@ void UBHWeaponComponent::OnRep_WeaponRole()
     ApplyWeaponRoleProfile(false);
     OnFireModeChanged.Broadcast(FireMode);
     OnWeaponRoleChanged.Broadcast(WeaponRole);
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_WEAPON_ROLE_REPLICATED role=%d magazine=%d reserve=%d "
+            "automatic=%d"
+        ),
+        static_cast<int32>(WeaponRole),
+        MagazineAmmo,
+        ReserveAmmo,
+        FireMode == EBHFireMode::Automatic ? 1 : 0
+    );
 }
 
 void UBHWeaponComponent::OnRep_FireMode()
@@ -1220,6 +1293,19 @@ void UBHWeaponComponent::ApplyWeaponRoleProfile(
             AssaultBaselineMaximumReserveAmmo;
     }
     EquippedRifle->ApplyWeaponConfig(Profile.RifleConfig);
+    const float PresentationScale = [&]()
+    {
+        switch (WeaponRole)
+        {
+            case EBHWeaponRole::Pistol: return 0.78f;
+            case EBHWeaponRole::Shotgun: return 1.12f;
+            case EBHWeaponRole::Support: return 1.18f;
+            case EBHWeaponRole::Carbine: return 0.92f;
+            case EBHWeaponRole::Marksman: return 1.08f;
+            case EBHWeaponRole::Assault: default: return 1.0f;
+        }
+    }();
+    EquippedRifle->SetActorScale3D(FVector(PresentationScale));
     MaxReserveAmmo = FMath::Max(0, Profile.MaximumReserveAmmo);
     CurrentSpreadBloomDegrees = 0.0f;
     PendingRecoilOffset = FVector2D::ZeroVector;
@@ -1422,15 +1508,27 @@ void UBHWeaponComponent::TryFire()
 
     FHitResult ShotHit;
     bool bHadBlockingHit = false;
-
-    const bool bDamagedTarget = EquippedRifle->PerformHitscan(
-        CameraOrigin,
-        CameraRotation.Vector(),
-        SpreadDegrees,
-        Controller,
-        &ShotHit,
-        &bHadBlockingHit
-    );
+    bool bDamagedTarget = false;
+    const int32 PelletCount = FMath::Clamp(Config.PelletCount, 1, 32);
+    for (int32 PelletIndex = 0; PelletIndex < PelletCount; ++PelletIndex)
+    {
+        FHitResult PelletHit;
+        bool bPelletBlockingHit = false;
+        const bool bPelletDamagedTarget = EquippedRifle->PerformHitscan(
+            CameraOrigin,
+            CameraRotation.Vector(),
+            SpreadDegrees + FMath::Max(0.0f, Config.PelletSpreadDegrees),
+            Controller,
+            &PelletHit,
+            &bPelletBlockingHit
+        );
+        bDamagedTarget |= bPelletDamagedTarget;
+        bHadBlockingHit |= bPelletBlockingHit;
+        if (bPelletBlockingHit && !ShotHit.bBlockingHit)
+        {
+            ShotHit = PelletHit;
+        }
+    }
     if (UGameInstance* GameInstance = GetWorld()
         ? GetWorld()->GetGameInstance()
         : nullptr)

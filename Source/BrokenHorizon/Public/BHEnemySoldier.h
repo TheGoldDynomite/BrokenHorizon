@@ -16,6 +16,7 @@ class UNiagaraSystem;
 class USceneComponent;
 class USoundBase;
 class UTextRenderComponent;
+class UStaticMeshComponent;
 struct FHitResult;
 
 UENUM(BlueprintType)
@@ -322,6 +323,7 @@ void RestoreSurrenderPersistence(bool bNewSurrendered, bool bNewCustodySecured, 
     float GetRetreatDuration() const;
     float GetNormalMovementSpeed() const;
     float GetRetreatMovementSpeed() const;
+    void ConfigureOperationCombatPacing();
     float GetAllyCasualtyMoraleRadius() const;
     float GetAllyCasualtySuppression() const;
     float GetSightRadius() const;
@@ -389,6 +391,7 @@ void RestoreSurrenderPersistence(bool bNewSurrendered, bool bNewCustodySecured, 
 
     UFUNCTION(BlueprintCallable, Category = "Enemy|Combat|Ammunition")
     ABHAmmoSupply* DropRemainingAmmunition();
+    void DropMedicalSupplies();
 
     int32 GetMagazineCapacity() const;
     int32 GetStartingReserveAmmo() const;
@@ -471,6 +474,27 @@ protected:
         Category = "Enemy|Archetype|Presentation"
     )
     TObjectPtr<UTextRenderComponent> ArchetypeLabel;
+
+    UPROPERTY(
+        VisibleAnywhere,
+        BlueprintReadOnly,
+        Category = "Enemy|Presentation"
+    )
+    TObjectPtr<UStaticMeshComponent> EnemyPlateMesh;
+
+    UPROPERTY(
+        VisibleAnywhere,
+        BlueprintReadOnly,
+        Category = "Enemy|Presentation"
+    )
+    TObjectPtr<UStaticMeshComponent> EnemyRadioMesh;
+
+    UPROPERTY(
+        VisibleAnywhere,
+        BlueprintReadOnly,
+        Category = "Enemy|Presentation"
+    )
+    TObjectPtr<UStaticMeshComponent> EnemyHelmetMesh;
 
     UPROPERTY(
         ReplicatedUsing = OnRep_CombatantArchetype,
@@ -922,7 +946,7 @@ protected:
         Category = "Enemy|Combat|Morale",
         meta = (ClampMin = "100.0", Units = "cm")
     )
-    float RetreatDistance = 1800.0f;
+    float RetreatDistance = 1200.0f;
 
     UPROPERTY(
         EditDefaultsOnly,
@@ -930,7 +954,7 @@ protected:
         Category = "Enemy|Combat|Morale",
         meta = (ClampMin = "0.1", Units = "s")
     )
-    float RetreatDuration = 6.0f;
+    float RetreatDuration = 18.0f;
 
     UPROPERTY(
         EditDefaultsOnly,
@@ -938,7 +962,7 @@ protected:
         Category = "Enemy|Combat|Morale",
         meta = (ClampMin = "0.0", Units = "cm/s")
     )
-    float RetreatMovementSpeed = 525.0f;
+    float RetreatMovementSpeed = 260.0f;
 
     UPROPERTY(
         EditDefaultsOnly,

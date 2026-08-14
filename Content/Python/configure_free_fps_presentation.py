@@ -18,10 +18,7 @@ RIFLE_MESH = (
     "/Game/InfimaGames/FreeFPSTemplate/Art/AssaultRifle/Meshes/"
     "SK_AssaultRifle"
 )
-FIRE_SOUND = (
-    "/Game/Weapons/GrenadeLauncher/Audio/"
-    "FirstPersonTemplateWeaponFire02"
-)
+FIRE_SOUND = "/Game/BrokenHorizon/Audio/SW_FirstLight_WeaponFire"
 CASING_MESH = (
     "/Game/InfimaGames/FreeFPSTemplate/Art/AssaultRifle/Meshes/"
     "SM_AssaultRifle_Casing"

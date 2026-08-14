@@ -601,6 +601,17 @@ public:
     UFUNCTION(BlueprintPure, Category = "Persistent War")
     FBHWarSectorState GetSectorState(FName SectorID) const;
 
+#if !UE_BUILD_SHIPPING
+    void SetSectorOwnerForTesting(
+        FName SectorID,
+        EBHWarFaction Owner
+    );
+    void SetSectorSupplyForTesting(
+        FName SectorID,
+        float Supply
+    );
+#endif
+
     UFUNCTION(BlueprintPure, Category = "Persistent War")
     bool HasSector(FName SectorID) const;
 
@@ -1219,6 +1230,7 @@ private:
     );
 
     bool bApplyingReplicatedSnapshot = false;
+    int32 LastAppliedReplicatedSnapshotRevision = INDEX_NONE;
     FBHCampaignDifficultyProfile CampaignDifficulty;
     FBHCampaignProgressionState CampaignProgression;
     float SimulationAccumulator = 0.0f;

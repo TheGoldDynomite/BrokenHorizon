@@ -45,5 +45,27 @@ bool FBHFieldTransportHandlingContractTest::RunTest(
         TEXT("Capacity tuning stays above the safe control floor"),
         ClampedTuning >= 0.25f && ClampedTuning <= 1.0f
     );
+
+    TestTrue(
+        TEXT("Land transport keeps its configured speed response"),
+        FMath::IsNearlyEqual(
+            ABHFieldTransport::CalculateWaterSpeedMultiplier(false, 0.72f),
+            1.0f
+        )
+    );
+    TestTrue(
+        TEXT("Waterborne transport applies its handling multiplier"),
+        FMath::IsNearlyEqual(
+            ABHFieldTransport::CalculateWaterSpeedMultiplier(true, 0.72f),
+            0.72f
+        )
+    );
+    TestTrue(
+        TEXT("Water handling stays inside safe tuning bounds"),
+        FMath::IsNearlyEqual(
+            ABHFieldTransport::CalculateWaterSpeedMultiplier(true, -2.0f),
+            0.1f
+        )
+    );
     return true;
 }

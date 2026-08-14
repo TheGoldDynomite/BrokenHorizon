@@ -11,6 +11,7 @@ param(
     [int]$ActorBudget = 500,
     [int]$TickFunctionBudget = 500,
     [switch]$Rendered,
+    [switch]$LowerTier,
     [switch]$Traversal,
     [switch]$WorldMap,
     [switch]$WorldTraversal,
@@ -116,6 +117,7 @@ $arguments = @(
     "-DDC-ForceMemoryCache",
     "-benchmark",
     "-fps=60",
+    "-ExecCmds=t.MaxFPS 0",
     "-seconds=$captureSeconds",
     "-csvCaptureFrames=$CaptureFrames",
     "-abslog=$runtimeLog"
@@ -123,11 +125,28 @@ $arguments = @(
 if ($Rendered) {
     $arguments += @(
         "-csvGpuStats",
-        "-RenderOffscreen",
         "-ResX=1920",
         "-ResY=1080",
-        "-ForceRes"
+        "-ForceRes",
+        "-NoVSync"
     )
+    if ($LowerTier) {
+        # Representative lower-tier profile: reduce scalability and internal
+        # resolution while retaining the D3D12/rendered evidence path.
+        $arguments += @(
+            "-ScalabilityQuality=1",
+            "-sg.ResolutionQuality=75",
+            "-sg.ViewDistanceQuality=1",
+            "-sg.AntiAliasingQuality=1",
+            "-sg.ShadowQuality=1",
+            "-sg.GlobalIlluminationQuality=1",
+            "-sg.ReflectionQuality=1",
+            "-sg.PostProcessQuality=1",
+            "-sg.TextureQuality=1",
+            "-sg.EffectsQuality=1",
+            "-r.ScreenPercentage=75"
+        )
+    }
 } else {
     $arguments += "-nullrhi"
     $arguments += "-userdir=$captureUserDir"
@@ -140,16 +159,49 @@ if ($WorldTraversal) {
 
 Write-Host "[Performance] Capturing $CaptureFrames frames on $map ($WarmupFrames warmup; rendered=$Rendered; worldTraversal=$WorldTraversal)"
 # Keep profiler, config, and save writes inside the project so the gate is
-# deterministic in restricted CI/agent environments.
-$process = Start-Process -FilePath $editor -ArgumentList $arguments -PassThru -Wait
-if ($process.ExitCode -ne 0) {
-    throw "Performance capture failed with exit code $($process.ExitCode). See $runtimeLog"
+# deterministic in restricted CI/agent environments. The benchmark command
+# can finish its CSV capture without exiting the game process, so wait for the
+# authoritative capture marker and then close only this owned process.
+$process = Start-Process -FilePath $editor -ArgumentList $arguments -PassThru
+$startupAllowanceSeconds = if ($Rendered) { 900 } else { 180 }
+$captureDeadline = [DateTime]::UtcNow.AddSeconds($captureSeconds + $startupAllowanceSeconds)
+while ([DateTime]::UtcNow -lt $captureDeadline) {
+    if (Test-Path -LiteralPath $runtimeLog) {
+        $liveLog = Get-Content -Raw -LiteralPath $runtimeLog
+        if ($liveLog -match "LogCsvProfiler: Display: Capture Ended") {
+            break
+        }
+    }
+    if ($process.HasExited) {
+        break
+    }
+    Start-Sleep -Seconds 1
 }
 if (-not (Test-Path -LiteralPath $runtimeLog)) {
     throw "Performance capture did not produce its runtime log: $runtimeLog"
 }
-
 $logContent = Get-Content -Raw -LiteralPath $runtimeLog
+if ($logContent -notmatch "LogCsvProfiler: Display: Capture Ended") {
+    if (-not $process.HasExited) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        $process.WaitForExit(5000) | Out-Null
+    }
+    throw "Performance capture did not reach the CSV completion marker. See $runtimeLog"
+}
+if (-not $process.HasExited) {
+    Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+    if (-not $process.WaitForExit(5000)) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        $process.WaitForExit(5000) | Out-Null
+    }
+}
+# Once Capture Ended has been observed, the process is intentionally stopped
+# to avoid the benchmark's normal game/editor teardown hang. Its exit code is
+# therefore not a reliable failure signal; the runtime log and CSV checks below
+# are the authoritative result.
+if (-not (Test-Path -LiteralPath $runtimeLog)) {
+    throw "Performance capture did not produce its runtime log: $runtimeLog"
+}
 $failurePatterns = @("Fatal error:", "Assertion failed:", "Unhandled Exception:", "Failed to load package", "CreateExport: Failed to load")
 if ($WorldTraversal) {
     $failurePatterns += "Navmesh bounds are too large!"
@@ -157,9 +209,6 @@ if ($WorldTraversal) {
 $failures = @($failurePatterns | Where-Object { $logContent -match [regex]::Escape($_) })
 if ($failures.Count -gt 0) {
     throw "Performance log contains failure markers: $($failures -join ', '). See $runtimeLog"
-}
-if ($logContent -notmatch "LogCsvProfiler: Display: Capture Ended") {
-    throw "Performance capture did not reach the CSV completion marker. See $runtimeLog"
 }
 $traversalMarkerPrefix = if ($WorldTraversal) {
     "BH_RENDERED_WORLD_TRAVERSAL"
@@ -638,13 +687,15 @@ $gpuDriverMatch = [regex]::Match(
     $logContent,
     "LogRHI:\s+Driver Version:\s+(?<driver>[^\s]+)"
 )
-$summary = [ordered]@{
+    $summary = [ordered]@{
     schemaVersion = 1
     generatedAtUtc = [DateTime]::UtcNow.ToString("o")
     mode = if ($WorldTraversal) {
         "EditorD3D12Offscreen1080pWorldTraversal"
     } elseif ($Traversal) {
         "EditorD3D12Offscreen1080pTraversal"
+    } elseif ($Rendered -and $LowerTier) {
+        "EditorD3D12LowerTier1080p"
     } elseif ($Rendered) {
         "EditorD3D12Offscreen1080p"
     } else {
@@ -653,6 +704,7 @@ $summary = [ordered]@{
     captureFrames = $CaptureFrames
     warmupFrames = $WarmupFrames
     rendererProof = [bool]$Rendered
+    lowerTierProof = [bool]$LowerTier
     traversalProof = [bool]$Traversal
     worldMapProof = [bool]$WorldMap
     worldTraversalProof = [bool]$WorldTraversal

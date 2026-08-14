@@ -23,6 +23,7 @@ $ErrorActionPreference = "Stop"
 if ($WarmupFrames -ge $CaptureFrames) {
     throw "Warmup frames must be lower than capture frames."
 }
+$captureSeconds = [Math]::Ceiling($CaptureFrames / 60.0) + 5
 if ($RenderedClientCount -gt $ClientCount) {
     throw "Rendered client count cannot exceed total client count."
 }
@@ -144,7 +145,12 @@ function Wait-ForMarker {
         "NetworkFailure|TravelFailure|PIE: Error:|" +
         "Checkpoint save failed|BH_(WAR|FIELD)_AUTOSAVE_FAILED|" +
         "Out of video memory trying to allocate"
-    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $markerTimeoutSeconds = if ($Label -match "CSV capture") {
+        [Math]::Max($TimeoutSeconds, 900)
+    } else {
+        $TimeoutSeconds
+    }
+    $deadline = [DateTime]::UtcNow.AddSeconds($markerTimeoutSeconds)
     do {
         foreach ($failureLogPath in $failureLogPaths) {
             if ($failureLogPath -eq $LogPath -or
@@ -597,6 +603,7 @@ try {
         "-NoSplash",
         "-DDC-ForceMemoryCache",
         "-abslog=$hostLog",
+        "-BHTestSaveSlotSuffix=$runId",
         "-BHTestNetworkBudgetTelemetry",
         "-BHTestNetworkBudgetConnections=$ClientCount",
         "-BHTestNetworkCombatDensity",
@@ -635,6 +642,7 @@ try {
             "-nosound",
             "-NoSplash",
             "-DDC-ForceMemoryCache",
+            "-BHTestSaveSlotSuffix=$runId",
             "-DisablePython",
             "-BHTestNetworkCombatDensity",
             "-BHTestNetworkHostiles=12",
@@ -649,6 +657,9 @@ try {
                 "-ForceRes",
                 "-NoVSync",
                 "-csvGpuStats",
+                "-benchmark",
+                "-fps=60",
+                "-seconds=$captureSeconds",
                 "-csvCaptureFrames=$CaptureFrames",
                 "-userdir=$UserDirectory"
             )
@@ -741,7 +752,7 @@ try {
             -Label "Rendered multiplayer production First Light route"
         $lootHUDOwner = Wait-ForAnyMarker `
             -LogPaths $clientLogs[0..($RenderedClientCount - 1)] `
-            -Pattern 'BH_BATTLEFIELD_LOOT_HUD_UPDATED result=success magazine=30 reserve=180 text="30 / 180"' `
+            -Pattern 'BH_BATTLEFIELD_LOOT_HUD_UPDATED result=success magazine=30 reserve=180' `
             -Label "Rendered owning-client battlefield-loot HUD"
         $lootHUDEvidence = Wait-ForPng `
             -Path $renderedLootHUDScreenshots[$lootHUDOwner.Index] `

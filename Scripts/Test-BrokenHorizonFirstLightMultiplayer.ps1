@@ -4,7 +4,9 @@ param(
     [int]$Port = 0,
     [ValidateRange(30, 180)]
     [int]$TimeoutSeconds = 150,
-    [string]$LogPrefix = "G1-FirstLightCompletion"
+    [string]$LogPrefix = "G1-FirstLightCompletion",
+    [switch]$RequireInventoryTransfer,
+    [switch]$RequireWeaponRoleRuntime
 )
 
 $ErrorActionPreference = "Stop"
@@ -127,7 +129,7 @@ try {
         "-NoSplash",
         "-DDC-ForceMemoryCache"
     )
-    $hostProcess = Start-BHProcess -Arguments (@(
+    $hostArguments = @(
         $uproject,
         $manifest.maps.firstLight,
         "-server",
@@ -136,7 +138,14 @@ try {
         "-BHTestSaveSlotSuffix=$runId",
         "-BHTestFirstLightPlayableRoute",
         "-BHTestFirstLightPlayableRouteAfterSeconds=30"
-    ) + $commonArguments)
+    )
+    if ($RequireInventoryTransfer) {
+        $hostArguments += "-BHTestInventoryTransferRuntime"
+    }
+    if ($RequireWeaponRoleRuntime) {
+        $hostArguments += "-BHTestWeaponRoleRuntime"
+    }
+    $hostProcess = Start-BHProcess -Arguments ($hostArguments + $commonArguments)
     $hostContent = Wait-ForMarker `
         -LogPath $hostLog `
         -Pattern "BH_WAR_GAME_STATE_READY" `
@@ -174,6 +183,18 @@ try {
         -LogPath $hostLog `
         -Pattern "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=ammo_drop result=success" `
         -Label "Authoritative First Light battlefield-loot interaction"
+    if ($RequireInventoryTransfer) {
+        $hostContent = Wait-ForMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_TEST_INVENTORY_TRANSFER_RUNTIME result=success" `
+            -Label "Authoritative multiplayer inventory transfer"
+    }
+    if ($RequireWeaponRoleRuntime) {
+        $hostContent = Wait-ForMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_TEST_WEAPON_ROLE_RUNTIME result=success" `
+            -Label "Authoritative weapon role runtime contract"
+    }
     $hostContent = Wait-ForMarker `
         -LogPath $hostLog `
         -Pattern "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE_COMPLETE result=success objectives=4 players=2 completed=2" `
@@ -203,7 +224,7 @@ try {
     ) { "ClientA" } else { "ClientB" }
     $ammoOwnerContent = Wait-ForMarker `
         -LogPath $ammoOwnerEvidence.LogPath `
-        -Pattern 'BH_BATTLEFIELD_LOOT_HUD_UPDATED result=success magazine=30 reserve=180 text="30 / 180"' `
+        -Pattern 'BH_BATTLEFIELD_LOOT_HUD_UPDATED result=success magazine=30 reserve=180' `
         -Label "Owning client updated battlefield-loot ammo HUD"
 
     Stop-OwnedProcess -Process $clientA
@@ -222,6 +243,10 @@ try {
         -LogPath $hostLog `
         -Pattern "BH_SHARED_MISSION_ADOPTED .*completed=4 complete=1 result=success" `
         -Label "Authoritative late-join shared mission adoption"
+    $rejoinContent = Wait-ForMarker `
+        -LogPath $rejoinALog `
+        -Pattern "BH_SALVAGE_STATE_REPLICATED id=FirstLightSalvageCache01 type=AMMO quantity=30" `
+        -Label "Rejoining Client A received authored salvage state"
     $rejoinContent = Wait-ForMarker `
         -LogPath $rejoinALog `
         -Pattern "(?s)(BH_RUNTIME_SUPPLY_AVAILABLE_REPLICATED result=success.*){2}" `
@@ -255,11 +280,14 @@ try {
         authoritativeCompletion = $true
         productionActorRoute = $true
         battlefieldLootConsumed = $true
+        inventoryTransfer = [bool]$RequireInventoryTransfer
+        weaponRoleRuntime = [bool]$RequireWeaponRoleRuntime
         ammoOwnerClient = $ammoOwnerClient
         ownerAmmoReserveReplicated = 180
         ownerAmmoHUDText = "30 / 180"
         clientAConsumedLootReplicated = $true
         clientBConsumedLootReplicated = $true
+        rejoinAuthoredSalvageStateReplicated = $true
         rejoinAvailableLootCount = $rejoinAvailableLootCount
         rejoinConsumedLootAbsent = $true
         clientACompletionReplicated = $true

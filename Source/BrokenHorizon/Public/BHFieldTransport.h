@@ -59,6 +59,11 @@ public:
         float LoadedControlMultiplierAtCapacity
     );
 
+    static float CalculateWaterSpeedMultiplier(
+        bool bWaterborne,
+        float ConfiguredMultiplier
+    );
+
     static float CalculateCollisionDamage(
         float ImpactSpeed,
         float DamageSpeedThreshold,
@@ -79,6 +84,8 @@ public:
     void SetPersistenceIDForTesting(FName InPersistenceID);
 #endif
     ABHCharacter* GetOccupant() const;
+
+    void ExecuteLogisticsTransferForTesting();
     void ForceExitOccupantForRespawn(ABHCharacter* Character);
     void PrepareOccupantForServerTravel(ABHCharacter* Character);
 
@@ -132,6 +139,9 @@ public:
     )
     bool IsImmobilized() const;
 
+    UFUNCTION(BlueprintPure, Category = "Field Transport|Water")
+    bool IsWaterborne() const;
+
     UFUNCTION(
         BlueprintPure,
         Category = "Field Transport|Logistics"
@@ -178,6 +188,17 @@ public:
     float LoadRecoveredMilitarySupply(
         float AvailableSupply,
         FName RecoverySourceSectorID
+    );
+
+    UFUNCTION(
+        CallInEditor,
+        BlueprintCallable,
+        Category = "Field Transport|Logistics"
+    )
+    void ConfigureAuthoredCargo(
+        float Supply,
+        FName SourceSectorID,
+        FName DestinationSectorID
     );
 
     UFUNCTION(
@@ -234,6 +255,7 @@ private:
     float GetHullMobilityMultiplier() const;
     float GetHullFuelBurnMultiplier() const;
     void UpdateGroundPosition(float DeltaTime);
+    void UpdateWaterPosition(float DeltaTime);
     void UpdateTransportLabel();
     void TryTransferFieldLogistics();
     void TryTransferCivilianAid();
@@ -301,6 +323,30 @@ private:
         meta = (AllowPrivateAccess = "true")
     )
     TObjectPtr<UStaticMeshComponent> HoodMesh;
+
+    UPROPERTY(
+        VisibleAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Water",
+        meta = (AllowPrivateAccess = "true")
+    )
+    TObjectPtr<UStaticMeshComponent> WatercraftHullMesh;
+
+    UPROPERTY(
+        VisibleAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Water",
+        meta = (AllowPrivateAccess = "true")
+    )
+    TObjectPtr<UStaticMeshComponent> WatercraftDeckMesh;
+
+    UPROPERTY(
+        VisibleAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Water",
+        meta = (AllowPrivateAccess = "true")
+    )
+    TObjectPtr<UStaticMeshComponent> WatercraftConsoleMesh;
 
     UPROPERTY(
         VisibleAnywhere,
@@ -404,6 +450,30 @@ private:
         )
     )
     float GroundClearance = 72.0f;
+
+    UPROPERTY(
+        EditInstanceOnly,
+        BlueprintReadOnly,
+        Category = "Field Transport|Water",
+        meta = (AllowPrivateAccess = "true")
+    )
+    bool bWaterborneTransport = false;
+
+    UPROPERTY(
+        EditInstanceOnly,
+        BlueprintReadOnly,
+        Category = "Field Transport|Water",
+        meta = (AllowPrivateAccess = "true", Units = "cm")
+    )
+    float WaterSurfaceZ = 0.0f;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
+        Category = "Field Transport|Water",
+        meta = (AllowPrivateAccess = "true", ClampMin = "0.1", ClampMax = "1.0")
+    )
+    float WaterSpeedMultiplier = 0.72f;
 
     UPROPERTY(
         EditAnywhere,

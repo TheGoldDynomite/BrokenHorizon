@@ -38,9 +38,37 @@
 #include "BHSupplyConvoyTarget.h"
 #include "BHWarOperationRules.h"
 #include "BHWarGameState.h"
+#include "BHOpenWorldOperationDirector.h"
 #include "BHWarMapWidget.h"
 #include "BHWarSubsystem.h"
 #include "BHWeaponComponent.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHOperationVariationSelectionContractTest,
+    "BrokenHorizon.Missions.OperationVariation.SelectionContract",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHOperationVariationSelectionContractTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+    const int32 First =
+        ABHOpenWorldOperationDirector::ResolveOperationVariationIndex(
+            FName(TEXT("WesternFOB")),
+            EBHWarPriorityType::Attack
+        );
+    const int32 Repeated =
+        ABHOpenWorldOperationDirector::ResolveOperationVariationIndex(
+            FName(TEXT("WesternFOB")),
+            EBHWarPriorityType::Attack
+        );
+    TestTrue(TEXT("Variation selection is bounded"), First >= 0 && First <= 1);
+    TestEqual(TEXT("Variation selection is deterministic"), First, Repeated);
+    return true;
+}
 
 #include "Engine/GameInstance.h"
 #include "Kismet/GameplayStatics.h"
@@ -1057,6 +1085,114 @@ bool FBHWarReplicationContractTest::RunTest(
             EBHWarFaction::Friendly
         )
     );
+    const FBHWarStateSnapshot StaleSnapshot =
+        SourceWar->CaptureReplicatedSnapshot(16);
+    TestFalse(
+        TEXT("Replica rejects an older delayed snapshot"),
+        ReplicaWar->ApplyReplicatedSnapshot(StaleSnapshot)
+    );
+    TestEqual(
+        TEXT("Replica keeps newer operation after stale data"),
+        ReplicaWar->GetCommittedOperationID(),
+        Snapshot.CommittedOperationID
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHReplicatedCampaignSoakTest,
+    "BrokenHorizon.Multiplayer.PersistentWar.ReplicatedCampaignSoak",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHReplicatedCampaignSoakTest::RunTest(
+    const FString& Parameters
+)
+{
+    UGameInstance* ServerGameInstance =
+        NewObject<UGameInstance>(GetTransientPackage());
+    UGameInstance* ClientGameInstance =
+        NewObject<UGameInstance>(GetTransientPackage());
+    UBHWarSubsystem* ServerWar =
+        NewObject<UBHWarSubsystem>(ServerGameInstance);
+    UBHWarSubsystem* ClientWar =
+        NewObject<UBHWarSubsystem>(ClientGameInstance);
+    TestNotNull(TEXT("Soak server subsystem is created"), ServerWar);
+    TestNotNull(TEXT("Soak client subsystem is created"), ClientWar);
+
+    if (!ServerWar || !ClientWar)
+    {
+        return false;
+    }
+
+    ServerWar->ResetCampaign();
+    constexpr int32 SoakTurnCount = 12;
+    for (int32 TurnIndex = 0;
+        TurnIndex < SoakTurnCount;
+        ++TurnIndex)
+    {
+        ServerWar->AdvanceWarTurn();
+        const int32 Revision = 100 + TurnIndex;
+        const FBHWarStateSnapshot Snapshot =
+            ServerWar->CaptureReplicatedSnapshot(Revision);
+
+        TestTrue(
+            *FString::Printf(
+                TEXT("Replica accepts soak revision %d"),
+                Revision
+            ),
+            ClientWar->ApplyReplicatedSnapshot(Snapshot)
+        );
+        TestEqual(
+            *FString::Printf(
+                TEXT("Replica turn remains synchronized at soak step %d"),
+                TurnIndex
+            ),
+            ClientWar->GetTurnNumber(),
+            ServerWar->GetTurnNumber()
+        );
+        TestEqual(
+            *FString::Printf(
+                TEXT("Replica priority remains synchronized at soak step %d"),
+                TurnIndex
+            ),
+            ClientWar->GetPrioritySectorID(),
+            ServerWar->GetPrioritySectorID()
+        );
+        TestEqual(
+            *FString::Printf(
+                TEXT("Replica convoy count remains synchronized at soak step %d"),
+                TurnIndex
+            ),
+            ClientWar->GetSupplyConvoys().Num(),
+            ServerWar->GetSupplyConvoys().Num()
+        );
+    }
+
+    const FBHWarStateSnapshot DelayedSnapshot =
+        ServerWar->CaptureReplicatedSnapshot(99);
+    TestFalse(
+        TEXT("Replica rejects a delayed pre-soak revision"),
+        ClientWar->ApplyReplicatedSnapshot(DelayedSnapshot)
+    );
+    TestEqual(
+        TEXT("Replica retains the final soak turn after delayed data"),
+        ClientWar->GetTurnNumber(),
+        ServerWar->GetTurnNumber()
+    );
+    FBHWarStateSnapshot MalformedSnapshot;
+    MalformedSnapshot.bInitialized = true;
+    MalformedSnapshot.Revision = 1000;
+    TestFalse(
+        TEXT("Replica rejects an initialized snapshot without sectors"),
+        ClientWar->ApplyReplicatedSnapshot(MalformedSnapshot)
+    );
+    TestEqual(
+        TEXT("Replica retains final state after malformed data"),
+        ClientWar->GetTurnNumber(),
+        ServerWar->GetTurnNumber()
+    );
     return true;
 }
 
@@ -1371,6 +1507,58 @@ bool FBHSharedSquadPingContractTest::RunTest(
         TEXT("Squad ping request is an authoritative server RPC"),
         PingRPC && PingRPC->HasAnyFunctionFlags(FUNC_NetServer)
     );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHFieldTransportReplicationContractTest,
+    "BrokenHorizon.Multiplayer.FieldTransport.ReplicationContract",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHFieldTransportReplicationContractTest::RunTest(
+    const FString& Parameters
+)
+{
+    const ABHFieldTransport* Defaults =
+        GetDefault<ABHFieldTransport>();
+    TestNotNull(
+        TEXT("Field transport defaults exist"),
+        Defaults
+    );
+    if (!Defaults)
+    {
+        return false;
+    }
+
+    TestTrue(
+        TEXT("Field transport replicates"),
+        Defaults->GetIsReplicated()
+    );
+    const FName ReplicatedProperties[] = {
+        FName(TEXT("CurrentFuel")),
+        FName(TEXT("CurrentHull")),
+        FName(TEXT("CurrentCargoSupply")),
+        FName(TEXT("CargoSourceSectorID")),
+        FName(TEXT("CargoDestinationSectorID")),
+        FName(TEXT("CargoType"))
+    };
+    for (const FName PropertyName : ReplicatedProperties)
+    {
+        const FProperty* Property =
+            FindFProperty<FProperty>(
+                ABHFieldTransport::StaticClass(),
+                PropertyName
+            );
+        TestTrue(
+            *FString::Printf(
+                TEXT("Field transport replicates %s"),
+                *PropertyName.ToString()
+            ),
+            Property && Property->HasAnyPropertyFlags(CPF_Net)
+        );
+    }
     return true;
 }
 
@@ -2731,6 +2919,78 @@ bool FBHRouteOperationVariationsTest::RunTest(
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHMilitaryConvoyDeliveryTest,
+    "BrokenHorizon.PersistentWar.Logistics.MilitaryConvoyDelivery",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHMilitaryConvoyDeliveryTest::RunTest(
+    const FString& Parameters
+)
+{
+    UGameInstance* GameInstance =
+        NewObject<UGameInstance>(GetTransientPackage());
+    UBHWarSubsystem* War =
+        NewObject<UBHWarSubsystem>(GameInstance);
+    TestNotNull(TEXT("War subsystem is created"), War);
+
+    if (!War)
+    {
+        return false;
+    }
+
+    War->ResetCampaign();
+    FBHWarSupplyConvoyState Convoy;
+    Convoy.ConvoyID = TEXT("MilitaryConvoy_DeliveryContract");
+    Convoy.SourceSectorID = TEXT("WesternFOB");
+    Convoy.DestinationSectorID = TEXT("DovrenVillage");
+    Convoy.Owner = EBHWarFaction::Friendly;
+    Convoy.CargoType = EBHWarConvoyCargoType::MilitarySupply;
+    Convoy.SupplyPayload = 15.0f;
+    Convoy.TurnsRemaining = 1;
+    Convoy.DispatchTurn = War->GetTurnNumber();
+    BHRouteOperations::Initialize(Convoy);
+
+    TestTrue(
+        TEXT("Military convoy fixture restores"),
+        War->RestoreWarState(
+            War->GetSectorStates(),
+            { Convoy },
+            War->GetRecentWarEvents(),
+            War->GetTurnNumber(),
+            War->GetSimulationAccumulator(),
+            BHSave::CurrentSchemaVersion
+        )
+    );
+    const float SupplyBefore =
+        War->GetSectorState(Convoy.DestinationSectorID).Supply;
+    War->AdvanceWarTurn();
+
+    TestTrue(
+        TEXT("Military convoy is removed after reaching its deadline"),
+        !War->HasSupplyConvoy(Convoy.ConvoyID)
+    );
+    TestTrue(
+        TEXT("Military convoy payload reaches destination supply"),
+        War->GetSectorState(Convoy.DestinationSectorID).Supply >
+            SupplyBefore
+    );
+    TestTrue(
+        TEXT("Military convoy arrival enters campaign history"),
+        War->GetRecentWarEvents().ContainsByPredicate(
+            [Convoy](const FBHWarEventRecord& Event)
+            {
+                return Event.EventType ==
+                        FName(TEXT("ConvoyArrived")) &&
+                    Event.SectorID == Convoy.DestinationSectorID;
+            }
+        )
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBHCampaignDifficultyTest,
     "BrokenHorizon.PersistentWar.Progression.CampaignDifficulty",
     EAutomationTestFlags::EditorContext |
@@ -2855,6 +3115,10 @@ bool FBHCampaignDifficultyTest::RunTest(
         NewObject<UGameInstance>(GetTransientPackage());
     UBHWarSubsystem* War =
         NewObject<UBHWarSubsystem>(GameInstance);
+    if (War)
+    {
+        War->ResetCampaign();
+    }
     TestTrue(TEXT("Authority accepts Veteran preset"),
         IsValid(War) && War->SetCampaignDifficultyPreset(
             EBHCampaignDifficultyPreset::Veteran));
@@ -3514,6 +3778,153 @@ bool FBHFortyMinuteCampaignEnduranceTest::RunTest(
                 War->GetPrioritySectorID(),
                 War->GetPriorityType()
             )
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHFarFieldOccupationSimulationTest,
+    "BrokenHorizon.PersistentWar.Occupation.FarFieldSimulation",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHFarFieldOccupationSimulationTest::RunTest(
+    const FString& Parameters
+)
+{
+    UGameInstance* GameInstance =
+        NewObject<UGameInstance>(GetTransientPackage());
+    UBHWarSubsystem* War =
+        NewObject<UBHWarSubsystem>(GameInstance);
+    TestNotNull(TEXT("War subsystem is created"), War);
+
+    if (!War)
+    {
+        return false;
+    }
+
+    War->ResetCampaign();
+    const FName CommittedSectorID = War->GetPrioritySectorID();
+    const EBHWarPriorityType CommittedType = War->GetPriorityType();
+    TestTrue(
+        TEXT("Occupation test commits an active operation"),
+        War->SetCommittedOperation(
+            CommittedSectorID,
+            CommittedType
+        )
+    );
+
+    FName DistantSectorID = NAME_None;
+    for (const FBHWarSectorState& Sector : War->GetSectorStates())
+    {
+        if (Sector.SectorID != CommittedSectorID &&
+            Sector.Owner == EBHWarFaction::Enemy)
+        {
+            DistantSectorID = Sector.SectorID;
+            break;
+        }
+    }
+
+    TestFalse(
+        TEXT("Far-field test finds a non-committed enemy sector"),
+        DistantSectorID.IsNone()
+    );
+    if (DistantSectorID.IsNone())
+    {
+        return false;
+    }
+
+    const FBHWarSectorState Before =
+        War->GetSectorState(DistantSectorID);
+    War->AdvanceWarTurn();
+    const FBHWarSectorState After =
+        War->GetSectorState(DistantSectorID);
+
+    TestTrue(
+        TEXT("Far-field occupation advances while another sector is committed"),
+        !FMath::IsNearlyEqual(Before.Supply, After.Supply) ||
+            !FMath::IsNearlyEqual(Before.EnemyStrength, After.EnemyStrength) ||
+            Before.LastBattleTurn != After.LastBattleTurn
+    );
+    TestTrue(
+        TEXT("Committed sector remains excluded from background simulation"),
+        War->HasCommittedOperation() &&
+            War->GetCommittedOperationSectorID() == CommittedSectorID
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHEnemyLogisticsReadinessTest,
+    "BrokenHorizon.PersistentWar.Occupation.EnemyLogisticsReadiness",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHEnemyLogisticsReadinessTest::RunTest(
+    const FString& Parameters
+)
+{
+    UGameInstance* GameInstance =
+        NewObject<UGameInstance>(GetTransientPackage());
+    UBHWarSubsystem* War =
+        NewObject<UBHWarSubsystem>(GameInstance);
+    TestNotNull(TEXT("War subsystem is created"), War);
+
+    if (!War)
+    {
+        return false;
+    }
+
+    War->ResetCampaign();
+    FName EnemyHubID = NAME_None;
+    FName EnemyLineSectorID = NAME_None;
+    for (const FBHWarSectorState& Sector : War->GetSectorStates())
+    {
+        if (Sector.Owner != EBHWarFaction::Enemy)
+        {
+            continue;
+        }
+
+        if (War->IsLogisticsHubSector(Sector.SectorID))
+        {
+            EnemyHubID = Sector.SectorID;
+        }
+        else if (EnemyLineSectorID.IsNone() &&
+            War->IsSectorConnectedToFactionLogistics(Sector.SectorID))
+        {
+            EnemyLineSectorID = Sector.SectorID;
+        }
+    }
+
+    TestFalse(
+        TEXT("Campaign contains an enemy logistics hub"),
+        EnemyHubID.IsNone()
+    );
+    TestFalse(
+        TEXT("Campaign contains an enemy sector on the logistics network"),
+        EnemyLineSectorID.IsNone()
+    );
+    if (EnemyHubID.IsNone() || EnemyLineSectorID.IsNone())
+    {
+        return false;
+    }
+
+    TestTrue(
+        TEXT("Enemy logistics hub produces strategic supply"),
+        War->GetSectorSupplyChangePerTurn(EnemyHubID) >
+            War->GetSectorSupplyChangePerTurn(EnemyLineSectorID)
+    );
+    TestTrue(
+        TEXT("Enemy logistics network provides combat readiness"),
+        War->GetSectorReinforcementPerTurn(EnemyLineSectorID) >
+            KINDA_SMALL_NUMBER
+    );
+    TestTrue(
+        TEXT("Enemy logistics hub has combat readiness"),
+        War->GetSectorCombatSupplyFactor(EnemyHubID) >
+            0.0f
     );
     return true;
 }
@@ -7034,6 +7445,8 @@ bool FBHSaveRoundTripTest::RunTest(const FString& Parameters)
     Source->SavedHealth = 72.0f;
     Source->SavedMagazineAmmo = 17;
     Source->SavedReserveAmmo = 61;
+    Source->SavedMedkitCount = 2;
+    Source->SavedFieldDressingCount = 4;
     Source->bCampaignEpilogueAcknowledged = true;
     Source->bOperationDebriefAcknowledged = true;
     Source->OpenWorldOperationState.bHasSnapshot = true;
@@ -7154,6 +7567,39 @@ bool FBHSaveRoundTripTest::RunTest(const FString& Parameters)
     Source->WarFriendlyRecruitmentProgress = 0.35f;
     Source->WarEnemyRecruitmentProgress = 0.65f;
 
+    Source->ResistanceForce.AvailableOperatorCount = 1;
+    Source->ResistanceForce.OperationalVehicleCount = 1;
+    Source->ResistanceForce.MedicalSupply = 6.0f;
+    Source->ResistanceForce.Readiness = 0.72f;
+    Source->ResistanceForce.LastOperationID = TEXT("KoronaCrossroads");
+    Source->ResistanceForce.bLastOperationSucceeded = true;
+    FBHResistanceOperatorState& SavedResistanceOperator =
+        Source->ResistanceForce.Operators.AddDefaulted_GetRef();
+    SavedResistanceOperator.OperatorID = TEXT("FieldOperative_Point");
+    SavedResistanceOperator.Specialty = TEXT("Rifleman");
+    SavedResistanceOperator.Experience = 0.64f;
+    SavedResistanceOperator.bAvailable = true;
+    FBHResistanceVehicleState& SavedResistanceVehicle =
+        Source->ResistanceForce.Vehicles.AddDefaulted_GetRef();
+    SavedResistanceVehicle.VehicleID = TEXT("WesternFOB_Truck01");
+    SavedResistanceVehicle.VehicleType = TEXT("UtilityTruck");
+    SavedResistanceVehicle.SectorID = TEXT("WesternFOB");
+    SavedResistanceVehicle.Condition = 0.81f;
+    SavedResistanceVehicle.bReady = true;
+    FBHResistanceFacilityState& SavedResistanceFacility =
+        Source->ResistanceForce.Facilities.AddDefaulted_GetRef();
+    SavedResistanceFacility.FacilityID = TEXT("WesternFOB_AmmoCache");
+    SavedResistanceFacility.FacilityType = TEXT("SupplyCache");
+    SavedResistanceFacility.SectorID = TEXT("WesternFOB");
+    SavedResistanceFacility.SupplyCacheCharges = 3;
+    SavedResistanceFacility.bOperational = true;
+    FBHResistanceDeploymentState& SavedResistanceDeployment =
+        Source->ResistanceForce.Deployments.AddDefaulted_GetRef();
+    SavedResistanceDeployment.DeploymentID = TEXT("Deployment_KoronaCrossroads");
+    SavedResistanceDeployment.OperationID = TEXT("KoronaCrossroads");
+    SavedResistanceDeployment.OperatorIDs = { TEXT("FieldOperative_Point") };
+    SavedResistanceDeployment.VehicleIDs = { TEXT("WesternFOB_Truck01") };
+
     TArray<uint8> Bytes;
     TestTrue(
         TEXT("Save game serializes to memory"),
@@ -7254,6 +7700,84 @@ bool FBHSaveRoundTripTest::RunTest(const FString& Parameters)
         Restored->FieldSquadMemberStates.Num(),
         2
     );
+    TestEqual(
+        TEXT("Resistance available operator count survives"),
+        Restored->ResistanceForce.AvailableOperatorCount,
+        1
+    );
+    TestEqual(
+        TEXT("Resistance readiness survives"),
+        Restored->ResistanceForce.Readiness,
+        0.72f
+    );
+    TestEqual(
+        TEXT("Resistance medical supply survives"),
+        Restored->ResistanceForce.MedicalSupply,
+        6.0f
+    );
+    TestEqual(
+        TEXT("Resistance last operation survives"),
+        Restored->ResistanceForce.LastOperationID,
+        FName(TEXT("KoronaCrossroads"))
+    );
+    TestTrue(
+        TEXT("Resistance operation outcome survives"),
+        Restored->ResistanceForce.bLastOperationSucceeded
+    );
+    TestEqual(
+        TEXT("Resistance operator roster count survives"),
+        Restored->ResistanceForce.Operators.Num(),
+        1
+    );
+    TestEqual(
+        TEXT("Resistance vehicle roster count survives"),
+        Restored->ResistanceForce.Vehicles.Num(),
+        1
+    );
+    TestEqual(
+        TEXT("Resistance facility roster count survives"),
+        Restored->ResistanceForce.Facilities.Num(),
+        1
+    );
+    if (Restored->ResistanceForce.Facilities.Num() == 1)
+    {
+        const FBHResistanceFacilityState& RestoredFacility =
+            Restored->ResistanceForce.Facilities[0];
+        TestEqual(
+            TEXT("Resistance facility identity survives"),
+            RestoredFacility.FacilityID,
+            FName(TEXT("WesternFOB_AmmoCache"))
+        );
+        TestEqual(
+            TEXT("Resistance facility supply charges survive"),
+            RestoredFacility.SupplyCacheCharges,
+            3
+        );
+        TestTrue(
+            TEXT("Resistance facility operational state survives"),
+            RestoredFacility.bOperational
+        );
+    }
+    TestEqual(
+        TEXT("Resistance deployment roster count survives"),
+        Restored->ResistanceForce.Deployments.Num(),
+        1
+    );
+    if (Restored->ResistanceForce.Deployments.Num() == 1)
+    {
+        const FBHResistanceDeploymentState& RestoredDeployment =
+            Restored->ResistanceForce.Deployments[0];
+        TestEqual(
+            TEXT("Resistance deployment operation survives"),
+            RestoredDeployment.OperationID,
+            FName(TEXT("KoronaCrossroads"))
+        );
+        TestEqual(
+            TEXT("Resistance deployment operator identity survives"),
+            RestoredDeployment.OperatorIDs[0],
+            FName(TEXT("FieldOperative_Point"))
+        );
+    }
     if (Restored->FieldSquadMemberStates.Num() == 2)
     {
         const FBHFieldSquadMemberState& RestoredPointOperative =
@@ -8820,7 +9344,7 @@ bool FBHAccessibilitySettingsContractTest::RunTest(
     TestEqual(
         TEXT("Every gameplay control has a stable remapping definition"),
         Bindings.Num(),
-        33
+        36
     );
     TestTrue(
         TEXT("Tactical flashlight has a stable remappable binding"),
@@ -8853,6 +9377,22 @@ bool FBHAccessibilitySettingsContractTest::RunTest(
             {
                 return Binding.BindingID == FName(TEXT("ControlledBreathing")) &&
                     Binding.DefaultKeyboardKey == EKeys::LeftAlt;
+            }));
+    TestTrue(
+        TEXT("Inventory and loadout has a stable remappable binding"),
+        Bindings.ContainsByPredicate(
+            [](const FBHInputBindingDefinition& Binding)
+            {
+                return Binding.BindingID == FName(TEXT("Inventory")) &&
+                    Binding.DefaultKeyboardKey == EKeys::I;
+            }));
+    TestTrue(
+        TEXT("Inventory role cycling has a stable remappable binding"),
+        Bindings.ContainsByPredicate(
+            [](const FBHInputBindingDefinition& Binding)
+            {
+                return Binding.BindingID == FName(TEXT("InventoryCycle")) &&
+                    Binding.DefaultKeyboardKey == EKeys::F6;
             }));
     TSet<FName> BindingIDs;
     TSet<FKey> KeyboardKeys;
@@ -8897,6 +9437,8 @@ bool FBHAccessibilitySettingsContractTest::RunTest(
         BindingIDs.Contains(TEXT("FieldDressing")) && BindingIDs.Contains(TEXT("Medkit")));
     TestTrue(TEXT("Engineering control is remappable"),
         BindingIDs.Contains(TEXT("Engineering")));
+    TestTrue(TEXT("Anti-vehicle launcher control is remappable"),
+        BindingIDs.Contains(TEXT("AntiVehicle")));
 
     const FString ExpectedInteractPrompt = FString::Printf(
         TEXT("%s / FACE TOP"),
@@ -9433,6 +9975,54 @@ bool FBHFieldFortificationRulesTest::RunTest(
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHFieldTransportSustainmentTest,
+    "BrokenHorizon.PersistentWar.Logistics.FieldTransportSustainment",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHFieldTransportSustainmentTest::RunTest(
+    const FString& Parameters
+)
+{
+    const float HealthyBurn =
+        ABHFieldTransport::CalculateHullFuelBurnMultiplier(
+            1.0f,
+            0.35f,
+            1.30f
+        );
+    const float DamagedBurn =
+        ABHFieldTransport::CalculateHullFuelBurnMultiplier(
+            0.20f,
+            0.35f,
+            1.30f
+        );
+
+    TestEqual(
+        TEXT("Healthy transport retains baseline fuel burn"),
+        HealthyBurn,
+        1.0f
+    );
+    TestTrue(
+        TEXT("Damaged transport consumes more fuel"),
+        DamagedBurn > HealthyBurn
+    );
+    TestTrue(
+        TEXT("Damaged transport fuel multiplier remains bounded"),
+        DamagedBurn <= 1.30f
+    );
+    TestTrue(
+        TEXT("Critical damage still preserves a usable multiplier"),
+        ABHFieldTransport::CalculateHullFuelBurnMultiplier(
+            0.0f,
+            0.35f,
+            1.30f
+        ) >= DamagedBurn
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBHWeaponRoleProfilesTest,
     "BrokenHorizon.Gameplay.Weapon.RoleProfiles",
     EAutomationTestFlags::EditorContext |
@@ -9502,10 +10092,25 @@ bool FBHWeaponRoleProfilesTest::RunTest(
         EBHWeaponRole::Support
     );
     TestEqual(
-        TEXT("Role cycle wraps support to assault"),
+        TEXT("Role cycle advances support to carbine"),
         UBHWeaponComponent::GetNextWeaponRole(
             EBHWeaponRole::Support
         ),
+        EBHWeaponRole::Carbine
+    );
+    TestEqual(
+        TEXT("Role cycle advances carbine to pistol"),
+        UBHWeaponComponent::GetNextWeaponRole(EBHWeaponRole::Carbine),
+        EBHWeaponRole::Pistol
+    );
+    TestEqual(
+        TEXT("Role cycle advances pistol to shotgun"),
+        UBHWeaponComponent::GetNextWeaponRole(EBHWeaponRole::Pistol),
+        EBHWeaponRole::Shotgun
+    );
+    TestEqual(
+        TEXT("Role cycle wraps shotgun to assault"),
+        UBHWeaponComponent::GetNextWeaponRole(EBHWeaponRole::Shotgun),
         EBHWeaponRole::Assault
     );
     const FProperty* WeaponRoleProperty =
@@ -10320,6 +10925,11 @@ bool FBHCarryLoadContractTest::RunTest(const FString& Parameters)
         Support.MovementNoiseMultiplier > Light.MovementNoiseMultiplier);
     TestTrue(TEXT("Load effects remain graduated rather than immobilizing"),
         Support.MovementSpeedMultiplier >= 0.72f);
+    TestEqual(TEXT("Loadout exposes a stable field-container capacity"),
+        Light.ContainerCapacityKilograms, 40.0f);
+    TestTrue(TEXT("Remaining container capacity tracks carried load"),
+        Light.ContainerRemainingKilograms > Support.ContainerRemainingKilograms &&
+        Support.ContainerRemainingKilograms >= 0.0f);
     const FProperty* FragProperty = FindFProperty<FProperty>(
         ABHCharacter::StaticClass(), FName(TEXT("FragGrenadeCount")));
     TestTrue(TEXT("Grenade mass source replicates to the owning client"),
@@ -10446,6 +11056,51 @@ bool FBHCombatEngineeringContractTest::RunTest(
     TestTrue(TEXT("Engineering inventory is a save-game contract"),
         SavedChargeProperty &&
         SavedChargeProperty->HasAnyPropertyFlags(CPF_SaveGame));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHInventoryTransferContractTest,
+    "BrokenHorizon.Inventory.Transfer.AuthorityContract",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHInventoryTransferContractTest::RunTest(const FString& Parameters)
+{
+    const UClass* CharacterClass = ABHCharacter::StaticClass();
+    const UFunction* TransferFunction = CharacterClass->FindFunctionByName(
+        TEXT("TransferInventoryItemTo"));
+    const UFunction* TransferServerFunction = CharacterClass->FindFunctionByName(
+        TEXT("ServerTransferInventoryItem"));
+    TestNotNull(TEXT("Player transfer API exists"), TransferFunction);
+    TestNotNull(TEXT("Player transfer server RPC exists"), TransferServerFunction);
+    if (TransferFunction)
+    {
+        TestTrue(TEXT("Transfer API is Blueprint-callable"),
+            TransferFunction->HasAnyFunctionFlags(FUNC_BlueprintCallable));
+    }
+    if (TransferServerFunction)
+    {
+        TestTrue(TEXT("Transfer server RPC is authoritative"),
+            TransferServerFunction->HasAnyFunctionFlags(FUNC_NetServer));
+        TestTrue(TEXT("Transfer server RPC is reliable"),
+            TransferServerFunction->HasAnyFunctionFlags(FUNC_NetReliable));
+    }
+    for (const FName PropertyName : {
+        FName(TEXT("FragGrenadeCount")),
+        FName(TEXT("SmokeGrenadeCount")),
+        FName(TEXT("EngineeringChargeCount")),
+        FName(TEXT("AntiVehicleRoundCount"))
+    })
+    {
+        const FProperty* Property = FindFProperty<FProperty>(
+            CharacterClass, PropertyName);
+        TestTrue(
+            *FString::Printf(TEXT("%s remains a replicated transfer inventory field"),
+                *PropertyName.ToString()),
+            Property && Property->HasAnyPropertyFlags(CPF_Net));
+    }
     return true;
 }
 

@@ -29,7 +29,10 @@
 namespace
 {
 constexpr float NavigationBuildRetrySeconds = 0.25f;
-constexpr float NavigationStartupDelaySeconds = 0.5f;
+// First Light uses dynamic Recast generation on a streamed graybox map. Give
+// the runtime nav build time to publish the checkpoint tiles before issuing
+// the first patrol, hold, or combat pursuit request.
+constexpr float NavigationStartupDelaySeconds = 3.0f;
 
 constexpr float LocalSearchRadius = 700.0f;
 
@@ -457,6 +460,16 @@ void ABHEnemyAIController::SetHoldPosition(
     ConsecutiveHoldMoveFailures = 0;
     NextHoldMoveTime = 0.0f;
 
+    if (IsValid(GetPawn()) &&
+        FVector::DistSquared2D(
+            GetPawn()->GetActorLocation(),
+            NewHoldLocation
+        ) <= FMath::Square(50.0f))
+    {
+        bMoveRequested = false;
+        return;
+    }
+
     if (CurrentState == EBHEnemyAIState::Patrol ||
         CurrentState == EBHEnemyAIState::ReturnToPatrol)
     {
@@ -742,6 +755,7 @@ void ABHEnemyAIController::OnMoveCompleted(
 {
     Super::OnMoveCompleted(RequestID, Result);
     bMoveRequested = false;
+    LastMoveResultCode = static_cast<int32>(Result.Code);
 
     ABHEnemySoldier* Enemy = GetEnemySoldier();
 
@@ -767,6 +781,15 @@ void ABHEnemyAIController::OnMoveCompleted(
                 FRotator(0.0f, HoldFacingYaw, 0.0f)
             );
         }
+    }
+
+    // Aborted requests are commonly superseded by a state transition or a
+    // newer movement request. They are not evidence that navigation failed;
+    // treating them as failures causes false Search/Patrol fallbacks and
+    // obscures the actual path-following result.
+    if (Result.Code == EPathFollowingResult::Aborted)
+    {
+        return;
     }
 
     if (!Result.IsSuccess())
@@ -2039,6 +2062,39 @@ void ABHEnemyAIController::HandleNavigationMoveFailure()
     }
     else if (FallbackState == EBHEnemyAIState::Search)
     {
+        FVector LocalSearchLocation;
+        if (FailedState == EBHEnemyAIState::Search &&
+            TryFindLocalSearchLocation(
+                GetWorld(),
+                Enemy->GetActorLocation(),
+                LocalSearchLocation
+            ) &&
+            FVector::DistSquared2D(
+                Enemy->GetActorLocation(),
+                LocalSearchLocation
+            ) > FMath::Square(30.0f) &&
+            FVector::DistSquared2D(
+                Enemy->GetActorLocation(),
+                LocalSearchLocation
+            ) <= FMath::Square(250.0f))
+        {
+            const FVector PreviousLocation = Enemy->GetActorLocation();
+            if (Enemy->SetActorLocation(LocalSearchLocation, true))
+            {
+                UE_LOG(
+                    LogTemp,
+                    Display,
+                    TEXT(
+                        "BH_AI_NAVIGATION_UNSTUCK soldier=%s "
+                        "from=%s to=%s"
+                    ),
+                    *Enemy->GetName(),
+                    *PreviousLocation.ToCompactString(),
+                    *LocalSearchLocation.ToCompactString()
+                );
+            }
+        }
+
         SetState(EBHEnemyAIState::Search);
         StateEndTime = CurrentTime + Enemy->GetSearchDuration();
     }
@@ -2063,11 +2119,12 @@ void ABHEnemyAIController::HandleNavigationMoveFailure()
         Warning,
         TEXT(
             "BH_AI_NAVIGATION_FALLBACK soldier=%s failed_state=%d "
-            "fallback_state=%d location=%s"
+            "fallback_state=%d result_code=%d location=%s"
         ),
         *Enemy->GetName(),
         static_cast<int32>(FailedState),
         static_cast<int32>(FallbackState),
+        static_cast<int32>(LastMoveResultCode),
         *Enemy->GetActorLocation().ToCompactString()
     );
 }

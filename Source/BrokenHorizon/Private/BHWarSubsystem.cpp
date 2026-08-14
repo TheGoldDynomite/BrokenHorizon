@@ -358,8 +358,26 @@ bool UBHWarSubsystem::ApplyReplicatedSnapshot(
     const UWorld* World = GetWorld();
 
     if (!Snapshot.bInitialized ||
+        Snapshot.Revision < 0 ||
+        Snapshot.SectorStates.IsEmpty() ||
         (IsValid(World) && World->GetNetMode() != NM_Client))
     {
+        return false;
+    }
+
+    if (LastAppliedReplicatedSnapshotRevision != INDEX_NONE &&
+        Snapshot.Revision < LastAppliedReplicatedSnapshotRevision)
+    {
+        UE_LOG(
+            LogTemp,
+            Verbose,
+            TEXT(
+                "BH_REPLICATION_SNAPSHOT_REJECTED_STALE revision=%d "
+                "last_applied=%d"
+            ),
+            Snapshot.Revision,
+            LastAppliedReplicatedSnapshotRevision
+        );
         return false;
     }
 
@@ -395,6 +413,7 @@ bool UBHWarSubsystem::ApplyReplicatedSnapshot(
     CommittedOperationType =
         Snapshot.CommittedOperationType;
     CampaignOutcome = Snapshot.CampaignOutcome;
+    LastAppliedReplicatedSnapshotRevision = Snapshot.Revision;
     TGuardValue<bool> ApplyingSnapshotGuard(
         bApplyingReplicatedSnapshot,
         true
@@ -5239,6 +5258,36 @@ FBHWarSectorState UBHWarSubsystem::GetSectorState(
         ? SectorStates[SectorIndex]
         : FBHWarSectorState();
 }
+
+#if !UE_BUILD_SHIPPING
+void UBHWarSubsystem::SetSectorOwnerForTesting(
+    FName SectorID,
+    EBHWarFaction Owner
+)
+{
+    const int32 SectorIndex = FindSectorIndex(SectorID);
+    if (SectorStates.IsValidIndex(SectorIndex))
+    {
+        SectorStates[SectorIndex].Owner = Owner;
+    }
+}
+
+void UBHWarSubsystem::SetSectorSupplyForTesting(
+    FName SectorID,
+    float Supply
+)
+{
+    const int32 SectorIndex = FindSectorIndex(SectorID);
+    if (SectorStates.IsValidIndex(SectorIndex))
+    {
+        SectorStates[SectorIndex].Supply = FMath::Clamp(
+            Supply,
+            0.0f,
+            MaximumSectorSupply
+        );
+    }
+}
+#endif
 
 bool UBHWarSubsystem::HasSector(FName SectorID) const
 {

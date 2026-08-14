@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "BHMissionData.h"
@@ -285,13 +285,10 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Mission")
     FBHOpenWorldOperationState OpenWorldOperationState;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FBHResistanceForceState ResistanceForce;
 
-    UPROPERTY(
-        VisibleAnywhere,
-        BlueprintReadOnly,
-        SaveGame,
-        Category = "Persistent War|Field Squad"
-    )
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Field Squad")
     int32 LivingFieldSquadCount = 0;
 
     UPROPERTY(
@@ -523,4 +520,9 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Player")
     int32 SavedEngineeringChargeCount = -1;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Player|Anti Vehicle")
+    int32 SavedAntiVehicleRoundCount = -1;
 };
+
+

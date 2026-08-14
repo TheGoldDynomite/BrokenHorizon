@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "BHWarTypes.generated.h"
@@ -155,6 +155,117 @@ struct BROKENHORIZON_API FBHFieldSquadMemberState
 };
 
 USTRUCT(BlueprintType)
+struct BROKENHORIZON_API FBHResistanceOperatorState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName OperatorID = NAME_None;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName Specialty = NAME_None;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    int32 Experience = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    bool bAvailable = true;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    bool bInjured = false;
+};
+
+USTRUCT(BlueprintType)
+struct BROKENHORIZON_API FBHResistanceVehicleState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName VehicleID = NAME_None;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName VehicleType = NAME_None;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName SectorID = NAME_None;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+    float Condition = 1.0f;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    bool bReady = true;
+};
+
+USTRUCT(BlueprintType)
+struct BROKENHORIZON_API FBHResistanceFacilityState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName FacilityID = NAME_None;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName FacilityType = NAME_None;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName SectorID = NAME_None;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    int32 SupplyCacheCharges = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    bool bOperational = true;
+};
+
+USTRUCT(BlueprintType)
+struct BROKENHORIZON_API FBHResistanceDeploymentState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName DeploymentID = NAME_None;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    TArray<FName> OperatorIDs;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    TArray<FName> VehicleIDs;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName OperationID = NAME_None;
+};
+
+USTRUCT(BlueprintType)
+struct BROKENHORIZON_API FBHResistanceForceState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName ForceID = FName(TEXT("ResistanceForce_Main"));
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    int32 AvailableOperatorCount = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    int32 OperationalVehicleCount = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    float AmmunitionSupply = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    float MedicalSupply = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    float FuelSupply = 0.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+    float Readiness = 1.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    TArray<FBHResistanceOperatorState> Operators;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    TArray<FBHResistanceVehicleState> Vehicles;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    TArray<FBHResistanceFacilityState> Facilities;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    TArray<FBHResistanceDeploymentState> Deployments;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    FName LastOperationID = NAME_None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "Persistent War|Resistance Force")
+    bool bLastOperationSucceeded = false;
+};
+
+USTRUCT(BlueprintType)
 struct BROKENHORIZON_API FBHOpenWorldOperationState
 {
     GENERATED_BODY()
@@ -239,6 +350,12 @@ struct BROKENHORIZON_API FBHOpenWorldOperationState
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "War")
     FName EnemySourceSectorID = NAME_None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "War|Operation")
+    int32 OperationVariationIndex = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "War|Operation")
+    FVector OperationCenter = FVector::ZeroVector;
 };
 
 USTRUCT(BlueprintType)
@@ -800,3 +917,4 @@ struct BROKENHORIZON_API FBHWarEventRecord
     )
     FString Summary;
 };
+

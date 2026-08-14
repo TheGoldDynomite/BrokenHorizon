@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "BHWarTypes.h"
@@ -103,6 +103,11 @@ protected:
         float InDeltaTime
     ) override;
 
+    virtual FReply NativeOnPreviewKeyDown(
+        const FGeometry& InGeometry,
+        const FKeyEvent& InKeyEvent
+    ) override;
+
     virtual FReply NativeOnKeyDown(
         const FGeometry& InGeometry,
         const FKeyEvent& InKeyEvent
@@ -161,3 +166,4 @@ private:
     FString StrategicActionFeedback;
     int32 SelectedCustomDifficultyAxis = 0;
 };
+
