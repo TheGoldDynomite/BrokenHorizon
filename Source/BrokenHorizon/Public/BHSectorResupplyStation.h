@@ -42,6 +42,17 @@ public:
         float SupplyCostPerMember
     );
 
+    static bool IsRescueTreatmentDestination(
+        FName StationSectorID,
+        FName RescueDestinationSectorID
+    );
+
+    static FText BuildRescueTreatmentInteractionText(
+        bool bAtTreatmentDestination,
+        FName CasualtyID,
+        const FText& TreatmentDestination
+    );
+
     static bool ShouldIssueEmergencyFallbackKit(
         int32 ReserveAmmo,
         int32 MedkitCount,

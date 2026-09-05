@@ -425,6 +425,106 @@ float ABHFieldTransport::CalculateWaterSpeedMultiplier(
         : 1.0f;
 }
 
+FString ABHFieldTransport::BuildCargoStatusLabel(
+    float CargoSupply,
+    float CargoCapacity,
+    EBHWarConvoyCargoType CargoType,
+    const FText& DestinationName
+)
+{
+    const float SafeCargoSupply = FMath::Max(0.0f, CargoSupply);
+    const float SafeCargoCapacity = FMath::Max(1.0f, CargoCapacity);
+
+    if (SafeCargoSupply <= KINDA_SMALL_NUMBER)
+    {
+        return FString::Printf(
+            TEXT("CARGO %.0f/%.0f"),
+            SafeCargoSupply,
+            SafeCargoCapacity
+        );
+    }
+
+    const TCHAR* CargoLabel =
+        CargoType == EBHWarConvoyCargoType::CivilianAid
+            ? TEXT("AID")
+            : TEXT("SUPPLY");
+    const FString SafeDestination = DestinationName.IsEmpty()
+        ? TEXT("DESTINATION PENDING")
+        : DestinationName.ToString().ToUpper();
+
+    return FString::Printf(
+        TEXT("%s %.0f/%.0f > %s"),
+        CargoLabel,
+        SafeCargoSupply,
+        SafeCargoCapacity,
+        *SafeDestination
+    );
+}
+
+FText ABHFieldTransport::BuildBoardingInteractionText(
+    bool bWaterborne,
+    float CargoSupply,
+    EBHWarConvoyCargoType CargoType,
+    const FText& DestinationName
+)
+{
+    const FText ActionText = bWaterborne
+        ? NSLOCTEXT(
+            "BrokenHorizon",
+            "BoardWaterborneTransportAction",
+            "board waterborne cargo transport"
+        )
+        : NSLOCTEXT(
+            "BrokenHorizon",
+            "BoardLandTransportAction",
+            "drive field transport"
+        );
+
+    if (FMath::Max(0.0f, CargoSupply) <= KINDA_SMALL_NUMBER)
+    {
+        return FText::Format(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "EmptyFieldTransportInteraction",
+                "Press [F] to {0}"
+            ),
+            ActionText
+        );
+    }
+
+    const FText CargoTypeText =
+        CargoType == EBHWarConvoyCargoType::CivilianAid
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "CivilianAidCargoInteractionLabel",
+                "AID"
+            )
+            : NSLOCTEXT(
+                "BrokenHorizon",
+                "MilitarySupplyCargoInteractionLabel",
+                "SUPPLY"
+            );
+    const FText SafeDestination = DestinationName.IsEmpty()
+        ? NSLOCTEXT(
+            "BrokenHorizon",
+            "PendingTransportDestination",
+            "DESTINATION PENDING"
+        )
+        : DestinationName;
+
+    return FText::Format(
+        NSLOCTEXT(
+            "BrokenHorizon",
+            "LoadedFieldTransportInteraction",
+            "Press [F] to {0}\n{1} {2} // DELIVER TO {3}"
+        ),
+        ActionText,
+        CargoTypeText,
+        FText::AsNumber(FMath::RoundToInt(CargoSupply)),
+        SafeDestination
+    );
+}
+
 float ABHFieldTransport::CalculateCollisionDamage(
     float ImpactSpeed,
     float DamageSpeedThreshold,
@@ -703,6 +803,13 @@ void ABHFieldTransport::ExecuteLogisticsTransferForTesting()
 {
     TryTransferFieldLogistics();
 }
+
+#if !UE_BUILD_SHIPPING
+void ABHFieldTransport::ExecuteCivilianAidTransferForTesting()
+{
+    TryTransferCivilianAid();
+}
+#endif
 
 void ABHFieldTransport::ForceExitOccupantForRespawn(
     ABHCharacter* Character
@@ -1224,13 +1331,40 @@ void ABHFieldTransport::Interact_Implementation(
 
 FText ABHFieldTransport::GetInteractionText_Implementation() const
 {
-    return IsValid(Occupant)
-        ? FText::FromString(TEXT("Field transport occupied"))
-        : (IsWaterborne()
-            ? FText::FromString(
-                TEXT("Press [F] to board waterborne cargo transport")
-            )
-            : FText::FromString(TEXT("Press [F] to drive field transport")));
+    if (IsValid(Occupant))
+    {
+        return FText::FromString(TEXT("Field transport occupied"));
+    }
+
+    FText DestinationName = FText::GetEmpty();
+    if (GetCargoSupply() > KINDA_SMALL_NUMBER &&
+        !CargoDestinationSectorID.IsNone())
+    {
+        const UGameInstance* GameInstance = GetGameInstance();
+        const UBHWarSubsystem* WarSubsystem = IsValid(GameInstance)
+            ? GameInstance->GetSubsystem<UBHWarSubsystem>()
+            : nullptr;
+        if (IsValid(WarSubsystem))
+        {
+            DestinationName = WarSubsystem->GetSectorState(
+                CargoDestinationSectorID
+            ).DisplayName;
+        }
+
+        if (DestinationName.IsEmpty())
+        {
+            DestinationName = FText::FromName(
+                CargoDestinationSectorID
+            );
+        }
+    }
+
+    return BuildBoardingInteractionText(
+        IsWaterborne(),
+        GetCargoSupply(),
+        CargoType,
+        DestinationName
+    );
 }
 
 void ABHFieldTransport::EnterVehicle(
@@ -1628,7 +1762,7 @@ void ABHFieldTransport::ClientActivateDriverControls_Implementation()
 
 void ABHFieldTransport::TryTransferFieldLogistics()
 {
-    if (!IsValid(Occupant))
+    if (!HasAuthority() || !IsValid(Occupant))
     {
         return;
     }
@@ -1730,7 +1864,6 @@ void ABHFieldTransport::TryTransferFieldLogistics()
         IsValid(WarSubsystem)
             ? WarSubsystem->GetSectorState(StationSectorID)
             : FBHWarSectorState();
-
     if (!IsValid(WarSubsystem) ||
         StationSector.SectorID.IsNone() ||
         StationSector.Owner != EBHWarFaction::Friendly)
@@ -1878,7 +2011,8 @@ void ABHFieldTransport::TryTransferFieldLogistics()
     UpdateTransportLabel();
     ForceNetUpdate();
 
-    if (IsValid(SaveSubsystem) && !SaveSubsystem->SaveProgress())
+    if (IsValid(SaveSubsystem) &&
+        !SaveSubsystem->SaveProgressForCharacter(Occupant))
     {
         NotifyDriver(
             TEXT("LOGISTICS UPDATED // CHECKPOINT SAVE FAILED")
@@ -1888,7 +2022,7 @@ void ABHFieldTransport::TryTransferFieldLogistics()
 
 void ABHFieldTransport::TryTransferCivilianAid()
 {
-    if (!IsValid(Occupant))
+    if (!HasAuthority() || !IsValid(Occupant))
     {
         return;
     }
@@ -1965,6 +2099,9 @@ void ABHFieldTransport::TryTransferCivilianAid()
         return;
     }
 
+    const bool bHadCargoBeforeTransfer =
+        CurrentCargoSupply > KINDA_SMALL_NUMBER;
+
     if (CurrentCargoSupply > KINDA_SMALL_NUMBER)
     {
         if (CargoType !=
@@ -2017,8 +2154,20 @@ void ABHFieldTransport::TryTransferCivilianAid()
             UpdateTransportLabel();
             ForceNetUpdate();
 
-            if (IsValid(SaveSubsystem) &&
-                !SaveSubsystem->SaveProgress())
+            const bool bCheckpointSaved =
+                IsValid(SaveSubsystem) &&
+                SaveSubsystem->SaveProgressForCharacter(Occupant);
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_FIELD_CIVILIAN_AID_CHECKPOINT stage=route "
+                    "owner=%s result=%s"
+                ),
+                *GetNameSafe(Occupant),
+                bCheckpointSaved ? TEXT("success") : TEXT("failure")
+            );
+            if (!bCheckpointSaved)
             {
                 NotifyDriver(
                     TEXT(
@@ -2143,7 +2292,21 @@ void ABHFieldTransport::TryTransferCivilianAid()
     UpdateTransportLabel();
     ForceNetUpdate();
 
-    if (IsValid(SaveSubsystem) && !SaveSubsystem->SaveProgress())
+    const bool bCheckpointSaved =
+        IsValid(SaveSubsystem) &&
+        SaveSubsystem->SaveProgressForCharacter(Occupant);
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_FIELD_CIVILIAN_AID_CHECKPOINT stage=%s owner=%s "
+            "result=%s"
+        ),
+        bHadCargoBeforeTransfer ? TEXT("delivery") : TEXT("load"),
+        *GetNameSafe(Occupant),
+        bCheckpointSaved ? TEXT("success") : TEXT("failure")
+    );
+    if (!bCheckpointSaved)
     {
         NotifyDriver(
             TEXT("CIVILIAN AID UPDATED // CHECKPOINT SAVE FAILED")
@@ -2507,19 +2670,35 @@ void ABHFieldTransport::UpdateTransportLabel()
         return;
     }
 
-    const FString CargoText =
-        CargoType == EBHWarConvoyCargoType::CivilianAid &&
-            GetCargoSupply() > KINDA_SMALL_NUMBER
-            ? FString::Printf(
-                TEXT("AID %.0f > %s"),
-                GetCargoSupply(),
-                *CargoDestinationSectorID.ToString().ToUpper()
-            )
-            : FString::Printf(
-                TEXT("CARGO %.0f/%.0f"),
-                GetCargoSupply(),
-                GetCargoCapacity()
+    FText DestinationName = FText::GetEmpty();
+    if (GetCargoSupply() > KINDA_SMALL_NUMBER &&
+        !CargoDestinationSectorID.IsNone())
+    {
+        const UGameInstance* GameInstance = GetGameInstance();
+        const UBHWarSubsystem* WarSubsystem = IsValid(GameInstance)
+            ? GameInstance->GetSubsystem<UBHWarSubsystem>()
+            : nullptr;
+        if (IsValid(WarSubsystem))
+        {
+            DestinationName = WarSubsystem->GetSectorState(
+                CargoDestinationSectorID
+            ).DisplayName;
+        }
+
+        if (DestinationName.IsEmpty())
+        {
+            DestinationName = FText::FromName(
+                CargoDestinationSectorID
             );
+        }
+    }
+
+    const FString CargoText = BuildCargoStatusLabel(
+        GetCargoSupply(),
+        GetCargoCapacity(),
+        CargoType,
+        DestinationName
+    );
     const FString ReadinessText = FString::Printf(
         TEXT(
             "FIELD TRANSPORT\n"

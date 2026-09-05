@@ -45,6 +45,16 @@ int32 ABHOpenWorldOperationDirector::ResolveOperationVariationIndex(
     );
 }
 
+bool ABHOpenWorldOperationDirector::IsOperationSnapshotCompatible(
+    FName SavedOperationID,
+    FName CurrentOperationID
+)
+{
+    return SavedOperationID.IsNone() ||
+        (!CurrentOperationID.IsNone() &&
+         SavedOperationID == CurrentOperationID);
+}
+
 bool ABHOpenWorldOperationDirector::StartOperation(
     ABHCharacter* InPlayerCharacter,
     FName InSectorID,
@@ -69,6 +79,19 @@ bool ABHOpenWorldOperationDirector::StartOperation(
         InSectorID,
         InOperationType
     );
+#if !UE_BUILD_SHIPPING
+    if (InOperationType == EBHWarPriorityType::Defend &&
+        FParse::Param(
+            FCommandLine::Get(),
+            TEXT("BHTestDefenseAGarrisonPersistence")
+        ))
+    {
+        // The authored Defense A fixture must exercise variation 0. Keep the
+        // override development-only so normal operation selection remains
+        // deterministic and data-driven.
+        OperationVariationIndex = 0;
+    }
+#endif
     if (InOperationType == EBHWarPriorityType::Attack &&
         FParse::Param(
             FCommandLine::Get(),
@@ -899,6 +922,16 @@ ABHOpenWorldOperationDirector::CaptureSaveState() const
     }
 
     State.bHasSnapshot = true;
+    const UWorld* World = GetWorld();
+    const UGameInstance* GameInstance = IsValid(World)
+        ? World->GetGameInstance()
+        : nullptr;
+    const UBHWarSubsystem* WarSubsystem = IsValid(GameInstance)
+        ? GameInstance->GetSubsystem<UBHWarSubsystem>()
+        : nullptr;
+    State.OperationID = IsValid(WarSubsystem)
+        ? WarSubsystem->GetCommittedOperationID()
+        : NAME_None;
     State.bOperationActivated = bOperationActivated;
     State.bWaitingForWave = bWaitingForWave;
     State.bSecuringObjective = bSecuringObjective;
@@ -937,8 +970,6 @@ ABHOpenWorldOperationDirector::CaptureSaveState() const
     State.EnemySourceSectorID = EnemySourceSectorID;
     State.OperationVariationIndex = OperationVariationIndex;
     State.OperationCenter = OperationCenter;
-
-    const UWorld* World = GetWorld();
 
     if (bWaitingForWave && IsValid(World))
     {
@@ -993,6 +1024,14 @@ void ABHOpenWorldOperationDirector::PublishOperationSnapshot(
     EBHActiveOperationPhase PhaseOverride
 )
 {
+    PublishOperationSnapshot(PhaseOverride, CaptureSaveState());
+}
+
+void ABHOpenWorldOperationDirector::PublishOperationSnapshot(
+    EBHActiveOperationPhase PhaseOverride,
+    const FBHOpenWorldOperationState& OperationState
+)
+{
     if (!HasAuthority())
     {
         return;
@@ -1009,7 +1048,6 @@ void ABHOpenWorldOperationDirector::PublishOperationSnapshot(
     }
 
     FBHActiveOperationSnapshot Snapshot;
-    Snapshot.Revision = ++OperationSnapshotRevision;
     Snapshot.Phase = PhaseOverride;
     Snapshot.SectorID = SectorID;
     const UGameInstance* GameInstance = World
@@ -1025,7 +1063,7 @@ void ABHOpenWorldOperationDirector::PublishOperationSnapshot(
     Snapshot.EnemySourceSectorID = EnemySourceSectorID;
     Snapshot.OperationType = OperationType;
     Snapshot.OperationCenter = OperationCenter;
-    Snapshot.OperationState = CaptureSaveState();
+    Snapshot.OperationState = OperationState;
 
     if (IsValid(World))
     {
@@ -1073,6 +1111,30 @@ bool ABHOpenWorldOperationDirector::RestoreOperationState(
         !IsValid(PlayerCharacter) ||
         bOperationComplete)
     {
+        return false;
+    }
+
+    const UGameInstance* GameInstance = World->GetGameInstance();
+    const UBHWarSubsystem* WarSubsystem = IsValid(GameInstance)
+        ? GameInstance->GetSubsystem<UBHWarSubsystem>()
+        : nullptr;
+    const FName CurrentOperationID = IsValid(WarSubsystem)
+        ? WarSubsystem->GetCommittedOperationID()
+        : NAME_None;
+    if (!IsOperationSnapshotCompatible(
+            SavedState.OperationID,
+            CurrentOperationID
+        ))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT(
+                "BH_OPERATION_RESTORE_ID_MISMATCH saved=%s current=%s"
+            ),
+            *SavedState.OperationID.ToString(),
+            *CurrentOperationID.ToString()
+        );
         return false;
     }
 
@@ -1274,9 +1336,23 @@ bool ABHOpenWorldOperationDirector::RestoreOperationState(
         MaximumWaveEnemyCount
     );
 
+    const bool bUsingAuthoredDefenseAGarrison =
+        OperationType == EBHWarPriorityType::Defend &&
+        OperationVariationIndex == 0 &&
+        CurrentWave == 1 &&
+        ConfigureAuthoredDefenseAGarrison(!bWaitingForWave);
+    const int32 RestoredLivingEnemyCount = bWaitingForWave
+        ? 0
+        : (bUsingAuthoredDefenseAGarrison
+            ? GetLivingEnemyCount()
+            : LivingEnemyCount);
+
     if (!bWaitingForWave)
     {
-        SpawnEnemies(LivingEnemyCount);
+        if (!bUsingAuthoredDefenseAGarrison)
+        {
+            SpawnEnemies(LivingEnemyCount);
+        }
         if (bRaidTargetSabotaged)
         {
             AlertRaidReactionForce();
@@ -1305,7 +1381,7 @@ bool ABHOpenWorldOperationDirector::RestoreOperationState(
             GetSectorDisplayName(),
             FText::AsNumber(CurrentWave),
             FText::AsNumber(TotalWaveCount),
-            FText::AsNumber(LivingEnemyCount),
+            FText::AsNumber(RestoredLivingEnemyCount),
             FText::AsNumber(LivingAllyCount)
         )
     );
@@ -1330,7 +1406,7 @@ bool ABHOpenWorldOperationDirector::RestoreOperationState(
         bRaidDetectedBeforeSabotage ? 1 : 0,
         ObjectiveSecureProgress,
         DefenseBreachProgress,
-        LivingEnemyCount,
+        RestoredLivingEnemyCount,
         LivingAllyCount,
         EnemyCasualties,
         EnemyRoutedCount,
@@ -1545,7 +1621,7 @@ void ABHOpenWorldOperationDirector::Tick(float DeltaSeconds)
                 : AttackInterWaveDelay;
         NextWaveTime =
             World->GetTimeSeconds() + InterWaveDelay;
-        PlayerCharacter->ShowStatusNotification(
+        ShowOperationNotification(
             FText::Format(
                 OperationType == EBHWarPriorityType::Defend
                     ? NSLOCTEXT(
@@ -1583,7 +1659,7 @@ void ABHOpenWorldOperationDirector::Tick(float DeltaSeconds)
                 ? EffectiveDefenseEnemiesPerWave
                 : EffectiveAttackReinforcementsPerWave;
         SpawnEnemies(IncomingEnemyCount);
-        PlayerCharacter->ShowStatusNotification(
+        ShowOperationNotification(
             FText::Format(
                 OperationType == EBHWarPriorityType::Defend
                     ? NSLOCTEXT(
@@ -1798,7 +1874,7 @@ float ABHOpenWorldOperationDirector::
 
 void ABHOpenWorldOperationDirector::ActivateOperation()
 {
-    if (bOperationActivated || bOperationComplete)
+    if (!HasAuthority() || bOperationActivated || bOperationComplete)
     {
         return;
     }
@@ -1894,35 +1970,8 @@ void ABHOpenWorldOperationDirector::ActivateOperation()
             );
         }
     }
-    if (OperationType == EBHWarPriorityType::Defend &&
-        OperationVariationIndex == 0)
-    {
-        for (TActorIterator<ABHEnemySoldier> It(GetWorld()); It; ++It)
-        {
-            ABHEnemySoldier* AuthoredEnemy = *It;
-            if (IsValid(AuthoredEnemy) &&
-                AuthoredEnemy->ActorHasTag(
-                    FName(TEXT("BH_Auto_DefenseA_Garrison"))) &&
-                !AuthoredEnemy->IsDead())
-            {
-                AuthoredEnemy->SetCombatFaction(EBHCombatFaction::Hostile);
-                AuthoredEnemy->ConfigureOperationCombatPacing();
-                AuthoredEnemy->SetActorHiddenInGame(false);
-                AuthoredEnemy->SetActorEnableCollision(true);
-                TrackedEnemies.AddUnique(AuthoredEnemy);
-                bUsingAuthoredDefenseAGarrison = true;
-            }
-        }
-        if (bUsingAuthoredDefenseAGarrison)
-        {
-            UE_LOG(
-                LogTemp,
-                Display,
-                TEXT("BH_OPERATION_AUTHORED_DEFENSE_GARRISON_TRACKED members=%d"),
-                TrackedEnemies.Num()
-            );
-        }
-    }
+    bUsingAuthoredDefenseAGarrison =
+        ConfigureAuthoredDefenseAGarrison(true);
     if (!bUsingAuthoredAttackAGarrison &&
         !bUsingAuthoredDefenseAGarrison)
     {
@@ -1933,7 +1982,7 @@ void ABHOpenWorldOperationDirector::ActivateOperation()
         );
     }
 
-    PlayerCharacter->ShowStatusNotification(
+    ShowOperationNotification(
         FText::Format(
             OperationType == EBHWarPriorityType::Defend
                 ? NSLOCTEXT(
@@ -2081,7 +2130,27 @@ void ABHOpenWorldOperationDirector::DestroyTrackedUnits()
 {
     for (ABHEnemySoldier* Enemy : TrackedEnemies)
     {
-        if (IsValid(Enemy) && !Enemy->IsDead())
+        if (!IsValid(Enemy))
+        {
+            continue;
+        }
+
+        if (Enemy->ActorHasTag(FName(TEXT("BH_Auto_DefenseA_Garrison"))))
+        {
+            if (UBHHealthComponent* HealthComponent =
+                Enemy->GetHealthComponent())
+            {
+                HealthComponent->OnDeath.RemoveDynamic(
+                    this,
+                    &ABHOpenWorldOperationDirector::HandleEnemyDeath
+                );
+            }
+
+            Enemy->SetOperationGarrisonActive(false);
+            continue;
+        }
+
+        if (!Enemy->IsDead())
         {
             Enemy->Destroy();
         }
@@ -2097,6 +2166,108 @@ void ABHOpenWorldOperationDirector::DestroyTrackedUnits()
 
     TrackedEnemies.Reset();
     TrackedAllies.Reset();
+}
+
+bool ABHOpenWorldOperationDirector::ConfigureAuthoredDefenseAGarrison(
+    bool bActivateGarrison
+)
+{
+    if (!HasAuthority() ||
+        OperationType != EBHWarPriorityType::Defend ||
+        OperationVariationIndex != 0)
+    {
+        return false;
+    }
+
+    UWorld* World = GetWorld();
+    if (!IsValid(World))
+    {
+        return false;
+    }
+
+    UGameInstance* GameInstance = GetGameInstance();
+    UBHSaveSubsystem* SaveSubsystem = IsValid(GameInstance)
+        ? GameInstance->GetSubsystem<UBHSaveSubsystem>()
+        : nullptr;
+    bool bFoundAuthoredGarrison = false;
+
+    for (TActorIterator<ABHEnemySoldier> It(World); It; ++It)
+    {
+        ABHEnemySoldier* AuthoredEnemy = *It;
+        if (!IsValid(AuthoredEnemy) ||
+            !AuthoredEnemy->ActorHasTag(
+                FName(TEXT("BH_Auto_DefenseA_Garrison"))))
+        {
+            continue;
+        }
+
+        bFoundAuthoredGarrison = true;
+        if (AuthoredEnemy->GetFieldOperativeID().IsNone())
+        {
+            const FString GarrisonIdentitySource =
+                AuthoredEnemy->GetFName().ToString();
+
+            AuthoredEnemy->SetFieldOperativeID(FName(*FString::Printf(
+                TEXT("DefenseA_%s"),
+                *GarrisonIdentitySource
+            )));
+        }
+
+        if (IsValid(SaveSubsystem))
+        {
+            SaveSubsystem->ApplyPendingSurrenderState(AuthoredEnemy);
+        }
+
+        if (!bActivateGarrison || AuthoredEnemy->IsDead())
+        {
+            AuthoredEnemy->SetOperationGarrisonActive(false);
+            continue;
+        }
+
+        AuthoredEnemy->SetCombatFaction(EBHCombatFaction::Hostile);
+        AuthoredEnemy->ConfigureOperationCombatPacing();
+        AuthoredEnemy->SetOperationGarrisonActive(true);
+
+        ABHEnemyAIController* EnemyController =
+            Cast<ABHEnemyAIController>(AuthoredEnemy->GetController());
+        if (!BHWarOperationRules::IsOperationCombatantReady(
+                true,
+                IsValid(EnemyController)))
+        {
+            AuthoredEnemy->SpawnDefaultController();
+            EnemyController = Cast<ABHEnemyAIController>(
+                AuthoredEnemy->GetController()
+            );
+        }
+
+        if (IsValid(EnemyController))
+        {
+            EnemyController->NotifyAllyAlert(PlayerCharacter);
+        }
+
+        if (UBHHealthComponent* HealthComponent =
+            AuthoredEnemy->GetHealthComponent())
+        {
+            HealthComponent->OnDeath.AddUniqueDynamic(
+                this,
+                &ABHOpenWorldOperationDirector::HandleEnemyDeath
+            );
+        }
+
+        TrackedEnemies.AddUnique(AuthoredEnemy);
+    }
+
+    if (bFoundAuthoredGarrison && bActivateGarrison)
+    {
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT("BH_OPERATION_AUTHORED_DEFENSE_GARRISON_TRACKED members=%d"),
+            TrackedEnemies.Num()
+        );
+    }
+
+    return bFoundAuthoredGarrison;
 }
 
 void ABHOpenWorldOperationDirector::RequestOperationCheckpoint(
@@ -2753,6 +2924,18 @@ void ABHOpenWorldOperationDirector::HandleEnemyDeath(
 {
     ++EnemyCasualties;
 
+    ShowOperationNotification(
+        FText::Format(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "OpenWorldHostileCasualty",
+                "HOSTILE CONTACT DOWN\n\n"
+                "Confirmed losses: {0}."
+            ),
+            FText::AsNumber(EnemyCasualties)
+        )
+    );
+
     UGameInstance* GameInstance = GetGameInstance();
     UBHWarSubsystem* WarSubsystem = IsValid(GameInstance)
         ? GameInstance->GetSubsystem<UBHWarSubsystem>()
@@ -2808,7 +2991,7 @@ void ABHOpenWorldOperationDirector::
 
 void ABHOpenWorldOperationDirector::CompleteOperation()
 {
-    if (!HasAuthority())
+    if (!HasAuthority() || bOperationComplete)
     {
         return;
     }
@@ -2838,11 +3021,14 @@ void ABHOpenWorldOperationDirector::CompleteOperation()
         return;
     }
 
+    ReportFriendlySupportCasualties();
+    const FBHOpenWorldOperationState TerminalOperationState =
+        CaptureSaveState();
     bOperationComplete = true;
     SetActorTickEnabled(false);
-    ReportFriendlySupportCasualties();
     PublishOperationSnapshot(
-        EBHActiveOperationPhase::DebriefSuccess
+        EBHActiveOperationPhase::DebriefSuccess,
+        TerminalOperationState
     );
 
     if (OperationType == EBHWarPriorityType::Raid)
@@ -2850,7 +3036,7 @@ void ABHOpenWorldOperationDirector::CompleteOperation()
         DestroyTrackedUnits();
     }
 
-    if (!PlayerCharacter->CompleteObjective(
+    if (!PlayerCharacter->CompleteSharedObjective(
             BHObjectiveIds::EliminateGuard
         ))
     {
@@ -2889,6 +3075,17 @@ void ABHOpenWorldOperationDirector::CompleteOperationForTesting()
 {
     CompleteOperation();
 }
+
+void ABHOpenWorldOperationDirector::FailOperationForTesting()
+{
+    FailOperation(
+        NSLOCTEXT(
+            "BrokenHorizon",
+            "MultiplayerFailureFixtureReason",
+            "The development failure fixture forced an operation loss."
+        )
+    );
+}
 #endif
 
 void ABHOpenWorldOperationDirector::FailOperation(
@@ -2925,11 +3122,14 @@ void ABHOpenWorldOperationDirector::FailOperation(
         return;
     }
 
+    ReportFriendlySupportCasualties();
+    const FBHOpenWorldOperationState TerminalOperationState =
+        CaptureSaveState();
     bOperationComplete = true;
     SetActorTickEnabled(false);
-    ReportFriendlySupportCasualties();
     PublishOperationSnapshot(
-        EBHActiveOperationPhase::DebriefFailure
+        EBHActiveOperationPhase::DebriefFailure,
+        TerminalOperationState
     );
 
     if (!PlayerCharacter->FailCurrentWarOperation(FailureReason))
@@ -2950,18 +3150,7 @@ void ABHOpenWorldOperationDirector::FailOperation(
         return;
     }
 
-    const FText DebriefMessage =
-        PlayerCharacter->GetMissionCompleteMessage();
-
-    for (ABHCharacter* Participant : GetPlayerParticipants())
-    {
-        if (IsValid(Participant))
-        {
-            Participant->PresentSharedOperationDebrief(
-                DebriefMessage
-            );
-        }
-    }
+    PlayerCharacter->PropagateSharedOperationFailure();
 
     DestroyTrackedUnits();
     DestroyRaidSabotageTarget();
@@ -3715,6 +3904,24 @@ ABHOpenWorldOperationDirector::
     }
 
     return Participants;
+}
+
+void ABHOpenWorldOperationDirector::ShowOperationNotification(
+    const FText& Message
+) const
+{
+    if (Message.IsEmpty())
+    {
+        return;
+    }
+
+    for (ABHCharacter* Participant : GetPlayerParticipants())
+    {
+        if (IsValid(Participant))
+        {
+            Participant->ShowStatusNotification(Message);
+        }
+    }
 }
 
 TArray<ABHCharacter*>

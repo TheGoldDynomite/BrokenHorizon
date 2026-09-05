@@ -35,7 +35,8 @@ void ABHCheckpoint::Interact_Implementation(
     AActor* InteractingActor
 )
 {
-    if (!IsValid(Cast<ABHCharacter>(InteractingActor)))
+    ABHCharacter* Character = Cast<ABHCharacter>(InteractingActor);
+    if (!IsValid(Character))
     {
         return;
     }
@@ -46,7 +47,7 @@ void ABHCheckpoint::Interact_Implementation(
         : nullptr;
 
     if (!IsValid(SaveSubsystem) ||
-        !SaveSubsystem->SaveProgress())
+        !SaveSubsystem->SaveProgressForCharacter(Character))
     {
         UE_LOG(LogTemp, Error, TEXT("Checkpoint save failed."));
     }

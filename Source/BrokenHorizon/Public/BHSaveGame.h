@@ -13,7 +13,7 @@ class UBHMissionData;
 namespace BHSave
 {
     inline constexpr int32 MinimumCompatibleSchemaVersion = 1;
-    inline constexpr int32 CurrentSchemaVersion = 59;
+    inline constexpr int32 CurrentSchemaVersion = 61;
 }
 
 USTRUCT(BlueprintType)
@@ -147,6 +147,21 @@ struct FBHSurrenderedEnemySaveState
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
 	float SurrenderEscapeSecondsRemaining = 0.0f;
+};
+
+USTRUCT(BlueprintType)
+struct FBHMissionItemContainerSaveState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+    FName PersistenceID = NAME_None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+    FName MissionItemID = NAME_None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+    FName StoredMissionItemID = NAME_None;
 };
 
 USTRUCT(BlueprintType)
@@ -358,6 +373,9 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "World")
     TArray<FName> ConsumedWorldItemIDs;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "World|Inventory")
+    TArray<FBHMissionItemContainerSaveState> MissionItemContainerStates;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "World")
     TArray<FBHFieldTransportSaveState> FieldTransportStates;

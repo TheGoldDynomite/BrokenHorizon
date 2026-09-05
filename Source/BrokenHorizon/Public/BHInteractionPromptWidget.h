@@ -4,6 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "BHInteractionPromptWidget.generated.h"
 
+class SWidget;
 class UTextBlock;
 
 UCLASS(Blueprintable)
@@ -15,7 +16,19 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Interaction")
     void SetInteractionText(const FText& NewText);
 
+    UFUNCTION(BlueprintCallable, Category = "Interaction")
+    void ClearInteractionText();
+
 protected:
-    UPROPERTY(meta = (BindWidget))
+    virtual TSharedRef<SWidget> RebuildWidget() override;
+
+    virtual void NativeConstruct() override;
+
+    void BuildNativeLayout();
+
+    UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UTextBlock> InteractionText;
+
+    FText ActiveText;
+    bool bHasActiveText = false;
 };

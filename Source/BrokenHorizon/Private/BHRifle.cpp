@@ -333,13 +333,61 @@ FTransform ABHRifle::GetPresentationMuzzleTransform() const
     return GetActorTransform();
 }
 
+void ABHRifle::ReportFireNoise()
+{
+    UWorld* World = GetWorld();
+    AActor* WeaponOwner = GetOwner();
+    if (!IsValid(World) ||
+        !IsValid(WeaponOwner) ||
+        RifleConfig.NoiseLoudness <= 0.0f)
+    {
+        return;
+    }
+
+    const FVector MuzzleOrigin =
+        GetPresentationMuzzleTransform().GetLocation();
+    const bool bMuzzleEnclosed = IsMuzzleEnvironmentEnclosed(
+        MuzzleOrigin
+    );
+    const float AcousticLoudnessMultiplier = bMuzzleEnclosed
+        ? FMath::Max(
+            0.0f,
+            RifleConfig.IndoorNoiseLoudnessMultiplier
+        )
+        : 1.0f;
+    const float AcousticRangeMultiplier = bMuzzleEnclosed
+        ? FMath::Max(
+            0.0f,
+            RifleConfig.IndoorNoiseRangeMultiplier
+        )
+        : 1.0f;
+    const float BattlefieldNoiseMultiplier = FMath::Max(
+        0.0f,
+        UBHBattlefieldConditions::GetCurrentProfile(this).
+            GunfireNoiseMultiplier
+    );
+    UAISense_Hearing::ReportNoiseEvent(
+        World,
+        MuzzleOrigin,
+        RifleConfig.NoiseLoudness *
+            AcousticLoudnessMultiplier *
+            BattlefieldNoiseMultiplier,
+        WeaponOwner,
+        RifleConfig.NoiseRange *
+            AcousticRangeMultiplier *
+            BattlefieldNoiseMultiplier,
+        TEXT("Gunfire")
+    );
+}
+
 bool ABHRifle::PerformHitscan(
     const FVector& CameraOrigin,
     const FVector& CameraDirection,
     float SpreadDegrees,
     AController* InstigatorController,
     FHitResult* OutHitResult,
-    bool* bOutHadBlockingHit
+    bool* bOutHadBlockingHit,
+    bool bPlayFirePresentation
 )
 {
     if (OutHitResult)
@@ -424,41 +472,10 @@ bool ABHRifle::PerformHitscan(
     }
     const FVector MuzzleOrigin =
         GetPresentationMuzzleTransform().GetLocation();
-    const bool bMuzzleEnclosed = IsMuzzleEnvironmentEnclosed(
-        MuzzleOrigin
-    );
 
-    if (RifleConfig.NoiseLoudness > 0.0f)
+    if (bPlayFirePresentation)
     {
-        const float AcousticLoudnessMultiplier = bMuzzleEnclosed
-            ? FMath::Max(
-                0.0f,
-                RifleConfig.IndoorNoiseLoudnessMultiplier
-            )
-            : 1.0f;
-        const float AcousticRangeMultiplier = bMuzzleEnclosed
-            ? FMath::Max(
-                0.0f,
-                RifleConfig.IndoorNoiseRangeMultiplier
-            )
-            : 1.0f;
-        const float BattlefieldNoiseMultiplier = FMath::Max(
-            0.0f,
-            UBHBattlefieldConditions::GetCurrentProfile(this).
-                GunfireNoiseMultiplier
-        );
-        UAISense_Hearing::ReportNoiseEvent(
-            World,
-            MuzzleOrigin,
-            RifleConfig.NoiseLoudness *
-                AcousticLoudnessMultiplier *
-                BattlefieldNoiseMultiplier,
-            WeaponOwner,
-            RifleConfig.NoiseRange *
-                AcousticRangeMultiplier *
-                BattlefieldNoiseMultiplier,
-            TEXT("Gunfire")
-        );
+        ReportFireNoise();
     }
 
     FHitResult MuzzleObstructionHit;
@@ -503,7 +520,8 @@ bool ABHRifle::PerformHitscan(
         *bOutHadBlockingHit = bWeaponHit;
     }
 
-    if (GetNetMode() != NM_DedicatedServer)
+    if (bPlayFirePresentation &&
+        GetNetMode() != NM_DedicatedServer)
     {
         PlayFirePresentation(WeaponHit, bWeaponHit);
     }

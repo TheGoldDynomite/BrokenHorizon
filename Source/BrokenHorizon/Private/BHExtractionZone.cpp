@@ -36,10 +36,33 @@ void ABHExtractionZone::BeginPlay()
 {
     Super::BeginPlay();
 
+    // Extraction changes shared mission state and must only be resolved by the
+    // authority. Clients receive the resulting objective/debrief state through
+    // the existing replicated character path.
+    if (!HasAuthority())
+    {
+        return;
+    }
+
     ExtractionBox->OnComponentBeginOverlap.AddDynamic(
         this,
         &ABHExtractionZone::HandleExtractionOverlap
     );
+}
+
+bool ABHExtractionZone::CanCompleteExtraction(
+    FName RequiredObjectiveID,
+    FName ExtractionObjectiveID,
+    FName CurrentObjectiveID,
+    const TArray<FName>& CompletedObjectiveIDs
+)
+{
+    return !ExtractionObjectiveID.IsNone() &&
+        CurrentObjectiveID == ExtractionObjectiveID &&
+        (
+            RequiredObjectiveID.IsNone() ||
+            CompletedObjectiveIDs.Contains(RequiredObjectiveID)
+        );
 }
 
 void ABHExtractionZone::HandleExtractionOverlap(
@@ -51,7 +74,7 @@ void ABHExtractionZone::HandleExtractionOverlap(
     const FHitResult& SweepResult
 )
 {
-    if (bCompletionTriggered)
+    if (!HasAuthority() || bCompletionTriggered)
     {
         return;
     }
@@ -63,10 +86,12 @@ void ABHExtractionZone::HandleExtractionOverlap(
         return;
     }
 
-    if ((!RequiredObjectiveId.IsNone() &&
-         !Character->IsObjectiveCompleted(RequiredObjectiveId)) ||
-        ExtractionObjectiveId.IsNone() ||
-        Character->GetCurrentObjectiveID() != ExtractionObjectiveId)
+    if (!CanCompleteExtraction(
+            RequiredObjectiveId,
+            ExtractionObjectiveId,
+            Character->GetCurrentObjectiveID(),
+            Character->GetCompletedObjectiveIDs()
+        ))
     {
         OnExtractionUnavailable(Character);
         return;

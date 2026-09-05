@@ -41,6 +41,11 @@ public:
         EBHWarPriorityType OperationType
     );
 
+    static bool IsOperationSnapshotCompatible(
+        FName SavedOperationID,
+        FName CurrentOperationID
+    );
+
     bool IsOperationInProgress() const;
 
     bool IsOperationActivated() const;
@@ -99,6 +104,7 @@ public:
 
 #if !UE_BUILD_SHIPPING
     void CompleteOperationForTesting();
+    void FailOperationForTesting();
 #endif
 
 protected:
@@ -285,6 +291,7 @@ private:
         float PlayerDistance
     ) const;
     void ActivateOperation();
+    bool ConfigureAuthoredDefenseAGarrison(bool bActivateGarrison);
     void BuildOperationPatrolPoints();
     void DestroyOperationPatrolPoints();
     void SpawnRaidSabotageTarget();
@@ -317,11 +324,16 @@ private:
     void CompleteOperation();
     void FailOperation(const FText& FailureReason);
     void PublishCurrentOperationSnapshot();
+    void PublishOperationSnapshot(
+        EBHActiveOperationPhase PhaseOverride,
+        const FBHOpenWorldOperationState& OperationState
+    );
     EBHActiveOperationPhase ResolveOperationPhase() const;
     bool HasLivingEnemies() const;
     int32 GetLivingEnemyCount() const;
     int32 GetLivingAllyCount() const;
     int32 GetSecondsUntilNextWave() const;
+    void ShowOperationNotification(const FText& Message) const;
     TArray<ABHPatrolPoint*> BuildPatrolPointAssignment(
         int32 UnitIndex
     ) const;
@@ -401,7 +413,6 @@ private:
     float DefenseBreachProgress = 0.0f;
     float LastCheckpointedDefenseBreachProgress = 0.0f;
     FTimerHandle OperationCheckpointTimerHandle;
-    int32 OperationSnapshotRevision = 0;
 };
 
 

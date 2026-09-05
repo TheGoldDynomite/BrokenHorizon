@@ -101,7 +101,8 @@ void ABHFieldArmory::Interact_Implementation(AActor* InteractingActor)
     const EBHWeaponRole NewRole = WeaponComponent->CycleWeaponRole(true);
     const FBHWeaponRoleProfile Profile =
         UBHWeaponComponent::BuildWeaponRoleProfile(NewRole);
-    const bool bSaved = IsValid(SaveSubsystem) && SaveSubsystem->SaveProgress();
+    const bool bSaved = IsValid(SaveSubsystem) &&
+        SaveSubsystem->SaveProgressForCharacter(Character);
     const FBHWarSectorState UpdatedSector = WarSubsystem->GetSectorState(SectorID);
     Character->ShowStatusNotification(
         FText::Format(

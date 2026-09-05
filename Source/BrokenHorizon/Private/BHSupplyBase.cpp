@@ -5,6 +5,8 @@
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/GameInstance.h"
+#include "Engine/NetDriver.h"
+#include "Engine/PackageMapClient.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Net/UnrealNetwork.h"
@@ -209,15 +211,25 @@ void ABHSupplyBase::OnRep_RuntimeSupply()
             FCommandLine::Get(),
             TEXT("BHTestRuntimeSupplyReplication")))
     {
+        const UNetDriver* NetDriver = GetNetDriver();
+        const FNetworkGUID NetworkID = IsValid(NetDriver) && NetDriver->GuidCache.IsValid()
+            ? NetDriver->GuidCache->GetNetGUID(this)
+            : FNetworkGUID();
+        if (!NetworkID.IsValid() || NetworkID.IsDefault())
+        {
+            return;
+        }
+
         bRuntimeSupplyAvailableReplicationLogged = true;
         UE_LOG(
             LogTemp,
             Display,
             TEXT(
                 "BH_RUNTIME_SUPPLY_AVAILABLE_REPLICATED "
-                "result=success supply=%s"
+                "result=success supply=%s network_id=%s"
             ),
-            *GetName()
+            *GetName(),
+            *NetworkID.ToString()
         );
     }
 #endif
@@ -236,15 +248,25 @@ void ABHSupplyBase::LogRuntimeSupplyReplicationIfReady()
             FCommandLine::Get(),
             TEXT("BHTestRuntimeSupplyReplication")))
     {
+        const UNetDriver* NetDriver = GetNetDriver();
+        const FNetworkGUID NetworkID = IsValid(NetDriver) && NetDriver->GuidCache.IsValid()
+            ? NetDriver->GuidCache->GetNetGUID(this)
+            : FNetworkGUID();
+        if (!NetworkID.IsValid() || NetworkID.IsDefault())
+        {
+            return;
+        }
+
         bRuntimeSupplyReplicationLogged = true;
         UE_LOG(
             LogTemp,
             Display,
             TEXT(
                 "BH_RUNTIME_SUPPLY_CONSUMED_REPLICATED "
-                "result=success supply=%s"
+                "result=success supply=%s network_id=%s"
             ),
-            *GetName()
+            *GetName(),
+            *NetworkID.ToString()
         );
     }
 #endif

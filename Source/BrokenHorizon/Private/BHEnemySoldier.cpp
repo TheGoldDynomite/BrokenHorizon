@@ -416,11 +416,34 @@ void ABHEnemySoldier::GetLifetimeReplicatedProps(
         SurrenderEscapeSecondsRemaining
     );
     DOREPLIFETIME(ABHEnemySoldier, bSurrenderSecured);
+    DOREPLIFETIME(ABHEnemySoldier, bOperationGarrisonActive);
 }
 
 void ABHEnemySoldier::BeginPlay()
 {
     Super::BeginPlay();
+
+    bIsOperationGarrison = ActorHasTag(
+        FName(TEXT("BH_Auto_DefenseA_Garrison"))
+    );
+    if (bIsOperationGarrison)
+    {
+        SetObjectiveIdToCompleteOnDeath(NAME_None);
+    }
+    if (bIsOperationGarrison && !HasAuthority())
+    {
+        bOperationGarrisonActive = false;
+    }
+
+    if (bIsOperationGarrison && HasAuthority() && FieldOperativeID.IsNone())
+    {
+        const FString GarrisonIdentitySource = GetFName().ToString();
+
+        SetFieldOperativeID(FName(*FString::Printf(
+            TEXT("DefenseA_%s"),
+            *GarrisonIdentitySource
+        )));
+    }
 
     if (UGameInstance* GameInstance = GetGameInstance())
     {
@@ -580,6 +603,35 @@ void ABHEnemySoldier::BeginPlay()
             &ABHEnemySoldier::HandleDeath
         );
     }
+
+    if (bIsOperationGarrison)
+    {
+        if (HasAuthority())
+        {
+            bOperationGarrisonActive = false;
+            ForceNetUpdate();
+        }
+        ApplyOperationGarrisonState();
+    }
+}
+
+void ABHEnemySoldier::SetOperationGarrisonActive(
+    bool bNewOperationGarrisonActive
+)
+{
+    if (!HasAuthority() || !bIsOperationGarrison)
+    {
+        return;
+    }
+
+    bOperationGarrisonActive = bNewOperationGarrisonActive;
+    ApplyOperationGarrisonState();
+    ForceNetUpdate();
+}
+
+bool ABHEnemySoldier::IsOperationGarrisonActive() const
+{
+    return !bIsOperationGarrison || bOperationGarrisonActive;
 }
 
 void ABHEnemySoldier::SetCombatantArchetype(
@@ -1180,6 +1232,47 @@ void ABHEnemySoldier::OnRep_CombatantArchetype()
 void ABHEnemySoldier::OnRep_CombatFaction()
 {
     UpdateCombatFactionTags();
+}
+
+void ABHEnemySoldier::OnRep_OperationGarrisonActive()
+{
+    ApplyOperationGarrisonState();
+}
+
+void ABHEnemySoldier::ApplyOperationGarrisonState()
+{
+    if (!bIsOperationGarrison)
+    {
+        return;
+    }
+
+    const bool bShouldBeActive = bOperationGarrisonActive && !IsDead();
+    SetActorHiddenInGame(!bShouldBeActive);
+    SetActorEnableCollision(bShouldBeActive);
+    SetCanBeDamaged(bShouldBeActive);
+
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+    {
+        if (bShouldBeActive)
+        {
+            Movement->SetMovementMode(MOVE_Walking);
+            Movement->MaxWalkSpeed = GetNormalMovementSpeed();
+        }
+        else
+        {
+            Movement->StopMovementImmediately();
+            Movement->DisableMovement();
+        }
+    }
+
+    if (HasAuthority())
+    {
+        if (ABHEnemyAIController* EnemyController =
+                Cast<ABHEnemyAIController>(GetController()))
+        {
+            EnemyController->SetOperationGarrisonActive(bShouldBeActive);
+        }
+    }
 }
 
 void ABHEnemySoldier::OnRep_Surrendered()
@@ -2107,6 +2200,7 @@ bool ABHEnemySoldier::FireAt(
     AController* EnemyController = GetController();
 
     if (!HasAuthority() ||
+        !IsOperationGarrisonActive() ||
         IsDead() ||
         IsSurrendered() ||
         RequiresMedicalEvacuation() ||

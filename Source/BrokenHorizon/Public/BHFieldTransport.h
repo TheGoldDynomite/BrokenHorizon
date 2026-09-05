@@ -64,6 +64,20 @@ public:
         float ConfiguredMultiplier
     );
 
+    static FString BuildCargoStatusLabel(
+        float CargoSupply,
+        float CargoCapacity,
+        EBHWarConvoyCargoType CargoType,
+        const FText& DestinationName
+    );
+
+    static FText BuildBoardingInteractionText(
+        bool bWaterborne,
+        float CargoSupply,
+        EBHWarConvoyCargoType CargoType,
+        const FText& DestinationName
+    );
+
     static float CalculateCollisionDamage(
         float ImpactSpeed,
         float DamageSpeedThreshold,
@@ -86,6 +100,9 @@ public:
     ABHCharacter* GetOccupant() const;
 
     void ExecuteLogisticsTransferForTesting();
+#if !UE_BUILD_SHIPPING
+    void ExecuteCivilianAidTransferForTesting();
+#endif
     void ForceExitOccupantForRespawn(ABHCharacter* Character);
     void PrepareOccupantForServerTravel(ABHCharacter* Character);
 

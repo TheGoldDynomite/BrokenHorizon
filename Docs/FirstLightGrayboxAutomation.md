@@ -27,8 +27,9 @@ Script**. It replaces only the tagged `FL_Guard` and preserves its transform
 and patrol route.
 
 After generation, run `Content/Python/validate_first_light_graybox.py` using
-the same menu. It is read-only and prints actor counts plus the objective IDs
-to Output Log.
+the same menu. It is read-only, prints actor counts plus the objective IDs to
+Output Log, and fails if the keycard, locked door, guard death objective, or
+extraction objective does not match the canonical First Light contract.
 
 ## Required final editor review
 

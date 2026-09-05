@@ -6,6 +6,8 @@
 #include "BHWarGameState.h"
 #include "BHWarOperationRules.h"
 #include "Engine/GameInstance.h"
+#include "Engine/NetConnection.h"
+#include "Engine/NetDriver.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
@@ -351,6 +353,15 @@ UBHWarSubsystem::CaptureReplicatedSnapshot(
     return Snapshot;
 }
 
+int32 UBHWarSubsystem::AllocateReplicatedSnapshotRevision()
+{
+    ReplicatedSnapshotRevision = FMath::Max(
+        1,
+        ReplicatedSnapshotRevision + 1
+    );
+    return ReplicatedSnapshotRevision;
+}
+
 bool UBHWarSubsystem::ApplyReplicatedSnapshot(
     const FBHWarStateSnapshot& Snapshot
 )
@@ -365,7 +376,15 @@ bool UBHWarSubsystem::ApplyReplicatedSnapshot(
         return false;
     }
 
-    if (LastAppliedReplicatedSnapshotRevision != INDEX_NONE &&
+    const UNetDriver* NetDriver = IsValid(World) ? World->GetNetDriver() : nullptr;
+    UNetConnection* ServerConnection = IsValid(NetDriver)
+        ? NetDriver->ServerConnection.Get()
+        : nullptr;
+    const bool bNewServerConnection = IsValid(ServerConnection) &&
+        LastAppliedReplicatedSnapshotConnection != ServerConnection;
+
+    if (!bNewServerConnection &&
+        LastAppliedReplicatedSnapshotRevision != INDEX_NONE &&
         Snapshot.Revision < LastAppliedReplicatedSnapshotRevision)
     {
         UE_LOG(
@@ -414,6 +433,10 @@ bool UBHWarSubsystem::ApplyReplicatedSnapshot(
         Snapshot.CommittedOperationType;
     CampaignOutcome = Snapshot.CampaignOutcome;
     LastAppliedReplicatedSnapshotRevision = Snapshot.Revision;
+    if (IsValid(ServerConnection))
+    {
+        LastAppliedReplicatedSnapshotConnection = ServerConnection;
+    }
     TGuardValue<bool> ApplyingSnapshotGuard(
         bApplyingReplicatedSnapshot,
         true
@@ -6512,7 +6535,7 @@ FText UBHWarSubsystem::GetOperationMissionBriefing(
         Sector.EnemyResponsePressure >=
             CounterinsurgencyResponseThreshold;
 
-    return FText::Format(
+    const FText MissionBriefing = FText::Format(
         bCounterinsurgencyDefense
             ? NSLOCTEXT(
                 "BrokenHorizon",
@@ -6588,6 +6611,25 @@ FText UBHWarSubsystem::GetOperationMissionBriefing(
             ),
         Sector.DisplayName
     );
+
+    if (OperationType == EBHWarPriorityType::Rescue &&
+        HasCommittedOperation() &&
+        CommittedOperationType == EBHWarPriorityType::Rescue &&
+        CommittedOperationSectorID == SectorID &&
+        !CommittedOperationTargetID.IsNone())
+    {
+        return FText::Format(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "RescueMissionBriefingAssignedTarget",
+                "{0}\n\nASSIGNED CASUALTY // {1}"
+            ),
+            MissionBriefing,
+            FText::FromName(CommittedOperationTargetID)
+        );
+    }
+
+    return MissionBriefing;
 }
 
 FText UBHWarSubsystem::GetPriorityObjectiveText(
@@ -6651,12 +6693,33 @@ FText UBHWarSubsystem::GetOperationObjectiveText(
     if (ObjectiveID == BHObjectiveIds::EvacuateCasualty &&
         OperationType == EBHWarPriorityType::Rescue)
     {
+        const bool bHasCommittedRescueTarget =
+            HasCommittedOperation() &&
+            CommittedOperationType == EBHWarPriorityType::Rescue &&
+            CommittedOperationSectorID == SectorID &&
+            !CommittedOperationTargetID.IsNone();
+        const FText RescueTargetLabel = bHasCommittedRescueTarget
+            ? FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "RescueObjectiveCasualtyLabel",
+                    "CASUALTY {0}"
+                ),
+                FText::FromName(CommittedOperationTargetID)
+            )
+            : NSLOCTEXT(
+                "BrokenHorizon",
+                "RescueObjectiveAssignedCasualtyLabel",
+                "the assigned casualty"
+            );
+
         return FText::Format(
             NSLOCTEXT(
                 "BrokenHorizon",
                 "EvacuateCasualtyObjective",
-                "Evacuate the assigned casualty to {0}"
+                "Evacuate {0} to {1}"
             ),
+            RescueTargetLabel,
             Sector.DisplayName
         );
     }

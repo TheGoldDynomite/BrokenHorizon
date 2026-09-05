@@ -363,6 +363,29 @@ ABHSupplyConvoyTarget::GetRouteOperationProfile() const
     return RouteOperationProfile;
 }
 
+FText ABHSupplyConvoyTarget::BuildRouteChoiceInteractionText(
+    const FText& CurrentRouteName,
+    const FText& NextRouteName
+)
+{
+    if (CurrentRouteName.IsEmpty() || NextRouteName.IsEmpty())
+    {
+        return FText::GetEmpty();
+    }
+
+    return FText::Format(
+        NSLOCTEXT(
+            "BrokenHorizon",
+            "ConvoyRouteChoiceInteractionDetailed",
+            "Press [F] to reroute convoy\n"
+            "CURRENT: {0}\n"
+            "NEXT: {1}"
+        ),
+        CurrentRouteName,
+        NextRouteName
+    );
+}
+
 float ABHSupplyConvoyTarget::GetOperationDeadlineRemaining() const
 {
     return FMath::Max(0.0f, OperationDeadlineRemaining);
@@ -724,11 +747,42 @@ GetInteractionText_Implementation() const
     if (!bResolved && IsCommittedFriendlyEscort() &&
         RouteChoices.Num() > 1)
     {
-        return NSLOCTEXT(
-            "BrokenHorizon",
-            "ConvoyRouteChoiceInteraction",
-            "Press [F] to choose alternate convoy route"
-        );
+        const int32 CurrentIndex =
+            RouteChoices.IndexOfByKey(TravelRoute);
+        const int32 NextIndex = CurrentIndex >= 0
+            ? (CurrentIndex + 1) % RouteChoices.Num()
+            : 0;
+        ABHWorldRoute* CurrentRoute = CurrentIndex >= 0
+            ? RouteChoices[CurrentIndex].Get()
+            : TravelRoute.Get();
+        ABHWorldRoute* NextRoute =
+            RouteChoices.IsValidIndex(NextIndex)
+                ? RouteChoices[NextIndex].Get()
+                : nullptr;
+
+        const FText CurrentRouteName = IsValid(CurrentRoute)
+            ? (CurrentRoute->GetRouteDisplayName().IsEmpty()
+                ? FText::FromName(CurrentRoute->GetRouteID())
+                : CurrentRoute->GetRouteDisplayName())
+            : FText::GetEmpty();
+        const FText NextRouteName = IsValid(NextRoute)
+            ? (NextRoute->GetRouteDisplayName().IsEmpty()
+                ? FText::FromName(NextRoute->GetRouteID())
+                : NextRoute->GetRouteDisplayName())
+            : FText::GetEmpty();
+        const FText DetailedRouteText =
+            BuildRouteChoiceInteractionText(
+                CurrentRouteName,
+                NextRouteName
+            );
+
+        return DetailedRouteText.IsEmpty()
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "ConvoyRouteChoiceInteraction",
+                "Press [F] to choose alternate convoy route"
+            )
+            : DetailedRouteText;
     }
 
     if (bResolved &&
@@ -826,13 +880,18 @@ void ABHSupplyConvoyTarget::HandleOperationDeadlineExpired()
             AssignedCharacter->GetAssignedWarPriorityType() ==
                 EBHWarPriorityType::EscortRescue)
         {
-            AssignedCharacter->FailCurrentWarOperation(
+            const bool bFailed =
+                AssignedCharacter->FailCurrentWarOperation(
                 NSLOCTEXT(
                     "BrokenHorizon",
                     "EscortDeadlineExpiredFailureReason",
                     "The convoy missed its operational window before clearing the route."
                 )
             );
+            if (bFailed)
+            {
+                AssignedCharacter->PropagateSharedOperationFailure();
+            }
             break;
         }
     }
@@ -1355,18 +1414,29 @@ bool ABHSupplyConvoyTarget::ResolveCommittedEscort(
             continue;
         }
 
-        const bool bResolvedOperation = bConvoySurvived
-            ? AssignedCharacter->CompleteObjective(
+        bool bResolvedOperation = false;
+        if (bConvoySurvived)
+        {
+            bResolvedOperation = AssignedCharacter->CompleteObjective(
                 BHObjectiveIds::ProtectConvoy
-            )
-            : AssignedCharacter->FailCurrentWarOperation(
-                NSLOCTEXT(
-                    "BrokenHorizon",
-                    "EscortConvoyDestroyedFailureReason",
-                    "The protected convoy was destroyed before "
-                    "it cleared the route."
-                )
             );
+        }
+        else
+        {
+            bResolvedOperation =
+                AssignedCharacter->FailCurrentWarOperation(
+                    NSLOCTEXT(
+                        "BrokenHorizon",
+                        "EscortConvoyDestroyedFailureReason",
+                        "The protected convoy was destroyed before "
+                        "it cleared the route."
+                    )
+                );
+            if (bResolvedOperation)
+            {
+                AssignedCharacter->PropagateSharedOperationFailure();
+            }
+        }
 
         if (bResolvedOperation)
         {

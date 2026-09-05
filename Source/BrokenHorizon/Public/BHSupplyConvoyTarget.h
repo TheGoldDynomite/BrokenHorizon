@@ -46,6 +46,11 @@ public:
         const FBHWarSupplyConvoyState& ConvoyState
     );
 
+    static FText BuildRouteChoiceInteractionText(
+        const FText& CurrentRouteName,
+        const FText& NextRouteName
+    );
+
     UFUNCTION(BlueprintCallable, Category = "Convoy")
     void ConfigureConvoy(
         const FBHWarSupplyConvoyState& ConvoyState

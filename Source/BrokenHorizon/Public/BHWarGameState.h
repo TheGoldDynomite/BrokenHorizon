@@ -64,6 +64,11 @@ struct BROKENHORIZON_API FBHActiveOperationSnapshot
     }
 };
 
+DECLARE_MULTICAST_DELEGATE_OneParam(
+    FBHActiveOperationSnapshotChangedSignature,
+    const FBHActiveOperationSnapshot&
+);
+
 USTRUCT(BlueprintType)
 struct BROKENHORIZON_API FBHSquadPingSnapshot
 {
@@ -255,6 +260,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "Persistent War|Networking")
     FBHActiveOperationSnapshot GetActiveOperationSnapshot() const;
 
+    FBHActiveOperationSnapshotChangedSignature&
+    OnActiveOperationSnapshotChanged();
+
     UFUNCTION(BlueprintPure, Category = "Squad|Ping")
     FBHSquadPingSnapshot GetSquadPingSnapshot() const;
 
@@ -293,6 +301,7 @@ private:
     UFUNCTION()
     void OnRep_SquadPingSnapshot();
 
+    void BroadcastActiveOperationSnapshotChanged();
     void PublishAuthoritativeSnapshot();
     void ApplyReplicatedSnapshot();
     UBHWarSubsystem* ResolveWarSubsystem() const;
@@ -308,14 +317,22 @@ private:
     void RunRenderedTraversalTest();
     void RunRenderedUIReviewTest();
     void RunFirstLightPlayableRouteTest();
+    void RunDefenseAGarrisonPersistenceTest();
+    void RunOperationFailureTest();
     void RunInventoryTransferRuntimeTest();
+    void RunMissionCacheTransferRuntimeTest();
+    void RunArmoredThreatTargetSelectionRuntimeTest();
     void RunWeaponRoleRuntimeTest();
     FTimerHandle NetworkBudgetTelemetryTestTimer;
     FTimerHandle NetworkCombatDensityClientVerificationTimer;
     FTimerHandle RenderedTraversalTestTimer;
     FTimerHandle RenderedUIReviewTestTimer;
     FTimerHandle FirstLightPlayableRouteTestTimer;
+    FTimerHandle DefenseAGarrisonPersistenceTestTimer;
+    FTimerHandle OperationFailureTestTimer;
     FTimerHandle InventoryTransferRuntimeTestTimer;
+    FTimerHandle MissionCacheTransferRuntimeTestTimer;
+    FTimerHandle ArmoredThreatTargetSelectionRuntimeTestTimer;
     FTimerHandle WeaponRoleRuntimeTestTimer;
     int32 NetworkBudgetTelemetrySampleCount = 0;
     int32 NetworkBudgetTelemetryRequiredConnections = 2;
@@ -353,6 +370,9 @@ private:
 
     UPROPERTY(ReplicatedUsing = OnRep_SquadPingSnapshot)
     FBHSquadPingSnapshot SquadPingSnapshot;
+
+    FBHActiveOperationSnapshotChangedSignature
+        ActiveOperationSnapshotChanged;
 
     UPROPERTY(Transient)
     TObjectPtr<UBHWarSubsystem> BoundWarSubsystem;

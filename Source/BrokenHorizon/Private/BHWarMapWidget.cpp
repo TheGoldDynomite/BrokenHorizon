@@ -1,6 +1,7 @@
 ﻿#include "BHWarMapWidget.h"
 
 #include "BHCharacter.h"
+#include "BHCombatStatusWidget.h"
 
 // Authored strategic-command markers retained beside localized display text.
 namespace BHStrategicCommandSourceContract
@@ -389,7 +390,8 @@ FString JoinSectorIDs(const TArray<FName>& SectorIDs)
 FString BuildDeploymentForcePreviewText(
     const UBHWarSubsystem& WarSubsystem,
     FName TargetSectorID,
-    EBHWarPriorityType OperationType
+    EBHWarPriorityType OperationType,
+    FName RescueCasualtyID
 )
 {
     if (OperationType == EBHWarPriorityType::Recon)
@@ -456,12 +458,28 @@ FString BuildDeploymentForcePreviewText(
 
     if (OperationType == EBHWarPriorityType::Rescue)
     {
+        const FText CasualtyLabel = RescueCasualtyID.IsNone()
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "WarMapAssignedCasualty",
+                "ASSIGNED CASUALTY"
+            )
+            : FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "WarMapCasualtyLabel",
+                    "CASUALTY {0}"
+                ),
+                FText::FromName(RescueCasualtyID)
+            );
+
         return FText::Format(
             NSLOCTEXT(
                 "BrokenHorizon",
                 "WarMapMedevacForcePreview",
-                "MEDEVAC // ASSIGNED CASUALTY // TREATMENT {0} // FOOT OR VEHICLE EXTRACTION"
+                "MEDEVAC // {0} // TREATMENT {1} // FOOT OR VEHICLE EXTRACTION"
             ),
+            CasualtyLabel,
             FText::FromString(
                 WarSubsystem.GetSectorState(TargetSectorID).DisplayName.ToString().ToUpper()
             )
@@ -1028,6 +1046,64 @@ FBHDeploymentLoadoutPreview BuildDeploymentLoadoutPreview(
         : bGrenadeGap
             ? FLinearColor(0.96f, 0.66f, 0.18f, 1.0f)
             : FLinearColor(0.32f, 0.84f, 0.51f, 1.0f);
+    return Preview;
+}
+
+struct FBHDeploymentFieldSquadPreview
+{
+    FString Text;
+    FLinearColor Color = FLinearColor(
+        0.56f,
+        0.64f,
+        0.62f,
+        1.0f
+    );
+};
+
+FBHDeploymentFieldSquadPreview BuildDeploymentFieldSquadPreview(
+    const UObject* WorldContextObject
+)
+{
+    FBHDeploymentFieldSquadPreview Preview;
+    const ABHCharacter* Player =
+        BHPlayerResolver::Find(WorldContextObject);
+
+    if (!IsValid(Player))
+    {
+        Preview.Text = NSLOCTEXT(
+            "BrokenHorizon",
+            "WarMapFieldSquadUnavailable",
+            "NEXT DEPLOYMENT // FIRETEAM STATUS UNAVAILABLE"
+        ).ToString();
+        return Preview;
+    }
+
+    const int32 LivingOperatives =
+        Player->GetLivingFieldSquadCount();
+    const int32 IncapacitatedOperatives =
+        Player->GetIncapacitatedFieldSquadCount();
+    const int32 MembersRequiringEvacuation =
+        Player->GetFieldSquadMembersRequiringEvacuationCount();
+    const int32 MembersNeedingService =
+        Player->GetFieldSquadMembersNeedingServiceCount();
+    const FString FullStatus =
+        UBHCombatStatusWidget::BuildFieldSquadDebriefStatusLabel(
+            LivingOperatives,
+            IncapacitatedOperatives,
+            MembersRequiringEvacuation,
+            MembersNeedingService
+        );
+    const int32 FirstLineEnd = FullStatus.Find(TEXT("\n"));
+    Preview.Text = FirstLineEnd == INDEX_NONE
+        ? FullStatus
+        : FullStatus.Left(FirstLineEnd);
+
+    Preview.Color = MembersRequiringEvacuation > 0
+        ? FLinearColor(0.94f, 0.30f, 0.18f, 1.0f)
+        : IncapacitatedOperatives > 0 ||
+            MembersNeedingService > 0
+        ? FLinearColor(0.96f, 0.66f, 0.18f, 1.0f)
+        : FLinearColor(0.32f, 0.84f, 0.51f, 1.0f);
     return Preview;
 }
 
@@ -2958,9 +3034,11 @@ int32 UBHWarMapWidget::NativePaint(
     FString DeploymentReadinessText;
     FString DeploymentTravelText;
     FString DeploymentLoadoutText;
+    FString DeploymentFieldSquadText;
     FLinearColor DeploymentReadinessColor = Muted;
     FLinearColor DeploymentTravelColor = Muted;
     FLinearColor DeploymentLoadoutColor = Muted;
+    FLinearColor DeploymentFieldSquadColor = Muted;
 
     if (bDeploymentMode)
     {
@@ -2976,11 +3054,20 @@ int32 UBHWarMapWidget::NativePaint(
         }
         else
         {
+            const ABHCharacter* OwningCharacter =
+                SelectedOperationType == EBHWarPriorityType::Rescue
+                    ? Cast<ABHCharacter>(GetOwningPlayerPawn())
+                    : nullptr;
+            const FName RescueCasualtyID = IsValid(OwningCharacter)
+                ? OwningCharacter->GetFieldSquadRescueTargetID()
+                : NAME_None;
+
             DeploymentPreviewText =
                 BuildDeploymentForcePreviewText(
                     *WarSubsystem,
                     SelectedSectorID,
-                    SelectedOperationType
+                    SelectedOperationType,
+                    RescueCasualtyID
                 );
             DeploymentReadinessText =
                 BuildDeploymentReadinessText(
@@ -3000,9 +3087,13 @@ int32 UBHWarMapWidget::NativePaint(
                 BuildDeploymentLoadoutPreview(
                     this,
                     SelectedOperationType
-                );
+            );
             DeploymentLoadoutText = LoadoutPreview.Text;
             DeploymentLoadoutColor = LoadoutPreview.Color;
+            const FBHDeploymentFieldSquadPreview FieldSquadPreview =
+                BuildDeploymentFieldSquadPreview(this);
+            DeploymentFieldSquadText = FieldSquadPreview.Text;
+            DeploymentFieldSquadColor = FieldSquadPreview.Color;
             const bool bCanFundDeployment =
                 WarSubsystem->CanFundOperation(
                     SelectedSectorID,
@@ -3289,6 +3380,19 @@ int32 UBHWarMapWidget::NativePaint(
             DeploymentLoadoutText,
             SmallFont,
             DeploymentLoadoutColor
+        );
+    }
+
+    if (!DeploymentFieldSquadText.IsEmpty())
+    {
+        DrawLabel(
+            OutDrawElements,
+            BaseLayer + 6,
+            AllottedGeometry,
+            FVector2D(50.0f, ViewSize.Y - 172.0f),
+            DeploymentFieldSquadText,
+            SmallFont,
+            DeploymentFieldSquadColor
         );
     }
 

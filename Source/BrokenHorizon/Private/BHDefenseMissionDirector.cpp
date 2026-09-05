@@ -130,6 +130,17 @@ void ABHDefenseMissionDirector::CaptureExistingDefenders()
             continue;
         }
 
+        // A defense mission may only claim unassigned legacy defenders. Authored
+        // objective actors and the dormant Defense A garrison have separate
+        // operation owners and must retain their own lifecycle contracts.
+        if (Enemy->ActorHasTag(
+                FName(TEXT("BH_Auto_DefenseA_Garrison"))
+            ) ||
+            !Enemy->GetObjectiveIdToCompleteOnDeath().IsNone())
+        {
+            continue;
+        }
+
         if (!EnemyClass)
         {
             EnemyClass = Enemy->GetClass();

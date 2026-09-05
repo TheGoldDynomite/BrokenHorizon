@@ -69,7 +69,8 @@ void ABHSectorResupplyStation::Interact_Implementation(
         ? GameInstance->GetSubsystem<UBHSaveSubsystem>()
         : nullptr;
 
-    if (!IsValid(Character) ||
+    if (!HasAuthority() ||
+        !IsValid(Character) ||
         !IsValid(World) ||
         !IsValid(WarSubsystem) ||
         SectorID.IsNone())
@@ -196,6 +197,13 @@ void ABHSectorResupplyStation::Interact_Implementation(
     }
 
     int32 FireteamMembersNeedingService = 0;
+    const bool bAtRescueTreatmentDestination =
+        WarSubsystem->GetCommittedOperationType() ==
+            EBHWarPriorityType::Rescue &&
+        IsRescueTreatmentDestination(
+            SectorID,
+            WarSubsystem->GetCommittedOperationSectorID()
+        );
     for (const ABHCharacter* ServiceCharacter : ServiceCharacters)
     {
         FireteamMembersNeedingService +=
@@ -221,7 +229,7 @@ void ABHSectorResupplyStation::Interact_Implementation(
     {
         const bool bCheckpointSaved =
             IsValid(SaveSubsystem) &&
-            SaveSubsystem->SaveProgress();
+            SaveSubsystem->SaveProgressForCharacter(Character);
         ShowUnavailableMessage(
             Character,
             bCheckpointSaved
@@ -247,7 +255,7 @@ void ABHSectorResupplyStation::Interact_Implementation(
     {
         const bool bCheckpointSaved =
             IsValid(SaveSubsystem) &&
-            SaveSubsystem->SaveProgress();
+            SaveSubsystem->SaveProgressForCharacter(Character);
         ShowUnavailableMessage(
             Character,
             FText::Format(
@@ -364,7 +372,7 @@ void ABHSectorResupplyStation::Interact_Implementation(
                 FMath::Max(0.1f, ResupplyCooldownSeconds);
             const bool bCheckpointSaved =
                 IsValid(SaveSubsystem) &&
-                SaveSubsystem->SaveProgress();
+                SaveSubsystem->SaveProgressForCharacter(Character);
             Character->ShowStatusNotification(
                 FText::Format(
                     NSLOCTEXT(
@@ -409,7 +417,7 @@ void ABHSectorResupplyStation::Interact_Implementation(
 
         const bool bCheckpointSaved =
             IsValid(SaveSubsystem) &&
-            SaveSubsystem->SaveProgress();
+            SaveSubsystem->SaveProgressForCharacter(Character);
         ShowUnavailableMessage(
             Character,
             FText::Format(
@@ -478,7 +486,8 @@ void ABHSectorResupplyStation::Interact_Implementation(
         FireteamMembersServiced +=
             ServiceCharacter->ServiceFieldSquadMembers(
                 GetActorLocation(),
-                FireteamServiceRadius
+                FireteamServiceRadius,
+                bAtRescueTreatmentDestination
             );
     }
     int32 IncapacitatedOperativesAfterService = 0;
@@ -533,7 +542,7 @@ void ABHSectorResupplyStation::Interact_Implementation(
         WarSubsystem->GetSectorState(SectorID);
     const bool bCheckpointSaved =
         IsValid(SaveSubsystem) &&
-        SaveSubsystem->SaveProgress();
+        SaveSubsystem->SaveProgressForCharacter(Character);
     Character->ShowStatusNotification(
         FText::Format(
             NSLOCTEXT(
@@ -647,6 +656,44 @@ float ABHSectorResupplyStation::GetResupplySupplyCost(
         );
 }
 
+bool ABHSectorResupplyStation::IsRescueTreatmentDestination(
+    FName StationSectorID,
+    FName RescueDestinationSectorID
+)
+{
+    return !StationSectorID.IsNone() &&
+        !RescueDestinationSectorID.IsNone() &&
+        StationSectorID == RescueDestinationSectorID;
+}
+
+FText ABHSectorResupplyStation::BuildRescueTreatmentInteractionText(
+    bool bAtTreatmentDestination,
+    FName CasualtyID,
+    const FText& TreatmentDestination
+)
+{
+    if (CasualtyID.IsNone() || TreatmentDestination.IsEmpty())
+    {
+        return FText::GetEmpty();
+    }
+
+    return FText::Format(
+        bAtTreatmentDestination
+            ? NSLOCTEXT(
+                "BrokenHorizon",
+                "RescueTreatmentInteraction",
+                "[F] Treat CASUALTY {0} // TREATMENT {1}"
+            )
+            : NSLOCTEXT(
+                "BrokenHorizon",
+                "RescueTreatmentRedirectInteraction",
+                "[F] Resupply // CASUALTY {0} // TREATMENT AT {1}"
+            ),
+        FText::FromName(CasualtyID),
+        TreatmentDestination
+    );
+}
+
 FText
 ABHSectorResupplyStation::GetInteractionText_Implementation() const
 {
@@ -694,6 +741,36 @@ ABHSectorResupplyStation::GetInteractionText_Implementation() const
             "SectorEmergencyFallbackInteraction",
             "[F] Emergency Fallback Kit"
         );
+    }
+
+    const FName RescueDestinationSectorID =
+        WarSubsystem->GetCommittedOperationSectorID();
+    const FName RescueTargetID =
+        WarSubsystem->GetCommittedOperationTargetID();
+    if (WarSubsystem->GetCommittedOperationType() ==
+            EBHWarPriorityType::Rescue &&
+        !RescueDestinationSectorID.IsNone() &&
+        !RescueTargetID.IsNone())
+    {
+        const FBHWarSectorState TreatmentSector =
+            WarSubsystem->GetSectorState(RescueDestinationSectorID);
+        const FText TreatmentDestination =
+            TreatmentSector.DisplayName.IsEmpty()
+                ? FText::FromName(RescueDestinationSectorID)
+                : TreatmentSector.DisplayName;
+        const FText RescueInteractionText =
+            BuildRescueTreatmentInteractionText(
+                IsRescueTreatmentDestination(
+                    SectorID,
+                    RescueDestinationSectorID
+                ),
+                RescueTargetID,
+                TreatmentDestination
+            );
+        if (!RescueInteractionText.IsEmpty())
+        {
+            return RescueInteractionText;
+        }
     }
 
     return NSLOCTEXT(

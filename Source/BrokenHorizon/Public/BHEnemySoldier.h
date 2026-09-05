@@ -173,6 +173,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "Enemy")
     bool IsDead() const;
 
+    void SetOperationGarrisonActive(bool bNewOperationGarrisonActive);
+    bool IsOperationGarrisonActive() const;
+
     UFUNCTION(BlueprintCallable, Category = "Enemy|Archetype")
     void SetCombatantArchetype(EBHCombatantArchetype NewArchetype);
 
@@ -1320,7 +1323,11 @@ private:
     UFUNCTION()
     void OnRep_SurrenderSecured();
 
+    UFUNCTION()
+    void OnRep_OperationGarrisonActive();
+
     void UpdateCombatFactionTags();
+    void ApplyOperationGarrisonState();
     void CaptureArchetypeBaseline();
     void ApplyCombatantArchetype(bool bResetResources);
     void RefreshArchetypePresentation();
@@ -1386,7 +1393,7 @@ private:
     bool bRequiresMedicalEvacuation = false;
     UPROPERTY(
         Replicated,
-        VisibleInstanceOnly,
+        EditInstanceOnly,
         BlueprintReadOnly,
         Category = "Enemy|Casualty",
         meta = (AllowPrivateAccess = "true")
@@ -1414,6 +1421,9 @@ private:
         Category = "Enemy|Morale",
         meta = (AllowPrivateAccess = "true"))
     bool bSurrenderSecured = false;
+    UPROPERTY(ReplicatedUsing = OnRep_OperationGarrisonActive)
+    bool bOperationGarrisonActive = true;
+    bool bIsOperationGarrison = false;
     bool bLoggedFactionDamage = false;
     FBHCombatantArchetypeProfile ArchetypeBaseline;
     bool bHasArchetypeBaseline = false;

@@ -224,10 +224,9 @@ bool ABHRaidSabotageTarget::CompleteSabotage(
     return true;
 }
 
-FText
-ABHRaidSabotageTarget::GetInteractionText_Implementation() const
+FText ABHRaidSabotageTarget::BuildInteractionText(bool bInSabotaged)
 {
-    return bSabotaged
+    return bInSabotaged
         ? NSLOCTEXT(
             "BrokenHorizon",
             "RaidSabotageTargetAlreadyArmedPrompt",
@@ -236,6 +235,12 @@ ABHRaidSabotageTarget::GetInteractionText_Implementation() const
         : NSLOCTEXT(
             "BrokenHorizon",
             "RaidSabotageTargetPrompt",
-            "Plant Demolition Charges"
+            "Press [F] to PLANT DEMOLITION CHARGES"
         );
+}
+
+FText
+ABHRaidSabotageTarget::GetInteractionText_Implementation() const
+{
+    return BuildInteractionText(bSabotaged);
 }

@@ -389,13 +389,25 @@ void ABHSalvagePickup::Interact_Implementation(AActor* InteractingActor)
     }
 }
 
-FText ABHSalvagePickup::GetInteractionText_Implementation() const
+FText ABHSalvagePickup::BuildInteractionText(
+    EBHSalvagePickupType Type,
+    int32 InQuantity
+)
 {
     return FText::Format(
-        NSLOCTEXT("BrokenHorizon", "SalvageInteraction", "RECOVER {0} // {1}"),
-        SalvageTypeText(SalvageType),
-        FText::AsNumber(Quantity)
+        NSLOCTEXT(
+            "BrokenHorizon",
+            "SalvageInteraction",
+            "Press [F] to RECOVER {0} // {1}"
+        ),
+        SalvageTypeText(Type),
+        FText::AsNumber(FMath::Max(0, InQuantity))
     );
+}
+
+FText ABHSalvagePickup::GetInteractionText_Implementation() const
+{
+    return BuildInteractionText(SalvageType, Quantity);
 }
 
 FName ABHSalvagePickup::GetPersistenceID() const { return PersistenceID; }

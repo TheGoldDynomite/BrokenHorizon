@@ -318,7 +318,8 @@ void ABHFieldSupportRelay::Interact_Implementation(AActor* InteractingActor)
 
     CooldownEndsServerTime = ServerTime + FMath::Max(1.0f, RelayCooldownSeconds);
     ForceNetUpdate();
-    const bool bSaved = IsValid(Save) && Save->SaveProgress();
+    const bool bSaved = IsValid(Save) &&
+        Save->SaveProgressForCharacter(Character);
     const FBHWarSectorState Updated = War->GetSectorState(SectorID);
     Character->ShowPriorityStatusNotification(
         FText::Format(

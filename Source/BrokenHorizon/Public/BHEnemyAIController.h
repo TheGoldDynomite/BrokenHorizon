@@ -78,6 +78,7 @@ public:
         bool bSuppressiveOrder
     );
 
+    void SetOperationGarrisonActive(bool bActive);
     void NotifyPawnDamaged(AActor* DamageCauser);
     void NotifySuppressed(AActor* SourceActor, float Amount);
     void NotifyAllyAlert(AActor* TargetActor);
@@ -248,6 +249,7 @@ private:
     bool bMovingToPeek = false;
     bool bPeekingFromCover = false;
     bool bReturningToCover = false;
+    bool bOperationGarrisonActive = true;
     bool bReceivingSquadAlert = false;
     bool bLoggedFactionEngagement = false;
     bool bWithdrawingForAmmunition = false;

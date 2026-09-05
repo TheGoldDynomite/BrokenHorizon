@@ -56,7 +56,7 @@ void UBHInventoryWidget::NativeConstruct()
         if (UCanvasPanelSlot* TextSlot =
                 RootCanvas->AddChildToCanvas(InventoryText))
         {
-            TextSlot->SetAnchors(FAnchors(0.22f, 0.20f, 0.78f, 0.80f));
+            TextSlot->SetAnchors(FAnchors(0.22f, 0.18f, 0.78f, 0.64f));
             TextSlot->SetOffsets(FMargin(0.0f));
         }
 
@@ -74,7 +74,7 @@ void UBHInventoryWidget::NativeConstruct()
         if (UCanvasPanelSlot* ButtonSlot =
                 RootCanvas->AddChildToCanvas(CycleRoleButton))
         {
-            ButtonSlot->SetAnchors(FAnchors(0.22f, 0.72f, 0.48f, 0.78f));
+            ButtonSlot->SetAnchors(FAnchors(0.22f, 0.66f, 0.48f, 0.72f));
             ButtonSlot->SetOffsets(FMargin(0.0f));
         }
 
@@ -92,7 +92,7 @@ void UBHInventoryWidget::NativeConstruct()
         if (UCanvasPanelSlot* DropSlot =
                 RootCanvas->AddChildToCanvas(DropFragButton))
         {
-            DropSlot->SetAnchors(FAnchors(0.52f, 0.72f, 0.78f, 0.78f));
+            DropSlot->SetAnchors(FAnchors(0.52f, 0.66f, 0.78f, 0.72f));
             DropSlot->SetOffsets(FMargin(0.0f));
         }
 
@@ -100,7 +100,8 @@ void UBHInventoryWidget::NativeConstruct()
             const TCHAR* Name,
             const TCHAR* Label,
             float Left,
-            float Top
+            float Top,
+            float Width
         ) -> UButton*
         {
             UButton* Button = WidgetTree->ConstructWidget<UButton>(
@@ -112,21 +113,29 @@ void UBHInventoryWidget::NativeConstruct()
             Button->SetContent(ButtonLabel);
             if (UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(Button))
             {
-                Slot->SetAnchors(FAnchors(Left, Top, Left + 0.26f, Top + 0.06f));
+                Slot->SetAnchors(FAnchors(Left, Top, Left + Width, Top + 0.06f));
                 Slot->SetOffsets(FMargin(0.0f));
             }
             return Button;
         };
         DropSmokeButton = AddDropButton(
-            TEXT("DropSmokeButton"), TEXT("DISCARD ONE SMOKE"), 0.22f, 0.80f);
+            TEXT("DropSmokeButton"), TEXT("DISCARD ONE SMOKE"), 0.22f, 0.73f, 0.26f);
         DropEngineeringButton = AddDropButton(
-            TEXT("DropEngineeringButton"), TEXT("DISCARD ONE TOOL"), 0.50f, 0.80f);
+            TEXT("DropEngineeringButton"), TEXT("DISCARD ONE TOOL"), 0.50f, 0.73f, 0.26f);
         DropAntiVehicleButton = AddDropButton(
-            TEXT("DropAntiVehicleButton"), TEXT("DISCARD ONE AT"), 0.22f, 0.87f);
+            TEXT("DropAntiVehicleButton"), TEXT("DISCARD ONE AT"), 0.22f, 0.80f, 0.26f);
         DropAmmoButton = AddDropButton(
-            TEXT("DropAmmoButton"), TEXT("DISCARD 30 AMMO"), 0.50f, 0.87f);
+            TEXT("DropAmmoButton"), TEXT("DISCARD 30 AMMO"), 0.50f, 0.80f, 0.26f);
         TransferFragButton = AddDropButton(
-            TEXT("TransferFragButton"), TEXT("TRANSFER FRAG TO NEAREST ALLY"), 0.22f, 0.94f);
+            TEXT("TransferFragButton"), TEXT("TRANSFER FRAG TO NEAREST ALLY"), 0.22f, 0.87f, 0.24f);
+        TransferAmmoButton = AddDropButton(
+            TEXT("TransferAmmoButton"), TEXT("TRANSFER 30 AMMO TO ALLY"), 0.48f, 0.87f, 0.24f);
+        TransferSmokeButton = AddDropButton(
+            TEXT("TransferSmokeButton"), TEXT("TRANSFER ONE SMOKE TO ALLY"), 0.74f, 0.87f, 0.24f);
+        TransferEngineeringButton = AddDropButton(
+            TEXT("TransferEngineeringButton"), TEXT("TRANSFER ONE TOOL TO ALLY"), 0.22f, 0.94f, 0.24f);
+        TransferAntiVehicleButton = AddDropButton(
+            TEXT("TransferAntiVehicleButton"), TEXT("TRANSFER ONE AT TO ALLY"), 0.48f, 0.94f, 0.24f);
     }
 
     SetVisibility(ESlateVisibility::Collapsed);
@@ -169,19 +178,69 @@ void UBHInventoryWidget::NativeConstruct()
         TransferFragButton->OnClicked.AddUniqueDynamic(
             this, &UBHInventoryWidget::HandleTransferFragClicked);
     }
+    if (IsValid(TransferAmmoButton))
+    {
+        TransferAmmoButton->OnClicked.AddUniqueDynamic(
+            this, &UBHInventoryWidget::HandleTransferAmmoClicked);
+    }
+    if (IsValid(TransferSmokeButton))
+    {
+        TransferSmokeButton->OnClicked.AddUniqueDynamic(
+            this, &UBHInventoryWidget::HandleTransferSmokeClicked);
+    }
+    if (IsValid(TransferEngineeringButton))
+    {
+        TransferEngineeringButton->OnClicked.AddUniqueDynamic(
+            this, &UBHInventoryWidget::HandleTransferEngineeringClicked);
+    }
+    if (IsValid(TransferAntiVehicleButton))
+    {
+        TransferAntiVehicleButton->OnClicked.AddUniqueDynamic(
+            this, &UBHInventoryWidget::HandleTransferAntiVehicleClicked);
+    }
     RefreshInventoryText();
+}
+
+FString UBHInventoryWidget::FormatMissionItemSummary(
+    const TArray<FName>& MissionItemIDs
+)
+{
+    FString Summary;
+
+    for (const FName MissionItemID : MissionItemIDs)
+    {
+        if (MissionItemID.IsNone())
+        {
+            continue;
+        }
+
+        if (!Summary.IsEmpty())
+        {
+            Summary += TEXT(", ");
+        }
+        Summary += MissionItemID.ToString();
+    }
+
+    return Summary.IsEmpty()
+        ? TEXT("NONE")
+        : Summary;
 }
 
 void UBHInventoryWidget::SetInventorySnapshot(
     const FBHInventorySnapshot& Snapshot
 )
 {
+    const FString MissionItemSummary = FormatMissionItemSummary(
+        Snapshot.MissionItemIDs
+    );
+
     SnapshotText = FString::Printf(
         TEXT("FIELD LOADOUT\n\n"
              "PRIMARY  %s\n"
              "MAGAZINE  %d     RESERVE  %d / %d\n\n"
              "FRAG  %d     SMOKE  %d     ENGINEERING  %d     AT  %d\n"
-             "MEDKITS  %d     DRESSINGS  %d     MISSION ITEMS  %d\n\n"
+             "MEDKITS  %d     DRESSINGS  %d     MISSION ITEMS  %d\n"
+             "  %s\n\n"
              "HELMET  %d%%     BODY ARMOR  %d%%\n"
              "CARRIED LOAD  %.1f / %.1f kg     AVAILABLE  %.1f kg\n"
              "STATUS  %s\n\n"
@@ -197,6 +256,7 @@ void UBHInventoryWidget::SetInventorySnapshot(
         Snapshot.Medkits,
         Snapshot.FieldDressings,
         Snapshot.MissionItemCount,
+        *MissionItemSummary,
         FMath::RoundToInt(Snapshot.HelmetDurabilityFraction * 100.0f),
         FMath::RoundToInt(Snapshot.BodyArmorDurabilityFraction * 100.0f),
         Snapshot.CarriedWeightKilograms,
@@ -295,6 +355,54 @@ void UBHInventoryWidget::HandleTransferFragClicked()
     if (OwningCharacter.IsValid())
     {
         OwningCharacter->TransferFragToNearestAlly(1);
+        SetInventorySnapshot(OwningCharacter->GetInventorySnapshot());
+    }
+}
+
+void UBHInventoryWidget::HandleTransferAmmoClicked()
+{
+    if (OwningCharacter.IsValid())
+    {
+        OwningCharacter->TransferInventoryItemToNearestAlly(
+            EBHSalvagePickupType::Ammunition,
+            30
+        );
+        SetInventorySnapshot(OwningCharacter->GetInventorySnapshot());
+    }
+}
+
+void UBHInventoryWidget::HandleTransferSmokeClicked()
+{
+    if (OwningCharacter.IsValid())
+    {
+        OwningCharacter->TransferInventoryItemToNearestAlly(
+            EBHSalvagePickupType::SmokeGrenades,
+            1
+        );
+        SetInventorySnapshot(OwningCharacter->GetInventorySnapshot());
+    }
+}
+
+void UBHInventoryWidget::HandleTransferEngineeringClicked()
+{
+    if (OwningCharacter.IsValid())
+    {
+        OwningCharacter->TransferInventoryItemToNearestAlly(
+            EBHSalvagePickupType::EngineeringCharges,
+            1
+        );
+        SetInventorySnapshot(OwningCharacter->GetInventorySnapshot());
+    }
+}
+
+void UBHInventoryWidget::HandleTransferAntiVehicleClicked()
+{
+    if (OwningCharacter.IsValid())
+    {
+        OwningCharacter->TransferInventoryItemToNearestAlly(
+            EBHSalvagePickupType::AntiVehicleRounds,
+            1
+        );
         SetInventorySnapshot(OwningCharacter->GetInventorySnapshot());
     }
 }

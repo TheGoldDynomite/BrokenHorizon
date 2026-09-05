@@ -16,6 +16,17 @@ class BROKENHORIZON_API ABHExtractionZone : public AActor
 public:
     ABHExtractionZone();
 
+    /**
+     * Evaluates the objective contract without requiring a live world actor.
+     * The overlap handler remains authoritative and uses this same rule.
+     */
+    static bool CanCompleteExtraction(
+        FName RequiredObjectiveID,
+        FName ExtractionObjectiveID,
+        FName CurrentObjectiveID,
+        const TArray<FName>& CompletedObjectiveIDs
+    );
+
     UFUNCTION(BlueprintImplementableEvent, Category = "Extraction")
     void OnExtractionUnavailable(ABHCharacter* PlayerCharacter);
 

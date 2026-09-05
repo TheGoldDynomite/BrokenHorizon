@@ -33,6 +33,15 @@ void ABHDoor::GetLifetimeReplicatedProps(
     DOREPLIFETIME(ABHDoor, bBreachChargePlanted);
 }
 
+bool ABHDoor::HasRequiredKeycard(
+    FName RequiredKeycardID,
+    const TArray<FName>& OwnedKeycardIDs
+)
+{
+    return !RequiredKeycardID.IsNone() &&
+        OwnedKeycardIDs.Contains(RequiredKeycardID);
+}
+
 void ABHDoor::Interact_Implementation(AActor* InteractingActor)
 {
     if (!HasAuthority())
@@ -49,7 +58,9 @@ void ABHDoor::Interact_Implementation(AActor* InteractingActor)
 
     if (bLocked)
     {
-        if (!Character->HasKeycard(RequiredKeycard))
+        if (!HasRequiredKeycard(
+                RequiredKeycard,
+                Character->GetOwnedKeycardIDs()))
         {
             if (!bBreachChargePlanted &&
                 Character->TryPlaceBreachingCharge(this))
@@ -60,6 +71,23 @@ void ABHDoor::Interact_Implementation(AActor* InteractingActor)
             }
             else
             {
+                Character->ShowPriorityStatusNotification(
+                    FText::Format(
+                        NSLOCTEXT(
+                            "BrokenHorizon",
+                            "DoorAccessDeniedNotification",
+                            "ACCESS DENIED // REQUIRED KEYCARD: {0}"
+                        ),
+                        RequiredKeycard.IsNone()
+                            ? NSLOCTEXT(
+                                "BrokenHorizon",
+                                "DoorAccessDeniedUnconfiguredCredential",
+                                "UNCONFIGURED"
+                            )
+                            : FText::FromName(RequiredKeycard)
+                    ),
+                    EBHNotificationPriority::High
+                );
                 UE_LOG(LogTemp, Warning, TEXT("Access Denied"));
             }
             return;
@@ -69,6 +97,15 @@ void ABHDoor::Interact_Implementation(AActor* InteractingActor)
 
         Character->CompleteSharedObjective(
             BHObjectiveIds::UnlockSecurityDoor
+        );
+
+        Character->ShowPriorityStatusNotification(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "DoorAccessGrantedNotification",
+                "ACCESS GRANTED // SECURITY DOOR UNLOCKED"
+            ),
+            EBHNotificationPriority::High
         );
 
         UE_LOG(LogTemp, Warning, TEXT("Door Unlocked"));

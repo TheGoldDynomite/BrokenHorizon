@@ -153,6 +153,12 @@ void ABHEnemyAIController::OnPossess(APawn* InPawn)
     SetState(EBHEnemyAIState::Patrol);
     NextPatrolRetryTime =
         GetWorld()->GetTimeSeconds() + NavigationStartupDelaySeconds;
+    if (ABHEnemySoldier* Enemy = GetEnemySoldier())
+    {
+        SetOperationGarrisonActive(
+            Enemy->IsOperationGarrisonActive()
+        );
+    }
 }
 
 void ABHEnemyAIController::ConfigurePerception()
@@ -181,6 +187,11 @@ void ABHEnemyAIController::ConfigurePerception()
 void ABHEnemyAIController::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+
+    if (!bOperationGarrisonActive)
+    {
+        return;
+    }
 
     ABHEnemySoldier* Enemy = GetEnemySoldier();
 
@@ -510,7 +521,8 @@ void ABHEnemyAIController::HandleTargetPerceptionUpdated(
     FAIStimulus Stimulus
 )
 {
-    if (CurrentState == EBHEnemyAIState::Dead)
+    if (!bOperationGarrisonActive ||
+        CurrentState == EBHEnemyAIState::Dead)
     {
         return;
     }
@@ -585,7 +597,8 @@ void ABHEnemyAIController::HandleTargetPerceptionUpdated(
 
 void ABHEnemyAIController::NotifyPawnDamaged(AActor* DamageCauser)
 {
-    if (CurrentState == EBHEnemyAIState::Dead)
+    if (!bOperationGarrisonActive ||
+        CurrentState == EBHEnemyAIState::Dead)
     {
         return;
     }
@@ -626,7 +639,8 @@ void ABHEnemyAIController::NotifySuppressed(
     float Amount
 )
 {
-    if (CurrentState == EBHEnemyAIState::Dead || Amount <= 0.0f)
+    if (!bOperationGarrisonActive ||
+        CurrentState == EBHEnemyAIState::Dead || Amount <= 0.0f)
     {
         return;
     }
@@ -660,7 +674,8 @@ void ABHEnemyAIController::NotifyAllyAlert(AActor* TargetActor)
 {
     AActor* ResolvedTarget = ResolveCombatTarget(TargetActor);
 
-    if (CurrentState == EBHEnemyAIState::Dead ||
+    if (!bOperationGarrisonActive ||
+        CurrentState == EBHEnemyAIState::Dead ||
         CurrentState == EBHEnemyAIState::Retreat ||
         CurrentState == EBHEnemyAIState::EvadeExplosive ||
         !IsValid(ResolvedTarget))
@@ -673,13 +688,71 @@ void ABHEnemyAIController::NotifyAllyAlert(AActor* TargetActor)
     bReceivingSquadAlert = false;
 }
 
+void ABHEnemyAIController::SetOperationGarrisonActive(bool bActive)
+{
+    if (!HasAuthority() || bOperationGarrisonActive == bActive)
+    {
+        return;
+    }
+
+    bOperationGarrisonActive = bActive;
+    if (!bOperationGarrisonActive)
+    {
+        ReleaseCover();
+        CombatTarget.Reset();
+        ClearFollowTarget();
+        ClearHoldPosition();
+        bHasSightOfTarget = false;
+        bMoveRequested = false;
+        bReceivingSquadAlert = false;
+        ResetCombatTactics();
+        ClearFocus(EAIFocusPriority::Gameplay);
+        StopMovement();
+
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
+        }
+
+        if (IsValid(AIPerception))
+        {
+            AIPerception->ForgetAll();
+            AIPerception->SetActive(false);
+        }
+
+        SetState(EBHEnemyAIState::Patrol);
+        SetActorTickEnabled(false);
+        return;
+    }
+
+    if (CurrentState == EBHEnemyAIState::Dead)
+    {
+        return;
+    }
+
+    if (IsValid(AIPerception))
+    {
+        AIPerception->SetActive(true);
+        AIPerception->RequestStimuliListenerUpdate();
+    }
+
+    SetActorTickEnabled(true);
+    SetState(EBHEnemyAIState::Patrol);
+    if (UWorld* World = GetWorld())
+    {
+        NextPatrolRetryTime =
+            World->GetTimeSeconds() + NavigationStartupDelaySeconds;
+    }
+}
+
 bool ABHEnemyAIController::NotifyGrenadeThreat(
     const FVector& ThreatLocation,
     float DangerRadius,
     float TimeUntilDetonation
 )
 {
-    if (CurrentState == EBHEnemyAIState::Dead)
+    if (!bOperationGarrisonActive ||
+        CurrentState == EBHEnemyAIState::Dead)
     {
         return false;
     }

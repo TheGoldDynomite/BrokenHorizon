@@ -26,6 +26,10 @@ public:
     UFUNCTION(BlueprintPure, Category = "Inventory")
     bool IsInventoryOpen() const;
 
+    static FString FormatMissionItemSummary(
+        const TArray<FName>& MissionItemIDs
+    );
+
 protected:
     virtual void NativeConstruct() override;
 
@@ -53,6 +57,18 @@ private:
     UFUNCTION()
     void HandleTransferFragClicked();
 
+    UFUNCTION()
+    void HandleTransferAmmoClicked();
+
+    UFUNCTION()
+    void HandleTransferSmokeClicked();
+
+    UFUNCTION()
+    void HandleTransferEngineeringClicked();
+
+    UFUNCTION()
+    void HandleTransferAntiVehicleClicked();
+
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UTextBlock> InventoryText;
 
@@ -76,6 +92,18 @@ private:
 
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UButton> TransferFragButton;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> TransferAmmoButton;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> TransferSmokeButton;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> TransferEngineeringButton;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UButton> TransferAntiVehicleButton;
 
     FString SnapshotText;
     bool bInventoryOpen = false;

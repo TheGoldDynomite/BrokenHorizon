@@ -42,6 +42,7 @@ class UBHUserSettingsSubsystem;
 class UBHSubtitleWidget;
 class ABHDefenseMissionDirector;
 class ABHAmbientWarDirector;
+class ABHWarGameState;
 class ABHOpenWorldOperationDirector;
 class ABHSectorResupplyStation;
 class ABHFieldTransport;
@@ -55,6 +56,7 @@ class UAnimSequenceBase;
 class USkeletalMeshComponent;
 class USoundBase;
 struct FHitResult;
+struct FBHActiveOperationSnapshot;
 enum class EBHPlayerHitZone : uint8;
 
 UENUM(BlueprintType)
@@ -109,6 +111,9 @@ struct BROKENHORIZON_API FBHInventorySnapshot
     int32 FieldDressings = 0;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+    TArray<FName> MissionItemIDs;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
     int32 MissionItemCount = 0;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
@@ -150,11 +155,15 @@ public:
         FName TargetLabel,
         bool bReachedTarget
     );
+
+    bool PrepareFieldSquadCasualtyForTransportTest();
 #endif
 
 
     UFUNCTION(BlueprintCallable, Category = "Inventory")
     void AddKeycard(FName KeycardID);
+
+    bool RemoveKeycard(FName KeycardID);
 
     bool CollectKeycard(
         FName KeycardID,
@@ -181,6 +190,10 @@ public:
     );
 
     bool CompleteSharedObjective(FName ObjectiveID);
+
+    void FailSharedOperationObjectives();
+
+    void PropagateSharedOperationFailure();
 
     void RefreshReplicatedMissionPresentation();
 
@@ -314,7 +327,8 @@ public:
 
     int32 ServiceFieldSquadMembers(
         const FVector& ServiceLocation,
-        float ServiceRadius
+        float ServiceRadius,
+        bool bAtRescueTreatmentDestination = false
     );
 
     bool IsFieldSquadHolding() const;
@@ -585,6 +599,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Inventory|Transfer")
     bool TransferFragToNearestAlly(int32 Quantity = 1);
 
+    UFUNCTION(BlueprintCallable, Category = "Inventory|Transfer")
+    bool TransferInventoryItemToNearestAlly(
+        EBHSalvagePickupType ItemType,
+        int32 Quantity = 1
+    );
+
     UFUNCTION(BlueprintPure, Category = "Combat|Grenades")
     int32 GetFragGrenadeCount() const;
 
@@ -654,6 +674,12 @@ public:
         AActor* GrenadeActor,
         const FVector& GrenadeLocation,
         float TimeUntilDetonation
+    );
+
+    void NotifyArmoredThreatContact(
+        AActor* ThreatActor,
+        const FVector& ThreatLocation,
+        bool bActive
     );
 
     UFUNCTION(BlueprintPure, Category = "Presentation")
@@ -835,6 +861,7 @@ protected:
         float PitchMultiplier
     );
     
+    void EnsureInteractionPromptWidget();
     void UpdateInteractionPrompt();
     
     void Interact();
@@ -855,6 +882,20 @@ protected:
     UFUNCTION(Server, Reliable)
     void ServerTransferInventoryItem(
         ABHCharacter* Recipient,
+        EBHSalvagePickupType ItemType,
+        int32 Quantity
+    );
+
+    UFUNCTION(Server, Reliable)
+    void ServerTransferFragToNearestAlly(int32 Quantity);
+
+    UFUNCTION(Server, Reliable)
+    void ServerTransferInventoryItemToNearestAlly(
+        EBHSalvagePickupType ItemType,
+        int32 Quantity
+    );
+
+    bool TransferInventoryItemToNearestAllyAuthority(
         EBHSalvagePickupType ItemType,
         int32 Quantity
     );
@@ -1039,6 +1080,12 @@ protected:
 
     void UpdateOperationWaypointHUD();
     void SynchronizeReplicatedOperationPresentation();
+    bool ShouldBindActiveOperationSnapshotPresentation() const;
+    void TryBindActiveOperationSnapshotPresentation();
+    void UnbindActiveOperationSnapshotPresentation();
+    void HandleActiveOperationSnapshotChanged(
+        const FBHActiveOperationSnapshot& Snapshot
+    );
 
     void UpdateSquadCommandWaypointHUD();
 
@@ -1237,6 +1284,7 @@ protected:
     void HandleMedkitTreatmentCompleted();
 
     void UpdateCarryLoadHUD();
+    void RefreshOpenInventoryPanel();
 
     UFUNCTION()
     void OnRep_FragInventory();
@@ -1254,6 +1302,9 @@ protected:
 
     UFUNCTION()
     void OnRep_WeaponBrace();
+
+    UFUNCTION()
+    void OnRep_OwnedKeycards();
 
     void UpdateTacticalFlashlightVisual();
     void UpdateWeaponBraceState();
@@ -2304,8 +2355,14 @@ protected:
     TObjectPtr<UBHInteractionPromptWidget> InteractionPromptWidget;
 
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
-    TSet<FName> OwnedKeycards;
+    UPROPERTY(
+        ReplicatedUsing = OnRep_OwnedKeycards,
+        VisibleAnywhere,
+        BlueprintReadOnly,
+        Category = "Inventory",
+        meta = (AllowPrivateAccess = "true")
+    )
+    TArray<FName> OwnedKeycards;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
     TSet<FName> CollectedKeycardPersistenceIDs;
@@ -2453,8 +2510,13 @@ protected:
     TMap<FName, uint8> LastObservedSectorSupplyReadiness;
     bool bLastObservedOperationFundingReady = false;
     FName LastObservedOperationSupplySource = NAME_None;
+    int32 LastPresentedOperationRevision = INDEX_NONE;
+    FName LastPresentedOperationID = NAME_None;
     FName LastPresentedOperationSectorID = NAME_None;
     uint8 LastPresentedOperationPhase = MAX_uint8;
+    FName LastNotifiedOperationID = NAME_None;
+    FName LastNotifiedOperationSectorID = NAME_None;
+    uint8 LastNotifiedOperationPhase = MAX_uint8;
     int32 LastObservedWarEventTurn = INDEX_NONE;
     FName LastObservedWarEventType = NAME_None;
     FName LastObservedWarEventSectorID = NAME_None;
@@ -2615,6 +2677,10 @@ protected:
     bool bFirstPersonPresentationBaseCached = false;
     bool bLeanCameraBaseCached = false;
     bool bLeanLeftHeld = false;
+
+    TWeakObjectPtr<ABHWarGameState>
+        BoundActiveOperationSnapshotGameState;
+    FDelegateHandle ActiveOperationSnapshotChangedHandle;
 
     bool bInteractionInputHeld = false;
     float InteractionPressTime = 0.0f;

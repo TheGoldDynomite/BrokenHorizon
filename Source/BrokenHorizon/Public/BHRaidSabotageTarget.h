@@ -22,6 +22,8 @@ class BROKENHORIZON_API ABHRaidSabotageTarget
 public:
     ABHRaidSabotageTarget();
 
+    static FText BuildInteractionText(bool bInSabotaged);
+
     void ConfigureTarget(
         ABHOpenWorldOperationDirector* InOperationDirector,
         FName InSectorID

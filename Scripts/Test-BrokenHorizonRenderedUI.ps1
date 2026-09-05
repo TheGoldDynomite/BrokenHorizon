@@ -4,7 +4,8 @@ param(
     [ValidateRange(30, 180)]
     [int]$TimeoutSeconds = 90,
     [string]$LogPrefix = "BHRenderedUI",
-    [switch]$PseudoLocalization
+    [switch]$PseudoLocalization,
+    [string]$CaseFilter
 )
 
 $ErrorActionPreference = "Stop"
@@ -72,6 +73,7 @@ function Stop-RenderedUIProcessTree {
 
 $captureCases = @(
     [pscustomobject]@{ mode = "HUD"; width = 1280; height = 720 },
+    [pscustomobject]@{ mode = "HUD_INTERACTION_PROMPT"; width = 1920; height = 1080 },
     [pscustomobject]@{ mode = "BRIEFING"; width = 1280; height = 720 },
     [pscustomobject]@{ mode = "PAUSE"; width = 1280; height = 720 },
     [pscustomobject]@{ mode = "SETTINGS"; width = 1280; height = 720 },
@@ -123,7 +125,20 @@ if ($PseudoLocalization) {
         [pscustomobject]@{ mode = "SESSION_ERROR"; width = 1920; height = 1080; profile = "LEET"; sessionReview = "ERROR" }
     )
 }
+if (-not [string]::IsNullOrWhiteSpace($CaseFilter)) {
+    $captureCases = @(
+        $captureCases | Where-Object {
+            $caseName = "$($_.mode)-$($_.width)x$($_.height)"
+            $caseName -match $CaseFilter
+        }
+    )
+    if ($captureCases.Count -eq 0) {
+        throw "CaseFilter '$CaseFilter' matched no rendered UI cases."
+    }
+    Write-Host "[Rendered UI] Case filter '$CaseFilter' selected $($captureCases.Count) case(s)."
+}
 $results = [System.Collections.Generic.List[object]]::new()
+$failures = [System.Collections.Generic.List[object]]::new()
 
 foreach ($captureCase in $captureCases) {
     $resolution = "$($captureCase.width)x$($captureCase.height)"
@@ -144,6 +159,9 @@ foreach ($captureCase in $captureCases) {
         -Force -ErrorAction SilentlyContinue
 
     Write-Host "[Rendered UI $($captureCase.mode) $resolution $profile] Starting"
+    $stage = "launch"
+    $process = $null
+    try {
     $isSessionReview =
         $captureCase.PSObject.Properties.Name -contains "sessionReview"
     $caseMap = if ($isSessionReview) { $mainMenuMap } else { $firstLightMap }
@@ -184,6 +202,7 @@ foreach ($captureCase in $captureCases) {
         -WindowStyle Hidden `
         -PassThru
 
+    $stage = "process"
     if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
         Stop-RenderedUIProcessTree -ProcessId $process.Id
         throw "Rendered UI $($captureCase.mode) $resolution timed out."
@@ -191,6 +210,7 @@ foreach ($captureCase in $captureCases) {
     if ($process.ExitCode -ne 0) {
         throw "Rendered UI $($captureCase.mode) $resolution exited $($process.ExitCode). See $logPath"
     }
+    $stage = "log"
     if (-not (Test-Path -LiteralPath $logPath)) {
         throw "Rendered UI $($captureCase.mode) $resolution did not produce $logPath"
     }
@@ -219,6 +239,7 @@ foreach ($captureCase in $captureCases) {
         throw "Rendered UI $($captureCase.mode) did not render at $resolution. See $logPath"
     }
 
+    $stage = "capture"
     $dimensions = $null
     $captureDeadline = (Get-Date).AddSeconds(15)
     while ((Get-Date) -lt $captureDeadline) {
@@ -244,6 +265,7 @@ foreach ($captureCase in $captureCases) {
         throw "Rendered UI $($captureCase.mode) $resolution did not produce $sourcePath"
     }
 
+    $stage = "copy"
     $copied = $false
     for ($copyAttempt = 0; $copyAttempt -lt 20; $copyAttempt++) {
         try {
@@ -271,6 +293,22 @@ foreach ($captureCase in $captureCases) {
         passed = $true
     })
     Write-Host "[Rendered UI $($captureCase.mode) $resolution $profile] Passed"
+    }
+    catch {
+        if ($null -ne $process -and -not $process.HasExited) {
+            Stop-RenderedUIProcessTree -ProcessId $process.Id
+        }
+        $failure = [pscustomobject]@{
+            mode = $captureCase.mode
+            resolution = $resolution
+            profile = $profile
+            stage = $stage
+            error = $_.Exception.Message
+            log = $logPath
+        }
+        $failures.Add($failure)
+        Write-Warning "[Rendered UI $($captureCase.mode) $resolution $profile] Failed at ${stage}: $($_.Exception.Message)"
+    }
 }
 
 $summary = [ordered]@{
@@ -281,6 +319,9 @@ $summary = [ordered]@{
     culture = if ($PseudoLocalization) { "leet" } else { "en" }
     interactiveInputProof = $false
     multiplayerProof = $false
+    passed = ($failures.Count -eq 0)
+    failureCount = $failures.Count
+    failures = @($failures)
     runId = $runId
     maps = @($firstLightMap, $mainMenuMap)
     captures = @($results)
@@ -288,4 +329,10 @@ $summary = [ordered]@{
 $summary | ConvertTo-Json -Depth 6 |
     Set-Content -LiteralPath $summaryPath -Encoding UTF8
 
-Write-Host "Rendered UI validation passed: $summaryPath"
+if ($failures.Count -eq 0) {
+    Write-Host "Rendered UI validation passed: $summaryPath"
+}
+if ($failures.Count -gt 0) {
+    Write-Error "Rendered UI validation completed with $($failures.Count) failed case(s). See $summaryPath"
+    exit 1
+}

@@ -35,6 +35,11 @@ public:
 
     bool IsUnlocked() const;
 
+    static bool HasRequiredKeycard(
+        FName RequiredKeycardID,
+        const TArray<FName>& OwnedKeycardIDs
+    );
+
     void RestoreUnlockedState(bool bShouldBeUnlocked);
 
     bool BreachDoor(ABHCharacter* BreachingCharacter);

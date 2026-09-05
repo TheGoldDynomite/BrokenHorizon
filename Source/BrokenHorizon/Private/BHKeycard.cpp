@@ -2,6 +2,7 @@
 
 #include "BHCharacter.h"
 #include "BHMissionData.h"
+#include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EngineUtils.h"
 
@@ -14,12 +15,25 @@ ABHKeycard::ABHKeycard()
         TEXT("KeycardMesh")
     );
 
-    SetRootComponent(KeycardMesh);
+    InteractionCollision = CreateDefaultSubobject<UBoxComponent>(
+        TEXT("InteractionCollision")
+    );
+    SetRootComponent(InteractionCollision);
+    KeycardMesh->SetupAttachment(InteractionCollision);
 
     KeycardMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     KeycardMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
     KeycardMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
     KeycardMesh->SetSimulatePhysics(false);
+
+    InteractionCollision->SetBoxExtent(FVector(35.0f, 65.0f, 20.0f));
+    InteractionCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    InteractionCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+    InteractionCollision->SetCollisionResponseToChannel(
+        ECC_Visibility,
+        ECR_Block
+    );
+    InteractionCollision->SetGenerateOverlapEvents(false);
 }
 
 void ABHKeycard::BeginPlay()

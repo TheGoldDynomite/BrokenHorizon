@@ -1,5 +1,6 @@
 #include "BHArmoredThreat.h"
 
+#include "BHCharacter.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
@@ -162,6 +163,21 @@ void ABHArmoredThreat::BeginPlay()
     }
 }
 
+void ABHArmoredThreat::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (ABHCharacter* PresentedTarget =
+            Cast<ABHCharacter>(LastPresentedTarget.Get()))
+    {
+        PresentedTarget->NotifyArmoredThreatContact(
+            this,
+            GetActorLocation(),
+            false
+        );
+    }
+    LastPresentedTarget.Reset();
+    Super::EndPlay(EndPlayReason);
+}
+
 void ABHArmoredThreat::GetLifetimeReplicatedProps(
     TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -184,31 +200,64 @@ void ABHArmoredThreat::Tick(float DeltaSeconds)
     WeaponCooldownRemaining = FMath::Max(0.0f, WeaponCooldownRemaining - DeltaSeconds);
 
     APawn* PlayerPawn = nullptr;
-    if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+    float ClosestPlayerDistanceSquared = TNumericLimits<float>::Max();
+    const float MaximumContactDistanceSquared = FMath::Square(
+        FMath::Max(100.0f, ContactRange)
+    );
+
+    for (FConstPlayerControllerIterator Iterator =
+             GetWorld()->GetPlayerControllerIterator();
+         Iterator;
+         ++Iterator)
     {
-        PlayerPawn = PC->GetPawn();
+        APlayerController* PlayerController = Iterator->Get();
+        APawn* CandidatePawn = IsValid(PlayerController)
+            ? PlayerController->GetPawn()
+            : nullptr;
+        if (!IsValid(CandidatePawn))
+        {
+            continue;
+        }
+
+        const float CandidateDistanceSquared = FVector::DistSquared(
+            GetActorLocation(), CandidatePawn->GetActorLocation()
+        );
+        if (CandidateDistanceSquared > MaximumContactDistanceSquared)
+        {
+            continue;
+        }
+
+        FHitResult Hit;
+        FCollisionQueryParams Params(
+            SCENE_QUERY_STAT(ArmoredThreatContact), true, this
+        );
+        Params.AddIgnoredActor(CandidatePawn);
+        const bool bBlocked = GetWorld()->LineTraceSingleByChannel(
+            Hit,
+            GetActorLocation() + FVector(0.0f, 0.0f, 80.0f),
+            CandidatePawn->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f),
+            ECC_Visibility,
+            Params
+        );
+        if (bBlocked && Hit.GetActor() != CandidatePawn)
+        {
+            continue;
+        }
+
+        if (CandidateDistanceSquared < ClosestPlayerDistanceSquared)
+        {
+            PlayerPawn = CandidatePawn;
+            ClosestPlayerDistanceSquared = CandidateDistanceSquared;
+        }
     }
 
-    const bool bInRange = IsValid(PlayerPawn) &&
-        FVector::DistSquared(GetActorLocation(), PlayerPawn->GetActorLocation()) <=
-            FMath::Square(FMath::Max(100.0f, ContactRange));
-    bool bVisible = false;
-    if (bInRange)
-    {
-        FHitResult Hit;
-        FCollisionQueryParams Params(SCENE_QUERY_STAT(ArmoredThreatContact), true, this);
-        Params.AddIgnoredActor(PlayerPawn);
-        const bool bBlocked = GetWorld()->LineTraceSingleByChannel(
-            Hit, GetActorLocation() + FVector(0.0f, 0.0f, 80.0f),
-            PlayerPawn->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f),
-            ECC_Visibility, Params);
-        bVisible = !bBlocked || Hit.GetActor() == PlayerPawn;
-    }
+    const bool bVisible = IsValid(PlayerPawn);
 
     if (bVisible != bHasPlayerContact || (bVisible && CurrentTarget != PlayerPawn))
     {
         bHasPlayerContact = bVisible;
         CurrentTarget = bVisible ? PlayerPawn : nullptr;
+        UpdateLocalContactPresentation();
         BroadcastThreatState(bVisible ? TEXT("player_contact") : TEXT("contact_lost"));
     }
 
@@ -280,6 +329,21 @@ bool ABHArmoredThreat::IsMobilityDisabled() const
     return GetArmorIntegrityFraction() <= FMath::Clamp(MobilityDisableFraction, 0.0f, 1.0f);
 }
 
+bool ABHArmoredThreat::HasPlayerContact() const
+{
+    return bHasPlayerContact;
+}
+
+AActor* ABHArmoredThreat::GetCurrentTarget() const
+{
+    return CurrentTarget;
+}
+
+float ABHArmoredThreat::GetContactRange() const
+{
+    return FMath::Max(100.0f, ContactRange);
+}
+
 FName ABHArmoredThreat::GetPersistenceID() const
 {
     return PersistenceID;
@@ -292,13 +356,67 @@ void ABHArmoredThreat::OnRep_ArmorIntegrity()
 
 void ABHArmoredThreat::OnRep_ContactState()
 {
+    UpdateLocalContactPresentation();
     BroadcastThreatState(bHasPlayerContact ? TEXT("replicated_contact") : TEXT("replicated_contact_lost"));
+}
+
+void ABHArmoredThreat::OnRep_CurrentTarget()
+{
+    UpdateLocalContactPresentation();
+    if (bHasPlayerContact)
+    {
+        BroadcastThreatState(TEXT("replicated_target"));
+    }
+}
+
+void ABHArmoredThreat::UpdateLocalContactPresentation()
+{
+    ABHCharacter* NewTarget = bHasPlayerContact
+        ? Cast<ABHCharacter>(CurrentTarget)
+        : nullptr;
+    const bool bTargetChanged =
+        LastPresentedTarget.Get() != NewTarget;
+
+    if (bTargetChanged)
+    {
+        if (ABHCharacter* PreviousTarget =
+                Cast<ABHCharacter>(LastPresentedTarget.Get()))
+        {
+            PreviousTarget->NotifyArmoredThreatContact(
+                this,
+                GetActorLocation(),
+                false
+            );
+        }
+        LastPresentedTarget.Reset();
+    }
+
+    if (!IsValid(NewTarget) || !NewTarget->IsLocallyControlled())
+    {
+        return;
+    }
+
+    if (!bTargetChanged)
+    {
+        return;
+    }
+
+    NewTarget->NotifyArmoredThreatContact(
+        this,
+        GetActorLocation(),
+        true
+    );
+    LastPresentedTarget = NewTarget;
 }
 
 void ABHArmoredThreat::BroadcastThreatState(const TCHAR* Reason) const
 {
     UE_LOG(LogTemp, Display,
-        TEXT("BH_ARMORED_THREAT_STATE id=%s reason=%s armor=%.3f mobility=%.3f disabled=%d"),
-        *PersistenceID.ToString(), Reason, GetArmorIntegrityFraction(),
-        GetMobilityFraction(), IsMobilityDisabled() ? 1 : 0);
+        TEXT("BH_ARMORED_THREAT_STATE id=%s reason=%s target=%s armor=%.3f mobility=%.3f disabled=%d"),
+        *PersistenceID.ToString(),
+        Reason,
+        IsValid(CurrentTarget) ? *CurrentTarget->GetName() : TEXT("None"),
+        GetArmorIntegrityFraction(),
+        GetMobilityFraction(),
+        IsMobilityDisabled() ? 1 : 0);
 }

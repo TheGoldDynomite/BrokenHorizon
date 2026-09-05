@@ -249,7 +249,8 @@ void ABHFieldFortification::Interact_Implementation(
                             SupplyCacheChargesRemaining + AddedCharges
                         );
                     const bool bSavedWithSupply =
-                        IsValid(SaveSubsystem) && SaveSubsystem->SaveProgress();
+                        IsValid(SaveSubsystem) &&
+                        SaveSubsystem->SaveProgressForCharacter(Character);
                     NotifyPlayer(
                         Character,
                     FText::Format(
@@ -344,7 +345,8 @@ void ABHFieldFortification::Interact_Implementation(
         ForceNetUpdate();
 
         const bool bFullyRepaired = GetHealthFraction() >= 1.0f;
-        const bool bSaved = IsValid(SaveSubsystem) && SaveSubsystem->SaveProgress();
+        const bool bSaved = IsValid(SaveSubsystem) &&
+            SaveSubsystem->SaveProgressForCharacter(Character);
         if (bFullyRepaired)
         {
             NotifyPlayer(
@@ -455,7 +457,8 @@ void ABHFieldFortification::Interact_Implementation(
 
     RefreshPresentation();
     ForceNetUpdate();
-    const bool bSaved = IsValid(SaveSubsystem) && SaveSubsystem->SaveProgress();
+    const bool bSaved = IsValid(SaveSubsystem) &&
+        SaveSubsystem->SaveProgressForCharacter(Character);
     NotifyPlayer(
         Character,
         FText::Format(

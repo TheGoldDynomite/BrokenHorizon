@@ -25,6 +25,20 @@ def _require_fragments(relative_path, fragments):
             )
 
 
+def _require_ordered_fragments(relative_path, contract_name, fragments):
+    source = _read(relative_path)
+    search_start = 0
+
+    for fragment in fragments:
+        fragment_index = source.find(fragment, search_start)
+        if fragment_index < 0:
+            raise RuntimeError(
+                "%s contract is missing or out of order in %s: %s"
+                % (contract_name, relative_path, fragment)
+            )
+        search_start = fragment_index + len(fragment)
+
+
 def _validate_reflection():
     director_class = getattr(
         unreal,
@@ -119,6 +133,7 @@ def _validate_source_contract():
         (
             "void SetObjectiveIdToCompleteOnDeath(FName ObjectiveID);",
             "FName GetObjectiveIdToCompleteOnDeath() const;",
+            "EditInstanceOnly,",
         ),
     )
     _require_fragments(
@@ -126,7 +141,7 @@ def _validate_source_contract():
         (
             "CaptureExistingDefenders();",
             "Enemy->SetObjectiveIdToCompleteOnDeath(NAME_None);",
-            "World->SpawnActor<ABHEnemySoldier>(",
+            "World->SpawnActorDeferred<ABHEnemySoldier>(",
             '"DefenseReinforcementWave"',
             "PlayerCharacter->CompleteObjective(",
             "BHObjectiveIds::EliminateGuard",
@@ -222,7 +237,7 @@ def _validate_source_contract():
             "EBHCombatFaction::Hostile",
             '"BH_OPERATION_SECURING_STARTED sector=%s "',
             '"BH_OPERATION_OBJECTIVE_SECURED sector=%s "',
-            "PlayerHealth->IsDead()",
+            "HasPlayerOrFieldOperativeInSecureArea()",
             "State.bSecuringObjective = bSecuringObjective;",
             "State.ObjectiveSecureProgress =",
             "SavedState.bSecuringObjective",
@@ -240,6 +255,109 @@ def _validate_source_contract():
             "PlayerCharacter->FailCurrentWarOperation(FailureReason)",
             '"OpenWorldDefenseBreachFailureReason"',
         ),
+    )
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp",
+        "Shared operation event notification fan-out",
+        (
+            "void ABHOpenWorldOperationDirector::ShowOperationNotification(",
+            "for (ABHCharacter* Participant : GetPlayerParticipants())",
+            "Participant->ShowStatusNotification(Message);",
+        ),
+    )
+    _require_fragments(
+        "Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp",
+        (
+            '"OpenWorldDefenseStarted"',
+            '"OpenWorldDefenseWaveCleared"',
+            '"OpenWorldDefenseWaveArrived"',
+            '"OpenWorldHostileCasualty"',
+        ),
+    )
+    _log(
+        "PASS operation activation, wave, and casualty notifications fan out "
+        "to authoritative player participants."
+    )
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp",
+        "Operation completion idempotence",
+        (
+            "void ABHOpenWorldOperationDirector::CompleteOperation()",
+            "if (!HasAuthority() || bOperationComplete)",
+            "bOperationComplete = true;",
+        ),
+    )
+    _log("PASS operation completion is guarded against duplicate finalization.")
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp",
+        "Shared operation completion",
+        (
+            "void ABHOpenWorldOperationDirector::CompleteOperation()",
+            "if (!PlayerCharacter->CompleteSharedObjective(",
+            "BHObjectiveIds::EliminateGuard",
+            "for (ABHCharacter* Participant : GetPlayerParticipants())",
+        ),
+    )
+    _log(
+        "PASS operation completion propagates the final objective to "
+        "all authoritative player participants."
+    )
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/BHCharacter.cpp",
+        "Debrief objective HUD suppression",
+        (
+            "void ABHCharacter::EnterMissionCompleteState(",
+            "if (IsValid(ObjectiveWidget))",
+            "ObjectiveWidget->SetVisibility(",
+            "ESlateVisibility::Collapsed",
+        ),
+    )
+    _log("PASS the active objective HUD is hidden during debrief lockout.")
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp",
+        "Shared operation failure propagation",
+        (
+            "void ABHOpenWorldOperationDirector::FailOperation(",
+            "if (!PlayerCharacter->FailCurrentWarOperation(FailureReason))",
+            "PlayerCharacter->PropagateSharedOperationFailure();",
+        ),
+    )
+    _require_fragments(
+        "Source/BrokenHorizon/BHCharacter.cpp",
+        (
+            "void ABHCharacter::FailSharedOperationObjectives()",
+            '"BH_SHARED_OPERATION_FAILURE_PROPAGATED "',
+            "void ABHCharacter::PropagateSharedOperationFailure()",
+            '"BH_SHARED_OPERATION_FAILURE_DEBRIEF "',
+        ),
+    )
+    _log(
+        "PASS operation failure propagates objective failure without "
+        "reapplying the strategic war result and presents one shared debrief."
+    )
+    _require_fragments(
+        "Source/BrokenHorizon/Private/BHSupplyConvoyTarget.cpp",
+        (
+            "AssignedCharacter->FailCurrentWarOperation(",
+            "AssignedCharacter->PropagateSharedOperationFailure();",
+        ),
+    )
+    _log(
+        "PASS escort convoy failure uses the shared objective/debrief path."
+    )
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/BHCharacter.cpp",
+        "Replicated terminal mission handoff",
+        (
+            "void ABHCharacter::RefreshReplicatedMissionPresentation()",
+            "const bool bTerminalMissionState =",
+            "IsMissionComplete() || IsMissionFailed()",
+            "EnterMissionCompleteState(false);",
+        ),
+    )
+    _log(
+        "PASS replicated terminal mission state re-enters the debrief "
+        "presentation on reconnecting clients."
     )
     _require_fragments(
         "Source/BrokenHorizon/Public/BHWarTypes.h",
@@ -269,9 +387,160 @@ def _validate_source_contract():
     _log("PASS defense launches reinforcement waves from level anchors.")
 
 
+def _validate_defense_a_garrison_lifecycle():
+    _require_fragments(
+        "Source/BrokenHorizon/Public/BHEnemySoldier.h",
+        (
+            "void SetOperationGarrisonActive(bool bNewOperationGarrisonActive);",
+            "bool IsOperationGarrisonActive() const;",
+            "void OnRep_OperationGarrisonActive();",
+            "UPROPERTY(ReplicatedUsing = OnRep_OperationGarrisonActive)",
+            "bool bOperationGarrisonActive = true;",
+            "bool bIsOperationGarrison = false;",
+        ),
+    )
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/Private/BHEnemySoldier.cpp",
+        "Defense A soldier replication gate",
+        (
+            "DOREPLIFETIME(ABHEnemySoldier, bOperationGarrisonActive);",
+            "bIsOperationGarrison = ActorHasTag(",
+            'FName(TEXT("BH_Auto_DefenseA_Garrison"))',
+            "if (bIsOperationGarrison)",
+            "SetObjectiveIdToCompleteOnDeath(NAME_None);",
+            "if (bIsOperationGarrison && HasAuthority() && FieldOperativeID.IsNone())",
+            "const FString GarrisonIdentitySource = GetFName().ToString();",
+            "SetFieldOperativeID(FName(*FString::Printf(",
+            'TEXT("DefenseA_%s")',
+            "SaveSubsystem->ApplyPendingSurrenderState(this);",
+            "void ABHEnemySoldier::OnRep_OperationGarrisonActive()",
+            "ApplyOperationGarrisonState();",
+            "const bool bShouldBeActive = bOperationGarrisonActive && !IsDead();",
+            "EnemyController->SetOperationGarrisonActive(bShouldBeActive);",
+        ),
+    )
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/Private/BHEnemyAIController.cpp",
+        "Defense A controller pause and resume",
+        (
+            "void ABHEnemyAIController::SetOperationGarrisonActive(bool bActive)",
+            "if (!bOperationGarrisonActive)",
+            "CombatTarget.Reset();",
+            "ClearFollowTarget();",
+            "ClearHoldPosition();",
+            "ClearFocus(EAIFocusPriority::Gameplay);",
+            "StopMovement();",
+            "ClearTimer(PatrolWaitTimerHandle);",
+            "AIPerception->ForgetAll();",
+            "AIPerception->SetActive(false);",
+            "SetActorTickEnabled(false);",
+            "AIPerception->SetActive(true);",
+            "AIPerception->RequestStimuliListenerUpdate();",
+            "SetActorTickEnabled(true);",
+        ),
+    )
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp",
+        "Defense A authored garrison lifecycle",
+        (
+            "bool ABHOpenWorldOperationDirector::RestoreOperationState(",
+            "ConfigureAuthoredDefenseAGarrison(!bWaitingForWave);",
+            "void ABHOpenWorldOperationDirector::ActivateOperation()",
+            "ConfigureAuthoredDefenseAGarrison(true);",
+            "bool ABHOpenWorldOperationDirector::ConfigureAuthoredDefenseAGarrison(",
+            "if (!IsValid(World))",
+            'FName(TEXT("BH_Auto_DefenseA_Garrison"))',
+            "AuthoredEnemy->GetFieldOperativeID().IsNone()",
+            "const FString GarrisonIdentitySource =",
+            "AuthoredEnemy->GetFName().ToString();",
+            "AuthoredEnemy->SetFieldOperativeID(FName(*FString::Printf(",
+            'TEXT("DefenseA_%s")',
+            "SaveSubsystem->ApplyPendingSurrenderState(AuthoredEnemy);",
+            "if (!bActivateGarrison || AuthoredEnemy->IsDead())",
+            "AuthoredEnemy->SetOperationGarrisonActive(false);",
+            "AuthoredEnemy->SetOperationGarrisonActive(true);",
+            "EnemyController->NotifyAllyAlert(PlayerCharacter);",
+            "HealthComponent->OnDeath.AddUniqueDynamic(",
+            "&ABHOpenWorldOperationDirector::HandleEnemyDeath",
+            "TrackedEnemies.AddUnique(AuthoredEnemy);",
+        ),
+    )
+    _require_fragments(
+        "Source/BrokenHorizon/Private/BHOpenWorldOperationDirector.cpp",
+        (
+            "void ABHOpenWorldOperationDirector::DestroyTrackedUnits()",
+            'Enemy->ActorHasTag(FName(TEXT("BH_Auto_DefenseA_Garrison")))',
+            "HealthComponent->OnDeath.RemoveDynamic(",
+            "Enemy->SetOperationGarrisonActive(false);",
+        ),
+    )
+    _require_ordered_fragments(
+        "Source/BrokenHorizon/Private/BHWarGameState.cpp",
+        "First Light route excludes operation-only Defense A garrison",
+        (
+            "TArray<ABHEnemySoldier*> ObjectiveGuards;",
+            "It->GetObjectiveIdToCompleteOnDeath() ==",
+            "BHObjectiveIds::EliminateGuard",
+            "!It->ActorHasTag(",
+            'FName(TEXT("BH_Auto_DefenseA_Garrison"))',
+        ),
+    )
+
+    _log("PASS Defense A soldiers use a replicated operation-garrison gate.")
+    _log("PASS Defense A controllers clear stale state while paused and resume perception.")
+    _log("PASS Defense A lifecycle restores, activates, and tracks authored garrison members.")
+    _log("PASS Defense A teardown preserves tagged garrison actors.")
+    _log("PASS First Light route excludes operation-only Defense A garrison actors.")
+
+
+def _validate_defense_a_authored_id_contract():
+    map_path = "/Game/BrokenHorizon/Maps/L_FirstLight_Graybox"
+    if not unreal.EditorAssetLibrary.does_asset_exist(map_path):
+        raise RuntimeError("Missing First Light map: " + map_path)
+
+    unreal.EditorLevelLibrary.load_level(map_path)
+    world = unreal.EditorLevelLibrary.get_editor_world()
+    enemy_class = unreal.load_class(
+        None,
+        "/Script/BrokenHorizon.BHEnemySoldier",
+    )
+    if not enemy_class:
+        raise RuntimeError("BHEnemySoldier class is unavailable")
+
+    expected_ids = {
+        "DefenseA_FL_DefenseA_Garrison_01_West",
+        "DefenseA_FL_DefenseA_Garrison_02_East",
+        "DefenseA_FL_DefenseA_Garrison_03_NorthWest",
+        "DefenseA_FL_DefenseA_Garrison_04_NorthEast",
+        "DefenseA_FL_DefenseA_Garrison_05_OuterWest",
+        "DefenseA_FL_DefenseA_Garrison_06_OuterEast",
+    }
+    garrison = [
+        enemy for enemy in unreal.GameplayStatics.get_all_actors_of_class(
+            world,
+            enemy_class,
+        )
+        if "BH_Auto_DefenseA_Garrison" in [
+            str(tag) for tag in enemy.tags
+        ]
+    ]
+    actual_ids = {
+        str(enemy.get_editor_property("field_operative_id"))
+        for enemy in garrison
+    }
+    if len(garrison) != len(expected_ids) or actual_ids != expected_ids:
+        raise RuntimeError(
+            "Defense A authored identity contract mismatch: %s"
+            % sorted(actual_ids)
+        )
+    _log("PASS Defense A authored garrison IDs are explicit and stable.")
+
+
 def main():
     _validate_reflection()
     _validate_source_contract()
+    _validate_defense_a_garrison_lifecycle()
+    _validate_defense_a_authored_id_contract()
     _log("ALL CHECKS PASSED")
 
 

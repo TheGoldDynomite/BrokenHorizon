@@ -69,6 +69,7 @@
 #include "BHSmokeGrenade.h"
 #include "BHEngineeringCharge.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "GameFramework/DamageType.h"
 #include "HAL/PlatformMisc.h"
@@ -389,6 +390,11 @@ void ABHCharacter::GetLifetimeReplicatedProps(
         CurrentStamina,
         COND_OwnerOnly
     );
+    DOREPLIFETIME_CONDITION(
+        ABHCharacter,
+        OwnedKeycards,
+        COND_OwnerOnly
+    );
 
     DOREPLIFETIME(
         ABHCharacter,
@@ -604,23 +610,72 @@ void ABHCharacter::BeginPlay()
         }
     }
 
-    if (InteractionPromptClass &&
-        IsValid(PlayerController) &&
+    if (IsValid(PlayerController) &&
         PlayerController->GetLocalPlayer() != nullptr)
     {
+        const TSubclassOf<UBHInteractionPromptWidget> WidgetClass =
+            TSubclassOf<UBHInteractionPromptWidget>(
+                UBHInteractionPromptWidget::StaticClass()
+            );
         InteractionPromptWidget = CreateWidget<UBHInteractionPromptWidget>(
             PlayerController,
-            InteractionPromptClass
+            WidgetClass
         );
 
-        if (InteractionPromptWidget)
+        if (IsValid(InteractionPromptWidget))
         {
-            InteractionPromptWidget->AddToViewport();
+            InteractionPromptWidget->SetAlignmentInViewport(
+                FVector2D(0.5f, 0.5f)
+            );
+            InteractionPromptWidget->SetPositionInViewport(
+                FVector2D::ZeroVector,
+                false
+            );
+            InteractionPromptWidget->SetDesiredSizeInViewport(
+                FVector2D(760.0f, 96.0f)
+            );
+            InteractionPromptWidget->SetAnchorsInViewport(
+                FAnchors(0.5f, 0.42f, 0.5f, 0.42f)
+            );
+            InteractionPromptWidget->AddToViewport(60);
 
             InteractionPromptWidget->SetVisibility(
                 ESlateVisibility::Collapsed
             );
+
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_INTERACTION_PROMPT_NATIVE_INSTANCE class=%s "
+                    "blueprint_class_ignored=%d"
+                ),
+                *WidgetClass->GetPathName(),
+                InteractionPromptClass != nullptr ? 1 : 0
+            );
         }
+        else
+        {
+            UE_LOG(
+                LogTemp,
+                Error,
+                TEXT("BH_INTERACTION_PROMPT_CREATE_FAILED class=%s"),
+                *WidgetClass->GetPathName()
+            );
+        }
+    }
+    else
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("BH_INTERACTION_PROMPT_DEFERRED controller=%d local_player=%d"),
+            IsValid(PlayerController) ? 1 : 0,
+            IsValid(PlayerController) &&
+                    PlayerController->GetLocalPlayer() != nullptr
+                ? 1
+                : 0
+        );
     }
 
 
@@ -789,6 +844,8 @@ void ABHCharacter::BeginPlay()
             );
         }
     }
+
+    TryBindActiveOperationSnapshotPresentation();
 
     EnsureRuntimeInputActions();
     RefreshPlayerInputMappings();
@@ -1239,6 +1296,37 @@ void ABHCharacter::SetupPlayerInputComponent(
 
     EnsureRuntimeInputActions();
     RefreshPlayerInputMappings();
+
+    bool bInventoryKeyboardMappingPresent = false;
+    if (IsValid(InventoryAction) && IsValid(RuntimePlayerMappingContext))
+    {
+        for (const FEnhancedActionKeyMapping& Mapping :
+             RuntimePlayerMappingContext->GetMappings())
+        {
+            if (Mapping.Action == InventoryAction &&
+                Mapping.Key.IsValid() &&
+                !Mapping.Key.IsGamepadKey())
+            {
+                bInventoryKeyboardMappingPresent = true;
+                break;
+            }
+        }
+    }
+
+    if (!bInventoryKeyboardMappingPresent)
+    {
+        PlayerInputComponent->BindKey(
+            EKeys::I,
+            IE_Pressed,
+            this,
+            &ABHCharacter::ToggleInventoryPanel
+        );
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("BH_INVENTORY_KEY_FALLBACK_BOUND key=I")
+        );
+    }
 
     UEnhancedInputComponent* EnhancedInputComponent =
         Cast<UEnhancedInputComponent>(PlayerInputComponent);
@@ -4429,6 +4517,7 @@ void ABHCharacter::RestoreEngineeringChargeCount(int32 SavedCount)
 void ABHCharacter::OnRep_EngineeringInventory()
 {
     RefreshEngineeringHUD();
+    RefreshOpenInventoryPanel();
 }
 
 void ABHCharacter::RefreshEngineeringHUD()
@@ -4645,32 +4734,122 @@ void ABHCharacter::MulticastPlayFootstep_Implementation(
     }
 }
 
-void ABHCharacter::SynchronizeReplicatedOperationPresentation()
+bool ABHCharacter::ShouldBindActiveOperationSnapshotPresentation() const
 {
-    if (!IsLocallyControlled() || GetWorld() == nullptr)
+    const APlayerController* PlayerController =
+        ResolveOwningPlayerController();
+    return IsPlayerControlled() &&
+        IsValid(PlayerController) &&
+        PlayerController->GetLocalPlayer() != nullptr;
+}
+
+void ABHCharacter::TryBindActiveOperationSnapshotPresentation()
+{
+    if (!ShouldBindActiveOperationSnapshotPresentation())
+    {
+        UnbindActiveOperationSnapshotPresentation();
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    ABHWarGameState* WarGameState = IsValid(World)
+        ? World->GetGameState<ABHWarGameState>()
+        : nullptr;
+
+    if (!IsValid(WarGameState))
+    {
+        UnbindActiveOperationSnapshotPresentation();
+        return;
+    }
+
+    if (BoundActiveOperationSnapshotGameState.Get() == WarGameState &&
+        ActiveOperationSnapshotChangedHandle.IsValid())
     {
         return;
     }
 
-    const ABHWarGameState* WarGameState =
+    UnbindActiveOperationSnapshotPresentation();
+    ActiveOperationSnapshotChangedHandle =
+        WarGameState->OnActiveOperationSnapshotChanged().AddUObject(
+            this,
+            &ABHCharacter::HandleActiveOperationSnapshotChanged
+        );
+    BoundActiveOperationSnapshotGameState = WarGameState;
+}
+
+void ABHCharacter::UnbindActiveOperationSnapshotPresentation()
+{
+    if (ActiveOperationSnapshotChangedHandle.IsValid())
+    {
+        if (ABHWarGameState* WarGameState =
+                BoundActiveOperationSnapshotGameState.Get())
+        {
+            WarGameState->OnActiveOperationSnapshotChanged().Remove(
+                ActiveOperationSnapshotChangedHandle
+            );
+        }
+
+        ActiveOperationSnapshotChangedHandle.Reset();
+    }
+
+    BoundActiveOperationSnapshotGameState = nullptr;
+}
+
+void ABHCharacter::HandleActiveOperationSnapshotChanged(
+    const FBHActiveOperationSnapshot& Snapshot
+)
+{
+    (void)Snapshot;
+
+    if (!ShouldBindActiveOperationSnapshotPresentation())
+    {
+        UnbindActiveOperationSnapshotPresentation();
+        return;
+    }
+
+    SynchronizeReplicatedOperationPresentation();
+    UpdateOperationWaypointHUD();
+}
+
+void ABHCharacter::SynchronizeReplicatedOperationPresentation()
+{
+    if (GetWorld() == nullptr)
+    {
+        return;
+    }
+
+    if (!ShouldBindActiveOperationSnapshotPresentation())
+    {
+        UnbindActiveOperationSnapshotPresentation();
+        return;
+    }
+
+    ABHWarGameState* WarGameState =
         GetWorld()->GetGameState<ABHWarGameState>();
 
     if (!IsValid(WarGameState))
     {
+        UnbindActiveOperationSnapshotPresentation();
         return;
     }
+
+    TryBindActiveOperationSnapshotPresentation();
 
     const FBHActiveOperationSnapshot Snapshot =
         WarGameState->GetActiveOperationSnapshot();
     const uint8 SnapshotPhase =
         static_cast<uint8>(Snapshot.Phase);
 
-    if (Snapshot.SectorID == LastPresentedOperationSectorID &&
+    if (Snapshot.Revision == LastPresentedOperationRevision &&
+        Snapshot.OperationID == LastPresentedOperationID &&
+        Snapshot.SectorID == LastPresentedOperationSectorID &&
         SnapshotPhase == LastPresentedOperationPhase)
     {
         return;
     }
 
+    LastPresentedOperationRevision = Snapshot.Revision;
+    LastPresentedOperationID = Snapshot.OperationID;
     LastPresentedOperationSectorID = Snapshot.SectorID;
     LastPresentedOperationPhase = SnapshotPhase;
 
@@ -4702,33 +4881,59 @@ void ABHCharacter::SynchronizeReplicatedOperationPresentation()
 
             RefreshObjectiveWidget();
         }
+        if (Snapshot.Phase == EBHActiveOperationPhase::None)
+        {
+            LastNotifiedOperationID = NAME_None;
+            LastNotifiedOperationSectorID = NAME_None;
+            LastNotifiedOperationPhase = MAX_uint8;
+        }
         else if (
             Snapshot.Phase ==
                 EBHActiveOperationPhase::DebriefSuccess)
         {
-            DisplayStatusNotificationLocally(
-                NSLOCTEXT(
-                    "BrokenHorizon",
-                    "ReplicatedOperationDebriefSuccess",
-                    "SHARED OPERATION COMPLETE\n\n"
-                    "Campaign command is processing the outcome."
-                ),
-                EBHNotificationPriority::Critical
-            );
+            const bool bShouldNotify =
+                Snapshot.OperationID != LastNotifiedOperationID ||
+                Snapshot.SectorID != LastNotifiedOperationSectorID ||
+                SnapshotPhase != LastNotifiedOperationPhase;
+            if (bShouldNotify)
+            {
+                LastNotifiedOperationID = Snapshot.OperationID;
+                LastNotifiedOperationSectorID = Snapshot.SectorID;
+                LastNotifiedOperationPhase = SnapshotPhase;
+                DisplayStatusNotificationLocally(
+                    NSLOCTEXT(
+                        "BrokenHorizon",
+                        "ReplicatedOperationDebriefSuccess",
+                        "SHARED OPERATION COMPLETE\n\n"
+                        "Campaign command is processing the outcome."
+                    ),
+                    EBHNotificationPriority::Critical
+                );
+            }
         }
         else if (
             Snapshot.Phase ==
                 EBHActiveOperationPhase::DebriefFailure)
         {
-            DisplayStatusNotificationLocally(
-                NSLOCTEXT(
-                    "BrokenHorizon",
-                    "ReplicatedOperationDebriefFailure",
-                    "SHARED OPERATION FAILED\n\n"
-                    "Campaign command is assessing the losses."
-                ),
-                EBHNotificationPriority::Critical
-            );
+            const bool bShouldNotify =
+                Snapshot.OperationID != LastNotifiedOperationID ||
+                Snapshot.SectorID != LastNotifiedOperationSectorID ||
+                SnapshotPhase != LastNotifiedOperationPhase;
+            if (bShouldNotify)
+            {
+                LastNotifiedOperationID = Snapshot.OperationID;
+                LastNotifiedOperationSectorID = Snapshot.SectorID;
+                LastNotifiedOperationPhase = SnapshotPhase;
+                DisplayStatusNotificationLocally(
+                    NSLOCTEXT(
+                        "BrokenHorizon",
+                        "ReplicatedOperationDebriefFailure",
+                        "SHARED OPERATION FAILED\n\n"
+                        "Campaign command is assessing the losses."
+                    ),
+                    EBHNotificationPriority::Critical
+                );
+            }
         }
 
         return;
@@ -4779,25 +4984,41 @@ void ABHCharacter::SynchronizeReplicatedOperationPresentation()
         ObjectiveWidget->SetVisibility(ESlateVisibility::Visible);
     }
 
-    DisplayStatusNotificationLocally(
-        FText::Format(
-            Snapshot.Phase == EBHActiveOperationPhase::Approach
-                ? NSLOCTEXT(
-                    "BrokenHorizon",
-                    "ReplicatedOperationJoinedApproach",
-                    "SHARED OPERATION ASSIGNED\n\n"
-                    "Move to {0}. Follow the operation waypoint."
-                )
-                : NSLOCTEXT(
-                    "BrokenHorizon",
-                    "ReplicatedOperationJoinedActive",
-                    "SHARED OPERATION ACTIVE\n\n"
-                    "Support friendly forces in {0}."
-                ),
-            FText::FromName(Snapshot.SectorID)
-        ),
-        EBHNotificationPriority::High
-    );
+    const uint8 NotificationPhase =
+        Snapshot.Phase == EBHActiveOperationPhase::Approach
+            ? SnapshotPhase
+            : static_cast<uint8>(EBHActiveOperationPhase::Combat);
+    const bool bShouldNotify =
+        Snapshot.OperationID != LastNotifiedOperationID ||
+        Snapshot.SectorID != LastNotifiedOperationSectorID ||
+        NotificationPhase != LastNotifiedOperationPhase;
+
+    if (bShouldNotify)
+    {
+        LastNotifiedOperationID = Snapshot.OperationID;
+        LastNotifiedOperationSectorID = Snapshot.SectorID;
+        LastNotifiedOperationPhase = NotificationPhase;
+
+        DisplayStatusNotificationLocally(
+            FText::Format(
+                Snapshot.Phase == EBHActiveOperationPhase::Approach
+                    ? NSLOCTEXT(
+                        "BrokenHorizon",
+                        "ReplicatedOperationJoinedApproach",
+                        "SHARED OPERATION ASSIGNED\n\n"
+                        "Move to {0}. Follow the operation waypoint."
+                    )
+                    : NSLOCTEXT(
+                        "BrokenHorizon",
+                        "ReplicatedOperationJoinedActive",
+                        "SHARED OPERATION ACTIVE\n\n"
+                        "Support friendly forces in {0}."
+                    ),
+                FText::FromName(Snapshot.SectorID)
+            ),
+            EBHNotificationPriority::High
+        );
+    }
 }
 
 void ABHCharacter::UpdateOperationWaypointHUD()
@@ -4918,6 +5139,50 @@ void ABHCharacter::UpdateOperationWaypointHUD()
 
     if (bSnapshotHasWaypoint)
     {
+        const FBHOpenWorldOperationState& ReplicatedOperationState =
+            OperationSnapshot.OperationState;
+        const int32 TotalWaveCount =
+            OperationSnapshot.OperationType == EBHWarPriorityType::Defend
+                ? FMath::Max(
+                    1,
+                    ReplicatedOperationState.DefenseWaveCount
+                )
+                : FMath::Max(
+                    1,
+                    1 +
+                        ReplicatedOperationState
+                            .AttackReinforcementWaveCount
+                );
+        const int32 CurrentWave = FMath::Clamp(
+            ReplicatedOperationState.CurrentWave,
+            1,
+            TotalWaveCount
+        );
+        const FText OperationLabel =
+            OperationSnapshot.OperationType == EBHWarPriorityType::Defend
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "ReplicatedOperationDefendLabel",
+                    "DEFEND"
+                )
+            : OperationSnapshot.OperationType == EBHWarPriorityType::Raid
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "ReplicatedOperationRaidLabel",
+                    "RAID"
+                )
+            : OperationSnapshot.OperationType == EBHWarPriorityType::Resupply
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "ReplicatedOperationResupplyLabel",
+                    "RESUPPLY"
+                )
+                : NSLOCTEXT(
+                    "BrokenHorizon",
+                    "ReplicatedOperationAttackLabel",
+                    "ATTACK"
+                );
+
         switch (OperationSnapshot.Phase)
         {
         case EBHActiveOperationPhase::Approach:
@@ -4928,31 +5193,118 @@ void ABHCharacter::UpdateOperationWaypointHUD()
             );
             break;
         case EBHActiveOperationPhase::AwaitingWave:
-            OperationStatusText = NSLOCTEXT(
-                "BrokenHorizon",
-                "ReplicatedOperationAwaitingWave",
-                "Prepare for the next enemy wave"
+            OperationStatusText = FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "ReplicatedOperationAwaitingWaveDetailed",
+                    "{0} // WAVE {1}/{2} CLEAR\n"
+                    "REINFORCEMENTS {3}s // SUPPORT {4}/{5}"
+                ),
+                OperationLabel,
+                FText::AsNumber(CurrentWave),
+                FText::AsNumber(TotalWaveCount),
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        FMath::CeilToInt(
+                            ReplicatedOperationState
+                                .SecondsUntilNextWave
+                        )
+                    )
+                ),
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.LivingAllyCount
+                    )
+                ),
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.FriendlySupportCount
+                    )
+                )
             );
             break;
         case EBHActiveOperationPhase::Securing:
-            OperationStatusText = NSLOCTEXT(
-                "BrokenHorizon",
-                "ReplicatedOperationSecuring",
-                "Secure and hold the objective"
+            OperationStatusText = FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "ReplicatedOperationSecuringDetailed",
+                    "{0} // SECURE AND HOLD\nSUPPORT {1}/{2}"
+                ),
+                OperationLabel,
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.LivingAllyCount
+                    )
+                ),
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.FriendlySupportCount
+                    )
+                )
             );
             break;
         case EBHActiveOperationPhase::RaidExfiltration:
-            OperationStatusText = NSLOCTEXT(
-                "BrokenHorizon",
-                "ReplicatedOperationRaidExfiltration",
-                "Break contact and leave the raid area"
+            OperationStatusText = FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "ReplicatedOperationRaidExfiltrationDetailed",
+                    "{0} // BREAK CONTACT\nSUPPORT {1}/{2}"
+                ),
+                OperationLabel,
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.LivingAllyCount
+                    )
+                ),
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.FriendlySupportCount
+                    )
+                )
             );
             break;
         default:
-            OperationStatusText = NSLOCTEXT(
-                "BrokenHorizon",
-                "ReplicatedOperationCombat",
-                "Operation active"
+            OperationStatusText = FText::Format(
+                NSLOCTEXT(
+                    "BrokenHorizon",
+                    "ReplicatedOperationCombatDetailed",
+                    "{0} // WAVE {1}/{2}\n"
+                    "HOSTILES {3} // LOSSES {4} // SUPPORT {5}/{6}"
+                ),
+                OperationLabel,
+                FText::AsNumber(CurrentWave),
+                FText::AsNumber(TotalWaveCount),
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.LivingEnemyCount
+                    )
+                ),
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.EnemyCasualties
+                    )
+                ),
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.LivingAllyCount
+                    )
+                ),
+                FText::AsNumber(
+                    FMath::Max(
+                        0,
+                        ReplicatedOperationState.FriendlySupportCount
+                    )
+                )
             );
             break;
         }
@@ -5483,11 +5835,18 @@ void ABHCharacter::UpdateResupplyWaypointHUD(float DeltaTime)
 
     const FVector ToStation =
         NearestStation->GetActorLocation() - GetActorLocation();
-    CombatStatusWidget->SetResupplyWaypoint(
-        true,
+    const FText StationDisplayName =
         NearestSector.DisplayName.IsEmpty()
             ? FText::FromName(NearestSector.SectorID)
-            : NearestSector.DisplayName,
+            : NearestSector.DisplayName;
+    CombatStatusWidget->SetResupplyWaypoint(
+        true,
+        FText::FromString(
+            UBHCombatStatusWidget::BuildResupplyWaypointLabel(
+                StationDisplayName.ToString(),
+                FieldSquadMembersNeedingService
+            )
+        ),
         ToStation,
         ToStation.Size2D()
     );
@@ -6021,12 +6380,58 @@ void ABHCharacter::UpdateVehicleReadinessHUD()
     const bool bDriving =
         IsValid(Transport) && Transport->GetOccupant() == this;
 
+    float CargoSupply = 0.0f;
+    EBHWarConvoyCargoType CargoType =
+        EBHWarConvoyCargoType::MilitarySupply;
+    FText DestinationName = FText::GetEmpty();
+
+    if (bDriving)
+    {
+        CargoSupply = Transport->GetCargoSupply();
+        CargoType = Transport->GetCargoType();
+
+        if (CargoSupply > KINDA_SMALL_NUMBER)
+        {
+            const FName DestinationSectorID =
+                Transport->GetCargoDestinationSectorID();
+            UWorld* World = GetWorld();
+            UGameInstance* GameInstance = IsValid(World)
+                ? World->GetGameInstance()
+                : nullptr;
+            UBHWarSubsystem* WarSubsystem = IsValid(GameInstance)
+                ? GameInstance->GetSubsystem<UBHWarSubsystem>()
+                : nullptr;
+
+            if (IsValid(WarSubsystem) &&
+                !DestinationSectorID.IsNone())
+            {
+                DestinationName = WarSubsystem->GetSectorState(
+                    DestinationSectorID
+                ).DisplayName;
+            }
+
+            if (DestinationName.IsEmpty() &&
+                !DestinationSectorID.IsNone())
+            {
+                DestinationName = FText::FromName(
+                    DestinationSectorID
+                );
+            }
+        }
+    }
+
     CombatStatusWidget->SetVehicleReadiness(
         bDriving,
         bDriving ? Transport->GetFuelPercentage() : 1.0f,
         bDriving ? Transport->GetHullPercentage() : 1.0f,
         bDriving ? Transport->GetSpeedKPH() : 0.0f,
         bDriving && Transport->IsImmobilized()
+    );
+    CombatStatusWidget->SetVehicleLogisticsStatus(
+        bDriving,
+        CargoSupply,
+        CargoType,
+        DestinationName
     );
 }
 
@@ -6155,6 +6560,62 @@ bool ABHCharacter::ConfigureFieldSquadContextReplicationTest(
         GetLivingFieldSquadCount()
     );
     return true;
+}
+
+bool ABHCharacter::PrepareFieldSquadCasualtyForTransportTest()
+{
+    if (!HasAuthority())
+    {
+        return false;
+    }
+
+    for (ABHEnemySoldier* Member : FieldSquadMembers)
+    {
+        if (!IsValid(Member) ||
+            Member->IsDead() ||
+            Member->IsIncapacitated())
+        {
+            continue;
+        }
+
+        UBHHealthComponent* MemberHealth =
+            Member->GetHealthComponent();
+        if (!IsValid(MemberHealth))
+        {
+            continue;
+        }
+
+        const float DamageApplied = MemberHealth->ApplyDamage(
+            MemberHealth->GetCurrentHealth() + 1.0f,
+            this
+        );
+        if (DamageApplied <= 0.0f ||
+            !Member->IsIncapacitated())
+        {
+            continue;
+        }
+
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_FIELD_SQUAD_CASUALTY_PREPARED "
+                "result=success id=%s"
+            ),
+            *Member->GetFieldOperativeID().ToString()
+        );
+        return true;
+    }
+
+    UE_LOG(
+        LogTemp,
+        Error,
+        TEXT(
+            "BH_TEST_FIELD_SQUAD_CASUALTY_PREPARED "
+            "result=failure"
+        )
+    );
+    return false;
 }
 #endif
 
@@ -6563,8 +7024,74 @@ void ABHCharacter::UpdateFirstPersonPresentationOffsets(float DeltaTime)
     );
 }
 
+void ABHCharacter::EnsureInteractionPromptWidget()
+{
+    if (IsValid(InteractionPromptWidget) || !IsPlayerControlled())
+    {
+        return;
+    }
+
+    APlayerController* PlayerController =
+        ResolveOwningPlayerController();
+    if (!IsValid(PlayerController) ||
+        PlayerController->GetLocalPlayer() == nullptr)
+    {
+        return;
+    }
+
+    const TSubclassOf<UBHInteractionPromptWidget> WidgetClass =
+        TSubclassOf<UBHInteractionPromptWidget>(
+            UBHInteractionPromptWidget::StaticClass()
+        );
+    InteractionPromptWidget = CreateWidget<UBHInteractionPromptWidget>(
+        PlayerController,
+        WidgetClass
+    );
+
+    if (IsValid(InteractionPromptWidget))
+    {
+        InteractionPromptWidget->SetAlignmentInViewport(
+            FVector2D(0.5f, 0.5f)
+        );
+        InteractionPromptWidget->SetPositionInViewport(
+            FVector2D::ZeroVector,
+            false
+        );
+        InteractionPromptWidget->SetDesiredSizeInViewport(
+            FVector2D(760.0f, 96.0f)
+        );
+        InteractionPromptWidget->SetAnchorsInViewport(
+            FAnchors(0.5f, 0.42f, 0.5f, 0.42f)
+        );
+        InteractionPromptWidget->AddToViewport(60);
+        InteractionPromptWidget->SetVisibility(
+            ESlateVisibility::Collapsed
+        );
+
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_INTERACTION_PROMPT_NATIVE_RETRY class=%s"
+            ),
+            *WidgetClass->GetPathName()
+        );
+    }
+    else
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT("BH_INTERACTION_PROMPT_CREATE_RETRY_FAILED class=%s"),
+            *WidgetClass->GetPathName()
+        );
+    }
+}
+
 void ABHCharacter::UpdateInteractionPrompt()
 {
+    EnsureInteractionPromptWidget();
+
     if (!IsValid(InteractionPromptWidget) || !IsValid(FirstPersonCamera))
     {
         return;
@@ -6572,45 +7099,45 @@ void ABHCharacter::UpdateInteractionPrompt()
 
     if (!IsPlayerControlled())
     {
-        InteractionPromptWidget->SetVisibility(
-            ESlateVisibility::Hidden
-        );
+        InteractionPromptWidget->ClearInteractionText();
         return;
     }
 
-    const FVector TraceStart = FirstPersonCamera->GetComponentLocation();
-    const FVector TraceEnd =
-        TraceStart +
-        (FirstPersonCamera->GetForwardVector() * InteractionDistance);
-
-    FHitResult HitResult;
-
-    FCollisionQueryParams QueryParams;
-    QueryParams.AddIgnoredActor(this);
-
-    const bool bHit = GetWorld()->LineTraceSingleByChannel(
-        HitResult,
-        TraceStart,
-        TraceEnd,
-        ECC_Visibility,
-        QueryParams
-    );
-
-    if (!bHit)
+    AActor* HitActor = nullptr;
+    if (!ResolveInteractionTarget(HitActor))
     {
-        InteractionPromptWidget->SetVisibility(
-            ESlateVisibility::Hidden
-        );
+        InteractionPromptWidget->ClearInteractionText();
         return;
     }
 
-    AActor* HitActor = HitResult.GetActor();
     const UBHUserSettingsSubsystem* UserSettings = GetUserSettings();
     const auto ResolveInputPrompts = [UserSettings](const FText& SourceText)
     {
         return IsValid(UserSettings)
             ? UserSettings->ResolveLegacyInputPrompts(SourceText)
             : SourceText;
+    };
+    const auto ApplyInteractionPrompt = [this](const FText& PromptText)
+    {
+        InteractionPromptWidget->SetInteractionText(PromptText);
+        InteractionPromptWidget->SetVisibility(ESlateVisibility::Visible);
+
+#if !UE_BUILD_SHIPPING
+        if (GEngine && IsLocallyControlled())
+        {
+            GEngine->AddOnScreenDebugMessage(
+                0xBADC0DEULL,
+                0.12f,
+                FColor(255, 220, 96),
+                FString::Printf(
+                    TEXT("INTERACTION // %s"),
+                    *PromptText.ToString()
+                ),
+                true,
+                FVector2D(1.25f, 1.25f)
+            );
+        }
+#endif
     };
 
     if (ABHCharacter* PlayerCasualty = Cast<ABHCharacter>(HitActor);
@@ -6619,7 +7146,7 @@ void ABHCharacter::UpdateInteractionPrompt()
     {
         const bool bStabilized =
             PlayerCasualty->IsPlayerCasualtyStabilized();
-        InteractionPromptWidget->SetInteractionText(
+        ApplyInteractionPrompt(
             ResolveInputPrompts(
                 bStabilized
                     ? NSLOCTEXT(
@@ -6641,9 +7168,6 @@ void ABHCharacter::UpdateInteractionPrompt()
                     )
             )
         );
-        InteractionPromptWidget->SetVisibility(
-            ESlateVisibility::Visible
-        );
         return;
     }
 
@@ -6651,14 +7175,13 @@ void ABHCharacter::UpdateInteractionPrompt()
         IsValid(Teammate) && Teammate != this &&
         Teammate->IsPlayerControlled())
     {
-        InteractionPromptWidget->SetInteractionText(
+        ApplyInteractionPrompt(
             ResolveInputPrompts(NSLOCTEXT(
                 "BrokenHorizon",
                 "ShareFieldSuppliesPrompt",
                 "Hold [F] to share ammunition and critical supplies"
             ))
         );
-        InteractionPromptWidget->SetVisibility(ESlateVisibility::Visible);
         return;
     }
 
@@ -6687,10 +7210,9 @@ void ABHCharacter::UpdateInteractionPrompt()
                             ->GetSurrenderEscapeSecondsRemaining()
                     ))
                 );
-        InteractionPromptWidget->SetInteractionText(
+        ApplyInteractionPrompt(
             ResolveInputPrompts(PromptText)
         );
-        InteractionPromptWidget->SetVisibility(ESlateVisibility::Visible);
         return;
     }
 
@@ -6700,7 +7222,7 @@ void ABHCharacter::UpdateInteractionPrompt()
         DownedOperative->IsIncapacitated() &&
         IsSharedFieldSquadMember(DownedOperative))
     {
-        InteractionPromptWidget->SetInteractionText(
+        ApplyInteractionPrompt(
             ResolveInputPrompts(
                 FText::Format(
                     NSLOCTEXT(
@@ -6718,9 +7240,6 @@ void ABHCharacter::UpdateInteractionPrompt()
                 )
             )
         );
-        InteractionPromptWidget->SetVisibility(
-            ESlateVisibility::Visible
-        );
         return;
     }
 
@@ -6732,18 +7251,13 @@ void ABHCharacter::UpdateInteractionPrompt()
         const FText PromptText =
             IBHInteractable::Execute_GetInteractionText(HitActor);
 
-        InteractionPromptWidget->SetInteractionText(
+        ApplyInteractionPrompt(
             ResolveInputPrompts(PromptText)
-        );
-        InteractionPromptWidget->SetVisibility(
-            ESlateVisibility::Visible
         );
     }
     else
     {
-        InteractionPromptWidget->SetVisibility(
-            ESlateVisibility::Hidden
-        );
+        InteractionPromptWidget->ClearInteractionText();
     }
 } 
 
@@ -7469,26 +7983,187 @@ bool ABHCharacter::ResolveInteractionTarget(
         TraceStart +
         (FirstPersonCamera->GetForwardVector() * InteractionDistance);
 
+    const auto IsInteractable = [](const AActor* Candidate)
+    {
+        return IsValid(Candidate) &&
+            Candidate->GetClass()->ImplementsInterface(
+                UBHInteractable::StaticClass()
+            );
+    };
+
     FHitResult Hit;
     FCollisionQueryParams QueryParams(
         SCENE_QUERY_STAT(BHCharacterInteraction),
-        true,
+        false,
         this
     );
     QueryParams.AddIgnoredActor(this);
 
-    if (!GetWorld()->LineTraceSingleByChannel(
+    const auto HasLineOfSight = [this, &TraceStart, &QueryParams](
+        AActor* Candidate,
+        const FVector& TargetPoint
+    )
+    {
+        FHitResult VisibilityHit;
+        const bool bVisibilityHit = GetWorld()->LineTraceSingleByChannel(
+            VisibilityHit,
+            TraceStart,
+            TargetPoint,
+            ECC_Visibility,
+            QueryParams
+        );
+
+        return !bVisibilityHit || VisibilityHit.GetActor() == Candidate;
+    };
+
+    const bool bLineTraceHit = GetWorld()->LineTraceSingleByChannel(
         Hit,
         TraceStart,
         TraceEnd,
         ECC_Visibility,
-        QueryParams))
+        QueryParams
+    );
+
+    AActor* ResolvedTarget =
+        bLineTraceHit && IsInteractable(Hit.GetActor())
+            ? Hit.GetActor()
+            : nullptr;
+    float ResolvedDistance = ResolvedTarget ? Hit.Distance : 0.0f;
+
+    bool bUsedSphereFallback = false;
+    bool bUsedProximityFallback = false;
+    if (!IsValid(ResolvedTarget))
+    {
+        TArray<FHitResult> SweepHits;
+        const bool bSweepHit = GetWorld()->SweepMultiByChannel(
+            SweepHits,
+            TraceStart,
+            TraceEnd,
+            FQuat::Identity,
+            ECC_Visibility,
+            FCollisionShape::MakeSphere(72.0f),
+            QueryParams
+        );
+
+        if (bSweepHit)
+        {
+            for (const FHitResult& SweepHit : SweepHits)
+            {
+                AActor* Candidate = SweepHit.GetActor();
+                if (!IsInteractable(Candidate))
+                {
+                    continue;
+                }
+
+                if (HasLineOfSight(Candidate, Candidate->GetActorLocation()))
+                {
+                    ResolvedTarget = Candidate;
+                    ResolvedDistance = SweepHit.Distance;
+                    bUsedSphereFallback = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!IsValid(ResolvedTarget))
+    {
+        const FVector CameraForward = FirstPersonCamera->GetForwardVector();
+        const float MaxInteractionDistance =
+            FMath::Max(100.0f, InteractionDistance);
+        const float MinimumViewDot = 0.45f;
+        float BestCandidateScore = TNumericLimits<float>::Max();
+
+        for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+        {
+            AActor* Candidate = *It;
+            if (!IsInteractable(Candidate) || Candidate == this)
+            {
+                continue;
+            }
+
+            const FBox CandidateBounds =
+                Candidate->GetComponentsBoundingBox(true);
+            if (!CandidateBounds.IsValid)
+            {
+                continue;
+            }
+
+            const FVector CandidatePoint = CandidateBounds.GetCenter();
+            const FVector ToCandidate = CandidatePoint - TraceStart;
+            const float CandidateCenterDistance = ToCandidate.Size();
+            if (CandidateCenterDistance <= KINDA_SMALL_NUMBER)
+            {
+                continue;
+            }
+
+            const FVector ClosestPoint =
+                CandidateBounds.GetClosestPointTo(TraceStart);
+            const float CandidateDistance =
+                FVector::Dist(TraceStart, ClosestPoint);
+            if (CandidateDistance > MaxInteractionDistance)
+            {
+                continue;
+            }
+
+            const float ViewDot = FVector::DotProduct(
+                CameraForward,
+                ToCandidate / CandidateCenterDistance
+            );
+            if (ViewDot < MinimumViewDot ||
+                !HasLineOfSight(Candidate, CandidatePoint))
+            {
+                continue;
+            }
+
+            const float CandidateScore =
+                CandidateDistance + ((1.0f - ViewDot) * 400.0f);
+            if (CandidateScore < BestCandidateScore)
+            {
+                BestCandidateScore = CandidateScore;
+                ResolvedTarget = Candidate;
+                ResolvedDistance = CandidateDistance;
+                bUsedProximityFallback = true;
+            }
+        }
+    }
+
+    static double LastTraceDiagnosticTime = -1.0;
+    const double CurrentTraceTime = GetWorld()->GetTimeSeconds();
+    if (IsLocallyControlled() &&
+        (LastTraceDiagnosticTime < 0.0 ||
+         CurrentTraceTime - LastTraceDiagnosticTime >= 0.5))
+    {
+        LastTraceDiagnosticTime = CurrentTraceTime;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_INTERACTION_TRACE hit=%d actor=%s class=%s "
+                "implements=%d distance=%.1f sphere_fallback=%d "
+                "proximity_fallback=%d"
+            ),
+            IsValid(ResolvedTarget) ? 1 : 0,
+            IsValid(ResolvedTarget)
+                ? *ResolvedTarget->GetName()
+                : TEXT("None"),
+            IsValid(ResolvedTarget)
+                ? *ResolvedTarget->GetClass()->GetPathName()
+                : TEXT("None"),
+            IsInteractable(ResolvedTarget) ? 1 : 0,
+            ResolvedDistance,
+            bUsedSphereFallback ? 1 : 0,
+            bUsedProximityFallback ? 1 : 0
+        );
+    }
+
+    if (!IsValid(ResolvedTarget))
     {
         return false;
     }
 
-    OutTarget = Hit.GetActor();
-    return IsValid(OutTarget);
+    OutTarget = ResolvedTarget;
+    return true;
 }
 
 bool ABHCharacter::ResolveFieldSquadContextTarget(
@@ -7585,14 +8260,35 @@ void ABHCharacter::AddKeycard(const FName KeycardID)
 {
     if (!KeycardID.IsNone())
     {
-        OwnedKeycards.Add(KeycardID);
+        OwnedKeycards.AddUnique(KeycardID);
+        ForceNetUpdate();
+        RefreshOpenInventoryPanel();
     }
+}
+
+bool ABHCharacter::RemoveKeycard(const FName KeycardID)
+{
+    if (!HasAuthority() || KeycardID.IsNone())
+    {
+        return false;
+    }
+
+    const bool bRemoved = OwnedKeycards.Remove(KeycardID) > 0;
+    if (bRemoved)
+    {
+        ForceNetUpdate();
+        RefreshOpenInventoryPanel();
+    }
+
+    return bRemoved;
 }
 
 void ABHCharacter::EndPlay(
     const EEndPlayReason::Type EndPlayReason
 )
 {
+    UnbindActiveOperationSnapshotPresentation();
+
     if (UGameInstance* GameInstance = GetGameInstance())
     {
         if (UBHUserSettingsSubsystem* SettingsSubsystem =
@@ -7662,8 +8358,10 @@ bool ABHCharacter::CollectKeycard(
         return false;
     }
 
-    OwnedKeycards.Add(KeycardID);
+    OwnedKeycards.AddUnique(KeycardID);
     CollectedKeycardPersistenceIDs.Add(PickupPersistenceID);
+    ForceNetUpdate();
+    RefreshOpenInventoryPanel();
     return true;
 }
 
@@ -7674,7 +8372,7 @@ bool ABHCharacter::HasKeycard(const FName KeycardID) const
 
 TArray<FName> ABHCharacter::GetOwnedKeycardIDs() const
 {
-    return OwnedKeycards.Array();
+    return OwnedKeycards;
 }
 
 TArray<FName>
@@ -7739,6 +8437,116 @@ bool ABHCharacter::CompleteSharedObjective(FName ObjectiveID)
     return bInitiatingCharacterCompleted;
 }
 
+void ABHCharacter::FailSharedOperationObjectives()
+{
+    if (!HasAuthority() || GetWorld() == nullptr)
+    {
+        return;
+    }
+
+    int32 FailedParticipantCount = 0;
+    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+    {
+        ABHCharacter* Participant = *It;
+        if (!IsValid(Participant) ||
+            Participant == this ||
+            !Participant->IsPlayerControlled() ||
+            !Participant->bRuntimeWarOperation ||
+            Participant->AssignedWarSectorID != AssignedWarSectorID ||
+            Participant->AssignedWarPriorityType !=
+                AssignedWarPriorityType ||
+            Participant->bIsHandlingMissionComplete ||
+            !IsValid(Participant->ObjectiveComponent) ||
+            Participant->ObjectiveComponent->IsMissionComplete() ||
+            Participant->ObjectiveComponent->IsMissionFailed() ||
+            Participant->ObjectiveComponent->GetCurrentObjectiveID().IsNone())
+        {
+            continue;
+        }
+
+        if (Participant->ObjectiveComponent->FailMission())
+        {
+            ++FailedParticipantCount;
+        }
+    }
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_SHARED_OPERATION_FAILURE_PROPAGATED "
+            "sector=%s participants=%d"
+        ),
+        *AssignedWarSectorID.ToString(),
+        FailedParticipantCount
+    );
+
+    if (FailedParticipantCount > 0)
+    {
+        UBHSaveSubsystem* SaveSubsystem = GetGameInstance()
+            ? GetGameInstance()->GetSubsystem<UBHSaveSubsystem>()
+            : nullptr;
+        if (!IsValid(SaveSubsystem) || !SaveSubsystem->SaveProgress())
+        {
+            UE_LOG(
+                LogTemp,
+                Error,
+                TEXT(
+                    "BH_SHARED_OPERATION_FAILURE_CHECKPOINT_FAILED "
+                    "participants=%d"
+                ),
+                FailedParticipantCount
+            );
+        }
+    }
+}
+
+void ABHCharacter::PropagateSharedOperationFailure()
+{
+    if (!HasAuthority() ||
+        GetWorld() == nullptr ||
+        !bRuntimeWarOperation ||
+        AssignedWarSectorID.IsNone() ||
+        AssignedWarPriorityType == EBHWarPriorityType::None)
+    {
+        return;
+    }
+
+    FailSharedOperationObjectives();
+
+    int32 DebriefParticipantCount = 0;
+    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+    {
+        ABHCharacter* Participant = *It;
+        if (!IsValid(Participant) ||
+            !Participant->IsPlayerControlled() ||
+            !Participant->IsRuntimeWarOperation() ||
+            Participant->GetAssignedWarSectorID() !=
+                AssignedWarSectorID ||
+            Participant->GetAssignedWarPriorityType() !=
+                AssignedWarPriorityType)
+        {
+            continue;
+        }
+
+        Participant->PresentSharedOperationDebrief(
+            MissionCompleteMessage
+        );
+        ++DebriefParticipantCount;
+    }
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_SHARED_OPERATION_FAILURE_DEBRIEF "
+            "sector=%s participants=%d"
+        ),
+        *AssignedWarSectorID.ToString(),
+        DebriefParticipantCount
+    );
+}
+
 void ABHCharacter::RefreshReplicatedMissionPresentation()
 {
     if (HasAuthority())
@@ -7747,8 +8555,32 @@ void ABHCharacter::RefreshReplicatedMissionPresentation()
     }
 
     RefreshObjectiveWidget();
-    if (IsMissionComplete() && !bIsHandlingMissionComplete)
+    const bool bTerminalMissionState =
+        IsMissionComplete() || IsMissionFailed();
+    if (bTerminalMissionState && !bIsHandlingMissionComplete)
     {
+#if !UE_BUILD_SHIPPING
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_OPERATION_DEBRIEF_RESTORED result=success "
+                "failed=%d complete=%d"
+            ),
+            IsMissionFailed() ? 1 : 0,
+            IsMissionComplete() ? 1 : 0
+        );
+#endif
+        if (IsMissionFailed())
+        {
+            MissionCompleteMessage = NSLOCTEXT(
+                "BrokenHorizon",
+                "ReplicatedMissionFailureFallback",
+                "MISSION FAILED\n\n"
+                "The failed operation is recorded in the campaign."
+            );
+        }
+
         EnterMissionCompleteState(false);
     }
 }
@@ -7771,7 +8603,7 @@ bool ABHCharacter::AdoptSharedMissionStateFrom(
     for (const FName KeycardID :
          SourceCharacter->GetOwnedKeycardIDs())
     {
-        OwnedKeycards.Add(KeycardID);
+        OwnedKeycards.AddUnique(KeycardID);
     }
     CollectedKeycardPersistenceIDs.Reset();
     for (const FName PersistenceID :
@@ -9175,7 +10007,8 @@ int32 ABHCharacter::GetFieldSquadMembersNeedingServiceCount() const
 
 int32 ABHCharacter::ServiceFieldSquadMembers(
     const FVector& ServiceLocation,
-    float ServiceRadius
+    float ServiceRadius,
+    bool bAtRescueTreatmentDestination
 )
 {
     const float RadiusSquared = FMath::Square(
@@ -9193,6 +10026,12 @@ int32 ABHCharacter::ServiceFieldSquadMembers(
                 EBHWarPriorityType::Rescue
             ? WarSubsystem->GetCommittedOperationTargetID()
             : NAME_None;
+    const bool bCanCompleteRescue =
+        bAtRescueTreatmentDestination &&
+        AssignedWarPriorityType == EBHWarPriorityType::Rescue &&
+        IsValid(WarSubsystem) &&
+        WarSubsystem->GetCommittedOperationSectorID() ==
+            AssignedWarSectorID;
 
     for (ABHEnemySoldier* Member : FieldSquadMembers)
     {
@@ -9214,7 +10053,8 @@ int32 ABHCharacter::ServiceFieldSquadMembers(
                 ++ServicedCount;
                 bStabilizedCasualty = true;
                 bCompletedRescue = bCompletedRescue ||
-                    (bServiced &&
+                    (bCanCompleteRescue &&
+                     bServiced &&
                      Member->GetFieldOperativeID() ==
                         RescueTargetID);
             }
@@ -9229,7 +10069,8 @@ int32 ABHCharacter::ServiceFieldSquadMembers(
         const bool bServiced = Member->ServiceCombatLoadout();
         ServicedCount += bServiced ? 1 : 0;
         bCompletedRescue = bCompletedRescue ||
-            (bServiced &&
+            (bCanCompleteRescue &&
+             bServiced &&
              Member->GetFieldOperativeID() == RescueTargetID);
     }
 
@@ -9238,8 +10079,21 @@ int32 ABHCharacter::ServiceFieldSquadMembers(
         ApplyFieldSquadOrder();
     }
 
-    if (bCompletedRescue)
+    if (bCompletedRescue &&
+        GetCurrentObjectiveID() == BHObjectiveIds::EvacuateCasualty)
     {
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_RESCUE_TREATMENT_COMPLETED casualty=%s "
+                "destination=%s"
+            ),
+            *RescueTargetID.ToString(),
+            IsValid(WarSubsystem)
+                ? *WarSubsystem->GetCommittedOperationSectorID().ToString()
+                : TEXT("None")
+        );
         CompleteObjective(BHObjectiveIds::EvacuateCasualty);
     }
 
@@ -11842,6 +12696,8 @@ bool ABHCharacter::FailCurrentWarOperation(
         WarSubsystem->GetSectorState(AssignedWarSectorID);
     const FName ResolvedOperationID =
         WarSubsystem->GetCommittedOperationID();
+    const FName ResolvedOperationTargetID =
+        WarSubsystem->GetCommittedOperationTargetID();
     const int32 FriendlySupportLosses =
         IsValid(OpenWorldOperationDirector)
             ? OpenWorldOperationDirector
@@ -12055,11 +12911,20 @@ bool ABHCharacter::FailCurrentWarOperation(
             )
             : AssignedWarPriorityType ==
                     EBHWarPriorityType::Rescue
-            ? NSLOCTEXT(
-                "BrokenHorizon",
-                "WarRescueFailedDebrief",
-                "CASUALTY NOT EVACUATED"
-            )
+            ? ResolvedOperationTargetID.IsNone()
+                ? NSLOCTEXT(
+                    "BrokenHorizon",
+                    "WarRescueFailedDebrief",
+                    "CASUALTY NOT EVACUATED"
+                )
+                : FText::Format(
+                    NSLOCTEXT(
+                        "BrokenHorizon",
+                        "WarRescueFailedAssignedDebrief",
+                        "CASUALTY {0} NOT EVACUATED"
+                    ),
+                    FText::FromName(ResolvedOperationTargetID)
+                )
             : AssignedWarPriorityType ==
                     EBHWarPriorityType::Recon
             ? NSLOCTEXT(
@@ -12400,7 +13265,14 @@ void ABHCharacter::ApplyRapidOperationRedeployment()
 
 void ABHCharacter::PrepareDeploymentModeForTest()
 {
-    if (!FParse::Param(FCommandLine::Get(), TEXT("BHTestBeginCommittedOperation")))
+    if (!FParse::Param(
+            FCommandLine::Get(),
+            TEXT("BHTestBeginCommittedOperation")
+        ) &&
+        !FParse::Param(
+            FCommandLine::Get(),
+            TEXT("BHTestDefenseAGarrisonPersistence")
+        ))
     {
         return;
     }
@@ -13001,6 +13873,18 @@ void ABHCharacter::UpdateCarryLoadHUD()
     );
 }
 
+void ABHCharacter::RefreshOpenInventoryPanel()
+{
+    if (!IsLocallyControlled() ||
+        !IsValid(InventoryWidget) ||
+        !InventoryWidget->IsInventoryOpen())
+    {
+        return;
+    }
+
+    InventoryWidget->SetInventorySnapshot(GetInventorySnapshot());
+}
+
 void ABHCharacter::OnRep_FragInventory()
 {
     FragGrenadeCount = FMath::Clamp(
@@ -13013,6 +13897,7 @@ void ABHCharacter::OnRep_FragInventory()
         CombatStatusWidget->SetFragGrenadeCount(FragGrenadeCount);
     }
     UpdateCarryLoadHUD();
+    RefreshOpenInventoryPanel();
 }
 
 void ABHCharacter::OnRep_SmokeGrenadeInventory()
@@ -13024,6 +13909,31 @@ void ABHCharacter::OnRep_SmokeGrenadeInventory()
     );
     RefreshSmokeGrenadeHUD();
     UpdateCarryLoadHUD();
+    RefreshOpenInventoryPanel();
+}
+
+void ABHCharacter::OnRep_OwnedKeycards()
+{
+    if (!IsLocallyControlled())
+    {
+        return;
+    }
+
+#if !UE_BUILD_SHIPPING
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_KEYCARD_INVENTORY_REPLICATED mission_items=%d"),
+        OwnedKeycards.Num()
+    );
+#endif
+
+    if (!IsValid(InventoryWidget))
+    {
+        return;
+    }
+
+    InventoryWidget->SetInventorySnapshot(GetInventorySnapshot());
 }
 
 float ABHCharacter::GetCurrentPlayerSuppression() const
@@ -13147,7 +14057,8 @@ FBHInventorySnapshot ABHCharacter::GetInventorySnapshot() const
         GetEngineeringChargeCount()
     );
     Snapshot.AntiVehicleRounds = GetAntiVehicleRoundCount();
-    Snapshot.MissionItemCount = OwnedKeycards.Num();
+    Snapshot.MissionItemIDs = OwnedKeycards;
+    Snapshot.MissionItemCount = Snapshot.MissionItemIDs.Num();
 
     if (IsValid(InjuryComponent))
     {
@@ -13191,13 +14102,17 @@ void ABHCharacter::ToggleInventoryPanel()
 
     if (!IsValid(InventoryWidget))
     {
-        if (!InventoryWidgetClass || !IsValid(GetWorld()))
+        APlayerController* PlayerController =
+            ResolveOwningPlayerController();
+        if (!InventoryWidgetClass ||
+            !IsValid(GetWorld()) ||
+            !IsValid(PlayerController))
         {
             return;
         }
 
         InventoryWidget = CreateWidget<UBHInventoryWidget>(
-            GetWorld()->GetFirstPlayerController(),
+            PlayerController,
             InventoryWidgetClass
         );
         if (!IsValid(InventoryWidget))
@@ -13205,6 +14120,16 @@ void ABHCharacter::ToggleInventoryPanel()
             return;
         }
         InventoryWidget->InitializeInventory(this);
+        InventoryWidget->SetAnchorsInViewport(
+            FAnchors(0.0f, 0.0f, 1.0f, 1.0f)
+        );
+        InventoryWidget->SetAlignmentInViewport(
+            FVector2D::ZeroVector
+        );
+        InventoryWidget->SetPositionInViewport(
+            FVector2D::ZeroVector,
+            false
+        );
         InventoryWidget->AddToViewport(280);
     }
 
@@ -13462,7 +14387,45 @@ void ABHCharacter::ServerTransferInventoryItem_Implementation(
 
 bool ABHCharacter::TransferFragToNearestAlly(int32 Quantity)
 {
+    Quantity = FMath::Clamp(Quantity, 1, 32);
     if (!HasAuthority())
+    {
+        ServerTransferFragToNearestAlly(Quantity);
+        return true;
+    }
+
+    if (!IsValid(GetWorld()))
+    {
+        return false;
+    }
+
+    return TransferInventoryItemToNearestAllyAuthority(
+        EBHSalvagePickupType::FragGrenades,
+        Quantity
+    );
+}
+
+bool ABHCharacter::TransferInventoryItemToNearestAlly(
+    EBHSalvagePickupType ItemType,
+    int32 Quantity
+)
+{
+    Quantity = FMath::Clamp(Quantity, 1, 32);
+    if (!HasAuthority())
+    {
+        ServerTransferInventoryItemToNearestAlly(ItemType, Quantity);
+        return true;
+    }
+
+    return TransferInventoryItemToNearestAllyAuthority(ItemType, Quantity);
+}
+
+bool ABHCharacter::TransferInventoryItemToNearestAllyAuthority(
+    EBHSalvagePickupType ItemType,
+    int32 Quantity
+)
+{
+    if (!IsValid(GetWorld()))
     {
         return false;
     }
@@ -13487,7 +14450,22 @@ bool ABHCharacter::TransferFragToNearestAlly(int32 Quantity)
         }
     }
     return IsValid(NearestAlly) && TransferInventoryItemTo(
-        NearestAlly, EBHSalvagePickupType::FragGrenades, Quantity);
+        NearestAlly, ItemType, Quantity);
+}
+
+void ABHCharacter::ServerTransferFragToNearestAlly_Implementation(
+    int32 Quantity
+)
+{
+    TransferFragToNearestAlly(Quantity);
+}
+
+void ABHCharacter::ServerTransferInventoryItemToNearestAlly_Implementation(
+    EBHSalvagePickupType ItemType,
+    int32 Quantity
+)
+{
+    TransferInventoryItemToNearestAlly(ItemType, Quantity);
 }
 
 int32 ABHCharacter::GetFragGrenadeCount() const
@@ -13614,7 +14592,7 @@ bool ABHCharacter::RestorePersistentState(
     {
         if (!KeycardID.IsNone())
         {
-            OwnedKeycards.Add(KeycardID);
+            OwnedKeycards.AddUnique(KeycardID);
         }
     }
 
@@ -13691,7 +14669,7 @@ bool ABHCharacter::RestoreRuntimeOperationState(
     {
         if (!KeycardID.IsNone())
         {
-            OwnedKeycards.Add(KeycardID);
+            OwnedKeycards.AddUnique(KeycardID);
         }
     }
 
@@ -13748,11 +14726,20 @@ bool ABHCharacter::RestoreRuntimeOperationState(
     {
         const bool bDirectorStarted =
             StartOpenWorldOperationDirector(true);
+        const bool bOperationUsesTacticalDirector =
+            AssignedWarPriorityType == EBHWarPriorityType::Attack ||
+            AssignedWarPriorityType == EBHWarPriorityType::Defend ||
+            AssignedWarPriorityType == EBHWarPriorityType::Raid;
         const bool bOperationRestored =
             bDirectorStarted &&
-            IsValid(OpenWorldOperationDirector) &&
-            OpenWorldOperationDirector->RestoreOperationState(
-                SavedOpenWorldOperationState
+            (
+                !bOperationUsesTacticalDirector ||
+                (
+                    IsValid(OpenWorldOperationDirector) &&
+                    OpenWorldOperationDirector->RestoreOperationState(
+                        SavedOpenWorldOperationState
+                    )
+                )
             );
 
         if (!bOperationRestored)
@@ -14259,6 +15246,14 @@ void ABHCharacter::ClientPresentOperationDebrief_Implementation(
 {
     MissionCompleteMessage = Message;
 
+#if !UE_BUILD_SHIPPING
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("BH_TEST_OPERATION_DEBRIEF_CLIENT result=success")
+    );
+#endif
+
     if (!bIsHandlingMissionComplete)
     {
         EnterMissionCompleteState(false);
@@ -14523,6 +15518,8 @@ void ABHCharacter::OnMissionCompleted()
             WarSubsystem->GetSectorState(ResolvedSectorID);
         const FName ResolvedOperationID =
             WarSubsystem->GetCommittedOperationID();
+        const FName ResolvedOperationTargetID =
+            WarSubsystem->GetCommittedOperationTargetID();
         bool bWarResultApplied = false;
         EBHRaidOperationalSignature RaidSignature =
             EBHRaidOperationalSignature::Contested;
@@ -14770,11 +15767,22 @@ void ABHCharacter::OnMissionCompleted()
                     )
                     : ResolvedMissionType ==
                             EBHWarPriorityType::Rescue
-                    ? NSLOCTEXT(
-                        "BrokenHorizon",
-                        "WarCasualtyEvacuatedDebrief",
-                        "CASUALTY EVACUATED"
-                    )
+                    ? ResolvedOperationTargetID.IsNone()
+                        ? NSLOCTEXT(
+                            "BrokenHorizon",
+                            "WarCasualtyEvacuatedDebrief",
+                            "CASUALTY EVACUATED"
+                        )
+                        : FText::Format(
+                            NSLOCTEXT(
+                                "BrokenHorizon",
+                                "WarCasualtyEvacuatedAssignedDebrief",
+                                "CASUALTY {0} EVACUATED"
+                            ),
+                            FText::FromName(
+                                ResolvedOperationTargetID
+                            )
+                        )
                     : ResolvedMissionType ==
                             EBHWarPriorityType::Recon
                     ? NSLOCTEXT(
@@ -15033,6 +16041,31 @@ void ABHCharacter::EnterMissionCompleteState(
     bool bSaveProgress
 )
 {
+    if (bRuntimeWarOperation &&
+        AssignedWarPriorityType != EBHWarPriorityType::None &&
+        !MissionCompleteMessage.ToString().Contains(
+            TEXT("NEXT DEPLOYMENT //")
+        ))
+    {
+        MissionCompleteMessage = FText::Format(
+            NSLOCTEXT(
+                "BrokenHorizon",
+                "PersistentOperationDebriefFieldForce",
+                "{0}\n\n{1}"
+            ),
+            MissionCompleteMessage,
+            FText::FromString(
+                UBHCombatStatusWidget::
+                    BuildFieldSquadDebriefStatusLabel(
+                        GetLivingFieldSquadCount(),
+                        GetIncapacitatedFieldSquadCount(),
+                        GetFieldSquadMembersRequiringEvacuationCount(),
+                        GetFieldSquadMembersNeedingServiceCount()
+                    )
+            )
+        );
+    }
+
     if (bIsHandlingMissionComplete)
     {
         return;
@@ -15077,6 +16110,13 @@ void ABHCharacter::EnterMissionCompleteState(
     if (IsValid(CombatStatusWidget))
     {
         CombatStatusWidget->SetVisibility(
+            ESlateVisibility::Collapsed
+        );
+    }
+
+    if (IsValid(ObjectiveWidget))
+    {
+        ObjectiveWidget->SetVisibility(
             ESlateVisibility::Collapsed
         );
     }
@@ -15799,6 +16839,7 @@ void ABHCharacter::HandleAmmoChanged(
             ReserveAmmo
         );
     }
+    RefreshOpenInventoryPanel();
 }
 
 void ABHCharacter::HandleInjuryStateChanged(
@@ -15821,6 +16862,7 @@ void ABHCharacter::HandleInjuryStateChanged(
             FieldDressings
         );
     }
+    RefreshOpenInventoryPanel();
 }
 
 void ABHCharacter::HandleMedicalStateChanged(
@@ -15841,6 +16883,7 @@ void ABHCharacter::HandleMedicalStateChanged(
             TreatmentProgress
         );
     }
+    RefreshOpenInventoryPanel();
 }
 
 void ABHCharacter::HandleMedkitTreatmentCompleted()
@@ -15990,6 +17033,7 @@ void ABHCharacter::HandleWeaponRoleChanged(
             );
         }
     }
+    RefreshOpenInventoryPanel();
 }
 
 void ABHCharacter::RefreshWeaponFireModeHUD(
@@ -16292,6 +17336,53 @@ void ABHCharacter::NotifyGrenadeThreat(
         ToGrenade,
         ToGrenade.Size(),
         TimeUntilDetonation
+    );
+}
+
+void ABHCharacter::NotifyArmoredThreatContact(
+    AActor* ThreatActor,
+    const FVector& ThreatLocation,
+    bool bActive
+)
+{
+    if (!IsLocallyControlled() || !IsValid(ThreatActor))
+    {
+        return;
+    }
+
+    if (bActive &&
+        (bIsHandlingDeath || bIsHandlingMissionComplete))
+    {
+        return;
+    }
+
+    if (bActive)
+    {
+        EnsureCombatStatusWidget();
+    }
+
+    if (!IsValid(CombatStatusWidget))
+    {
+        return;
+    }
+
+    const FVector ToThreat = ThreatLocation - GetActorLocation();
+    CombatStatusWidget->NotifyArmoredThreat(
+        ThreatActor,
+        ToThreat,
+        ToThreat.Size(),
+        bActive
+    );
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_ARMORED_THREAT_PRESENTATION local=1 threat=%s "
+            "active=%d distance_m=%.0f"
+        ),
+        *ThreatActor->GetName(),
+        bActive ? 1 : 0,
+        ToThreat.Size() / 100.0f
     );
 }
 

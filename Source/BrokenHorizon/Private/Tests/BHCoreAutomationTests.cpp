@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "BHHealthComponent.h"
+#include "BHArmoredThreat.h"
 #include "BHImpactEffect.h"
 #include "BHSmokeGrenade.h"
 #include "BHBattlefieldConditions.h"
@@ -9,6 +10,8 @@
 #include "BHAmmoHUDWidget.h"
 #include "BHHitMarkerWidget.h"
 #include "BHCharacter.h"
+#include "BHInventoryWidget.h"
+#include "BHMissionItemContainer.h"
 #include "BHCombatStatusWidget.h"
 #include "BHEnemySoldier.h"
 #include "BHEnemyAIController.h"
@@ -26,6 +29,7 @@
 #include "BHRaidSabotageTarget.h"
 #include "BHRifle.h"
 #include "BHSaveGame.h"
+#include "BHSalvagePickup.h"
 #include "BHSubtitleWidget.h"
 #include "BHTacticalSupportZone.h"
 #include "BHSectorAnchor.h"
@@ -67,6 +71,53 @@ bool FBHOperationVariationSelectionContractTest::RunTest(
         );
     TestTrue(TEXT("Variation selection is bounded"), First >= 0 && First <= 1);
     TestEqual(TEXT("Variation selection is deterministic"), First, Repeated);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHOperationSnapshotCompatibilityTest,
+    "BrokenHorizon.Missions.OperationSnapshot.Compatibility",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHOperationSnapshotCompatibilityTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+    const FName SavedOperationID(TEXT("Operation_DefenseA"));
+    const FName OtherOperationID(TEXT("Operation_AttackA"));
+
+    TestTrue(
+        TEXT("Legacy snapshots without an operation identity remain restorable"),
+        ABHOpenWorldOperationDirector::IsOperationSnapshotCompatible(
+            NAME_None,
+            OtherOperationID
+        )
+    );
+    TestTrue(
+        TEXT("Snapshots restore when the committed operation identity matches"),
+        ABHOpenWorldOperationDirector::IsOperationSnapshotCompatible(
+            SavedOperationID,
+            SavedOperationID
+        )
+    );
+    TestFalse(
+        TEXT("Snapshots with an operation identity reject missing committed operations"),
+        ABHOpenWorldOperationDirector::IsOperationSnapshotCompatible(
+            SavedOperationID,
+            NAME_None
+        )
+    );
+    TestFalse(
+        TEXT("Snapshots reject a different committed operation identity"),
+        ABHOpenWorldOperationDirector::IsOperationSnapshotCompatible(
+            SavedOperationID,
+            OtherOperationID
+        )
+    );
+
     return true;
 }
 
@@ -597,6 +648,106 @@ bool FBHFieldSquadServiceCostTest::RunTest(
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHRescueTreatmentDestinationTest,
+    "BrokenHorizon.PersistentWar.Operations.RescueTreatmentDestination",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHRescueTreatmentDestinationTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    const FName DestinationSectorID(TEXT("DovrenVillage"));
+
+    TestTrue(
+        TEXT("A station in the committed destination can treat the rescue casualty"),
+        ABHSectorResupplyStation::IsRescueTreatmentDestination(
+            DestinationSectorID,
+            DestinationSectorID
+        )
+    );
+    TestFalse(
+        TEXT("A station in another sector cannot complete the rescue"),
+        ABHSectorResupplyStation::IsRescueTreatmentDestination(
+            FName(TEXT("EasternDepot")),
+            DestinationSectorID
+        )
+    );
+    TestFalse(
+        TEXT("An unassigned station cannot complete the rescue"),
+        ABHSectorResupplyStation::IsRescueTreatmentDestination(
+            NAME_None,
+            DestinationSectorID
+        )
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHRescueTreatmentPresentationTest,
+    "BrokenHorizon.PersistentWar.Operations.RescueTreatmentPresentation",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHRescueTreatmentPresentationTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    const FName CasualtyID(TEXT("FieldOperative_TestRescue"));
+    const FText TreatmentDestination =
+        FText::FromString(TEXT("Dovren Village"));
+
+    const FString CorrectStationText =
+        ABHSectorResupplyStation::BuildRescueTreatmentInteractionText(
+            true,
+            CasualtyID,
+            TreatmentDestination
+        ).ToString();
+    TestTrue(
+        TEXT("The treatment station prompt names the casualty"),
+        CorrectStationText.Contains(CasualtyID.ToString())
+    );
+    TestTrue(
+        TEXT("The treatment station prompt names the destination"),
+        CorrectStationText.Contains(TreatmentDestination.ToString())
+    );
+    TestTrue(
+        TEXT("The treatment station prompt exposes the treatment action"),
+        CorrectStationText.Contains(TEXT("Treat"))
+    );
+
+    const FString OtherStationText =
+        ABHSectorResupplyStation::BuildRescueTreatmentInteractionText(
+            false,
+            CasualtyID,
+            TreatmentDestination
+        ).ToString();
+    TestTrue(
+        TEXT("A different station keeps ordinary resupply available"),
+        OtherStationText.Contains(TEXT("Resupply"))
+    );
+    TestTrue(
+        TEXT("A different station directs the player to treatment"),
+        OtherStationText.Contains(TreatmentDestination.ToString())
+    );
+    TestTrue(
+        TEXT("Missing Rescue identity does not create a misleading prompt"),
+        ABHSectorResupplyStation::BuildRescueTreatmentInteractionText(
+            true,
+            NAME_None,
+            TreatmentDestination
+        ).IsEmpty()
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBHEmergencyFallbackKitTest,
     "BrokenHorizon.PersistentWar.Logistics.EmergencyFallbackKit",
     EAutomationTestFlags::EditorContext |
@@ -648,6 +799,46 @@ bool FBHEmergencyFallbackKitTest::RunTest(
         ABHSectorResupplyStation::
             CalculateEmergencyFallbackAmmoRequest(20, 90, -30),
         0
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHConvoyRouteChoicePresentationTest,
+    "BrokenHorizon.PersistentWar.Operations.RouteChoicePresentation",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHConvoyRouteChoicePresentationTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    const FString DetailedText =
+        ABHSupplyConvoyTarget::BuildRouteChoiceInteractionText(
+            FText::FromString(TEXT("South Bridge")),
+            FText::FromString(TEXT("Old Quarry"))
+        ).ToString();
+    TestTrue(
+        TEXT("The route prompt names the current corridor"),
+        DetailedText.Contains(TEXT("South Bridge"))
+    );
+    TestTrue(
+        TEXT("The route prompt names the next corridor"),
+        DetailedText.Contains(TEXT("Old Quarry"))
+    );
+    TestTrue(
+        TEXT("The route prompt exposes the reroute action"),
+        DetailedText.Contains(TEXT("reroute"))
+    );
+    TestTrue(
+        TEXT("An incomplete route identity returns no misleading detail"),
+        ABHSupplyConvoyTarget::BuildRouteChoiceInteractionText(
+            FText::GetEmpty(),
+            FText::FromString(TEXT("Old Quarry"))
+        ).IsEmpty()
     );
     return true;
 }
@@ -1604,6 +1795,203 @@ bool FBHFieldTransportPassengerProtectionTest::RunTest(
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHFieldTransportCargoLabelTest,
+    "BrokenHorizon.Gameplay.Transport.CargoLabel",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHFieldTransportCargoLabelTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    const FString MilitaryLabel =
+        ABHFieldTransport::BuildCargoStatusLabel(
+            15.0f,
+            15.0f,
+            EBHWarConvoyCargoType::MilitarySupply,
+            FText::FromString(TEXT("Eastern Depot"))
+        );
+    TestTrue(
+        TEXT("Military cargo identifies its supply type"),
+        MilitaryLabel.Contains(TEXT("SUPPLY"))
+    );
+    TestTrue(
+        TEXT("Military cargo identifies its destination"),
+        MilitaryLabel.Contains(TEXT("EASTERN DEPOT"))
+    );
+
+    const FString AidLabel =
+        ABHFieldTransport::BuildCargoStatusLabel(
+            10.0f,
+            15.0f,
+            EBHWarConvoyCargoType::CivilianAid,
+            FText::FromString(TEXT("Korona Crossroads"))
+        );
+    TestTrue(
+        TEXT("Civilian aid identifies its cargo type"),
+        AidLabel.Contains(TEXT("AID"))
+    );
+    TestTrue(
+        TEXT("Civilian aid identifies its destination"),
+        AidLabel.Contains(TEXT("KORONA CROSSROADS"))
+    );
+
+    TestEqual(
+        TEXT("Empty transport cargo remains explicit"),
+        ABHFieldTransport::BuildCargoStatusLabel(
+            0.0f,
+            15.0f,
+            EBHWarConvoyCargoType::MilitarySupply,
+            FText::FromString(TEXT("Eastern Depot"))
+        ),
+        FString(TEXT("CARGO 0/15"))
+    );
+    TestTrue(
+        TEXT("Loaded cargo without a route exposes the pending state"),
+        ABHFieldTransport::BuildCargoStatusLabel(
+            5.0f,
+            15.0f,
+            EBHWarConvoyCargoType::MilitarySupply,
+            FText::GetEmpty()
+        ).Contains(TEXT("DESTINATION PENDING"))
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHFieldTransportBoardingPresentationTest,
+    "BrokenHorizon.Gameplay.Transport.BoardingPresentation",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHFieldTransportBoardingPresentationTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    const FString EmptyLandPrompt =
+        ABHFieldTransport::BuildBoardingInteractionText(
+            false,
+            0.0f,
+            EBHWarConvoyCargoType::MilitarySupply,
+            FText::GetEmpty()
+        ).ToString();
+    TestEqual(
+        TEXT("An empty land transport keeps its drive prompt"),
+        EmptyLandPrompt,
+        FString(TEXT("Press [F] to drive field transport"))
+    );
+
+    const FString MilitaryPrompt =
+        ABHFieldTransport::BuildBoardingInteractionText(
+            false,
+            15.0f,
+            EBHWarConvoyCargoType::MilitarySupply,
+            FText::FromString(TEXT("Eastern Depot"))
+        ).ToString();
+    TestTrue(
+        TEXT("A loaded land transport prompt identifies supply cargo"),
+        MilitaryPrompt.Contains(TEXT("SUPPLY 15"))
+    );
+    TestTrue(
+        TEXT("A loaded land transport prompt identifies its destination"),
+        MilitaryPrompt.Contains(TEXT("Eastern Depot"))
+    );
+
+    const FString AidPrompt =
+        ABHFieldTransport::BuildBoardingInteractionText(
+            true,
+            10.0f,
+            EBHWarConvoyCargoType::CivilianAid,
+            FText::FromString(TEXT("Korona Crossroads"))
+        ).ToString();
+    TestTrue(
+        TEXT("A waterborne aid prompt preserves the boarding action"),
+        AidPrompt.Contains(TEXT("board waterborne cargo transport"))
+    );
+    TestTrue(
+        TEXT("A waterborne aid prompt identifies its route"),
+        AidPrompt.Contains(TEXT("AID 10")) &&
+            AidPrompt.Contains(TEXT("Korona Crossroads"))
+    );
+    TestTrue(
+        TEXT("Loaded cargo without a destination exposes the pending route"),
+        ABHFieldTransport::BuildBoardingInteractionText(
+            false,
+            5.0f,
+            EBHWarConvoyCargoType::MilitarySupply,
+            FText::GetEmpty()
+        ).ToString().Contains(TEXT("DESTINATION PENDING"))
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHVehicleReadinessCargoPresentationTest,
+    "BrokenHorizon.Gameplay.UI.VehicleReadinessCargo",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHVehicleReadinessCargoPresentationTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    const FString EmptyLine =
+        UBHCombatStatusWidget::BuildVehicleCargoStatusLine(
+            0.0f,
+            EBHWarConvoyCargoType::MilitarySupply,
+            TEXT("Eastern Depot")
+        );
+    TestTrue(
+        TEXT("Empty transport readiness has no cargo line"),
+        EmptyLine.IsEmpty()
+    );
+
+    const FString SupplyLine =
+        UBHCombatStatusWidget::BuildVehicleCargoStatusLine(
+            15.0f,
+            EBHWarConvoyCargoType::MilitarySupply,
+            TEXT("Eastern Depot")
+        );
+    TestTrue(
+        TEXT("Driver readiness identifies military supply"),
+        SupplyLine == TEXT("SUPPLY 15 // TO EASTERN DEPOT")
+    );
+
+    const FString AidLine =
+        UBHCombatStatusWidget::BuildVehicleCargoStatusLine(
+            10.0f,
+            EBHWarConvoyCargoType::CivilianAid,
+            TEXT("Korona Crossroads")
+        );
+    TestTrue(
+        TEXT("Driver readiness identifies civilian aid"),
+        AidLine == TEXT("AID 10 // TO KORONA CROSSROADS")
+    );
+
+    const FString PendingLine =
+        UBHCombatStatusWidget::BuildVehicleCargoStatusLine(
+            5.0f,
+            EBHWarConvoyCargoType::MilitarySupply,
+            FString()
+        );
+    TestTrue(
+        TEXT("Driver readiness keeps a missing destination explicit"),
+        PendingLine == TEXT("SUPPLY 5 // TO DESTINATION PENDING")
+    );
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBHFieldTransportPassengerPersistenceTest,
     "BrokenHorizon.Gameplay.Transport.PassengerPersistence",
     EAutomationTestFlags::EditorContext |
@@ -1835,6 +2223,103 @@ bool FBHFieldSquadReadinessHUDContractTest::RunTest(
         );
     }
 
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHFieldSquadDebriefStatusTest,
+    "BrokenHorizon.PersistentWar.FieldSquad.DebriefStatus",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHFieldSquadDebriefStatusTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    TestEqual(
+        TEXT("A healthy fireteam is marked ready for the next deployment"),
+        UBHCombatStatusWidget::BuildFieldSquadDebriefStatusLabel(
+            3,
+            0,
+            0,
+            0
+        ),
+        FString(
+            TEXT(
+                "NEXT DEPLOYMENT // EFFECTIVE 3/3 // DOWN 0 // MEDEVAC 0\n"
+                "FIRETEAM READY FOR NEXT DEPLOYMENT"
+            )
+        )
+    );
+    TestEqual(
+        TEXT("Medical evacuation takes precedence over general service"),
+        UBHCombatStatusWidget::BuildFieldSquadDebriefStatusLabel(
+            3,
+            0,
+            1,
+            2
+        ),
+        FString(
+            TEXT(
+                "NEXT DEPLOYMENT // EFFECTIVE 2/3 // DOWN 0 // MEDEVAC 1\n"
+                "RECOVER MEDEVAC CASUALTIES BEFORE NEXT DEPLOYMENT"
+            )
+        )
+    );
+    TestEqual(
+        TEXT("An empty or invalid roster produces bounded recovery guidance"),
+        UBHCombatStatusWidget::BuildFieldSquadDebriefStatusLabel(
+            -1,
+            4,
+            2,
+            5
+        ),
+        FString(
+            TEXT(
+                "NEXT DEPLOYMENT // EFFECTIVE 0/0 // DOWN 0 // MEDEVAC 0\n"
+                "RECRUIT A FIELD FIRETEAM BEFORE NEXT DEPLOYMENT"
+            )
+        )
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHFieldSquadServiceWaypointTest,
+    "BrokenHorizon.Gameplay.UI.FieldSquadServiceWaypoint",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHFieldSquadServiceWaypointTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    TestEqual(
+        TEXT("A fireteam service waypoint tells the player what needs attention"),
+        UBHCombatStatusWidget::BuildResupplyWaypointLabel(
+            TEXT("WesternFOB"),
+            2
+        ),
+        FString(
+            TEXT(
+                "FIRETEAM SERVICE // 2 NEED SERVICE // WesternFOB"
+            )
+        )
+    );
+    TestEqual(
+        TEXT("A general resupply waypoint remains concise when no fireteam service is needed"),
+        UBHCombatStatusWidget::BuildResupplyWaypointLabel(
+            TEXT(""),
+            0
+        ),
+        FString(TEXT("FRIENDLY SUPPORT"))
+    );
     return true;
 }
 
@@ -2737,6 +3222,38 @@ bool FBHRescueOperationTest::RunTest(
         TEXT("Committed rescue retains casualty identity"),
         War->GetCommittedOperationTargetID(),
         CasualtyID
+    );
+
+    const FString RescueBriefing =
+        War->GetOperationMissionBriefing(
+            DestinationSectorID,
+            EBHWarPriorityType::Rescue
+        ).ToString();
+    TestTrue(
+        TEXT("Rescue briefing names the exact casualty"),
+        RescueBriefing.Contains(CasualtyID.ToString())
+    );
+    TestTrue(
+        TEXT("Rescue briefing names the treatment destination"),
+        RescueBriefing.Contains(
+            War->GetSectorState(DestinationSectorID).DisplayName.ToString()
+        )
+    );
+    const FString RescueObjectiveText =
+        War->GetOperationObjectiveText(
+            DestinationSectorID,
+            EBHWarPriorityType::Rescue,
+            BHObjectiveIds::EvacuateCasualty
+        ).ToString();
+    TestTrue(
+        TEXT("Rescue objective names the exact casualty"),
+        RescueObjectiveText.Contains(CasualtyID.ToString())
+    );
+    TestTrue(
+        TEXT("Rescue objective names the treatment destination"),
+        RescueObjectiveText.Contains(
+            War->GetSectorState(DestinationSectorID).DisplayName.ToString()
+        )
     );
 
     const FBHWarStateSnapshot Snapshot =
@@ -7450,6 +7967,8 @@ bool FBHSaveRoundTripTest::RunTest(const FString& Parameters)
     Source->bCampaignEpilogueAcknowledged = true;
     Source->bOperationDebriefAcknowledged = true;
     Source->OpenWorldOperationState.bHasSnapshot = true;
+    Source->OpenWorldOperationState.OperationID =
+        TEXT("Operation_SnapshotRoundTrip");
     Source->OpenWorldOperationState.bOperationActivated = false;
     Source->OpenWorldOperationState.bFriendlySupportHolding = true;
     Source->OpenWorldOperationState
@@ -7633,6 +8152,11 @@ bool FBHSaveRoundTripTest::RunTest(const FString& Parameters)
         TEXT("Operation approach snapshot survives"),
         Restored->OpenWorldOperationState.bHasSnapshot &&
             !Restored->OpenWorldOperationState.bOperationActivated
+    );
+    TestEqual(
+        TEXT("Operation snapshot identity survives"),
+        Restored->OpenWorldOperationState.OperationID,
+        Source->OpenWorldOperationState.OperationID
     );
     TestTrue(
         TEXT("Friendly hold order survives"),
@@ -8498,6 +9022,43 @@ bool FBHArmoredHitFeedbackContractTest::RunTest(
     TestNotNull(
         TEXT("Detailed Blueprint hit-marker API is available"),
         DetailedFunction
+    );
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHArmoredThreatWarningPresentationContractTest,
+    "BrokenHorizon.Combat.Feedback.ArmoredThreatWarning",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHArmoredThreatWarningPresentationContractTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    TestEqual(
+        TEXT("Armored contact warning uses a readable meter label"),
+        UBHCombatStatusWidget::BuildArmoredThreatWarningLabel(3300.0f),
+        FString(TEXT("ARMORED CONTACT // 33 M"))
+    );
+    TestEqual(
+        TEXT("Armored contact warning clamps invalid distance"),
+        UBHCombatStatusWidget::BuildArmoredThreatWarningLabel(-1.0f),
+        FString(TEXT("ARMORED CONTACT // 0 M"))
+    );
+
+    const FProperty* CurrentTargetProperty = FindFProperty<FProperty>(
+        ABHArmoredThreat::StaticClass(),
+        FName(TEXT("CurrentTarget"))
+    );
+    TestTrue(
+        TEXT("Armored threat target is replicated for client presentation"),
+        CurrentTargetProperty &&
+            CurrentTargetProperty->HasAnyPropertyFlags(CPF_Net)
     );
 
     return true;
@@ -10134,6 +10695,53 @@ bool FBHWeaponRoleProfilesTest::RunTest(
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHShotgunRoleContractTest,
+    "BrokenHorizon.Gameplay.Combat.ShotgunRole",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHShotgunRoleContractTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    const FBHWeaponRoleProfile Shotgun =
+        UBHWeaponComponent::BuildWeaponRoleProfile(
+            EBHWeaponRole::Shotgun
+        );
+
+    TestEqual(
+        TEXT("Shotgun keeps a deliberate low-capacity magazine"),
+        Shotgun.RifleConfig.MagazineSize,
+        8
+    );
+    TestFalse(
+        TEXT("Shotgun remains semi-automatic"),
+        Shotgun.RifleConfig.bAutomatic
+    );
+    TestEqual(
+        TEXT("One shotgun shell emits eight authoritative pellets"),
+        Shotgun.RifleConfig.PelletCount,
+        8
+    );
+    TestTrue(
+        TEXT("Shotgun pellets use a non-zero close-range spread"),
+        Shotgun.RifleConfig.PelletSpreadDegrees > 0.0f
+    );
+    TestTrue(
+        TEXT("Shotgun has a shorter effective range than the assault role"),
+        Shotgun.RifleConfig.Range <
+            UBHWeaponComponent::BuildWeaponRoleProfile(
+                EBHWeaponRole::Assault
+            ).RifleConfig.Range
+    );
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FBHCombatantArchetypeProfilesTest,
     "BrokenHorizon.Gameplay.AI.CombatantArchetypes",
     EAutomationTestFlags::EditorContext |
@@ -11073,8 +11681,87 @@ bool FBHInventoryTransferContractTest::RunTest(const FString& Parameters)
         TEXT("TransferInventoryItemTo"));
     const UFunction* TransferServerFunction = CharacterClass->FindFunctionByName(
         TEXT("ServerTransferInventoryItem"));
+    const UFunction* NearestTransferFunction =
+        CharacterClass->FindFunctionByName(
+            TEXT("TransferFragToNearestAlly"));
+    const UFunction* NearestTransferServerFunction =
+        CharacterClass->FindFunctionByName(
+            TEXT("ServerTransferFragToNearestAlly"));
+    const UFunction* NearestItemTransferFunction =
+        CharacterClass->FindFunctionByName(
+            TEXT("TransferInventoryItemToNearestAlly"));
+    const UFunction* NearestItemTransferServerFunction =
+        CharacterClass->FindFunctionByName(
+            TEXT("ServerTransferInventoryItemToNearestAlly"));
+    const UClass* InventoryWidgetClass = UBHInventoryWidget::StaticClass();
+    const FProperty* TransferSmokeButtonProperty = FindFProperty<FProperty>(
+        InventoryWidgetClass,
+        TEXT("TransferSmokeButton")
+    );
+    const UFunction* TransferSmokeHandler =
+        InventoryWidgetClass->FindFunctionByName(
+            TEXT("HandleTransferSmokeClicked")
+        );
+    const FProperty* TransferEngineeringButtonProperty =
+        FindFProperty<FProperty>(
+            InventoryWidgetClass,
+            TEXT("TransferEngineeringButton")
+        );
+    const UFunction* TransferEngineeringHandler =
+        InventoryWidgetClass->FindFunctionByName(
+            TEXT("HandleTransferEngineeringClicked")
+        );
+    const FProperty* TransferAntiVehicleButtonProperty =
+        FindFProperty<FProperty>(
+            InventoryWidgetClass,
+            TEXT("TransferAntiVehicleButton")
+        );
+    const UFunction* TransferAntiVehicleHandler =
+        InventoryWidgetClass->FindFunctionByName(
+            TEXT("HandleTransferAntiVehicleClicked")
+        );
     TestNotNull(TEXT("Player transfer API exists"), TransferFunction);
     TestNotNull(TEXT("Player transfer server RPC exists"), TransferServerFunction);
+    TestNotNull(
+        TEXT("Nearest-ally transfer API exists"),
+        NearestTransferFunction
+    );
+    TestNotNull(
+        TEXT("Nearest-ally transfer server RPC exists"),
+        NearestTransferServerFunction
+    );
+    TestNotNull(
+        TEXT("Nearest-ally item transfer API exists"),
+        NearestItemTransferFunction
+    );
+    TestNotNull(
+        TEXT("Nearest-ally item transfer server RPC exists"),
+        NearestItemTransferServerFunction
+    );
+    TestNotNull(
+        TEXT("Inventory exposes the smoke transfer button"),
+        TransferSmokeButtonProperty
+    );
+    TestNotNull(
+        TEXT("Inventory exposes the smoke transfer handler"),
+        TransferSmokeHandler
+    );
+    TestNotNull(
+        TEXT("Inventory exposes the engineering transfer button"),
+        TransferEngineeringButtonProperty
+    );
+    TestNotNull(
+        TEXT("Inventory exposes the engineering transfer handler"),
+        TransferEngineeringHandler
+    );
+    TestNotNull(
+        TEXT("Inventory exposes the anti-vehicle transfer button"),
+        TransferAntiVehicleButtonProperty
+    );
+    TestNotNull(
+        TEXT("Inventory exposes the anti-vehicle transfer handler"),
+        TransferAntiVehicleHandler
+    );
     if (TransferFunction)
     {
         TestTrue(TEXT("Transfer API is Blueprint-callable"),
@@ -11086,6 +11773,48 @@ bool FBHInventoryTransferContractTest::RunTest(const FString& Parameters)
             TransferServerFunction->HasAnyFunctionFlags(FUNC_NetServer));
         TestTrue(TEXT("Transfer server RPC is reliable"),
             TransferServerFunction->HasAnyFunctionFlags(FUNC_NetReliable));
+    }
+    if (NearestTransferFunction)
+    {
+        TestTrue(
+            TEXT("Nearest-ally transfer API is Blueprint-callable"),
+            NearestTransferFunction->HasAnyFunctionFlags(FUNC_BlueprintCallable)
+        );
+    }
+    if (NearestTransferServerFunction)
+    {
+        TestTrue(
+            TEXT("Nearest-ally transfer server RPC is authoritative"),
+            NearestTransferServerFunction->HasAnyFunctionFlags(FUNC_NetServer)
+        );
+        TestTrue(
+            TEXT("Nearest-ally transfer server RPC is reliable"),
+            NearestTransferServerFunction->HasAnyFunctionFlags(FUNC_NetReliable)
+        );
+    }
+    if (NearestItemTransferFunction)
+    {
+        TestTrue(
+            TEXT("Nearest-ally item transfer API is Blueprint-callable"),
+            NearestItemTransferFunction->HasAnyFunctionFlags(
+                FUNC_BlueprintCallable
+            )
+        );
+    }
+    if (NearestItemTransferServerFunction)
+    {
+        TestTrue(
+            TEXT("Nearest-ally item transfer server RPC is authoritative"),
+            NearestItemTransferServerFunction->HasAnyFunctionFlags(
+                FUNC_NetServer
+            )
+        );
+        TestTrue(
+            TEXT("Nearest-ally item transfer server RPC is reliable"),
+            NearestItemTransferServerFunction->HasAnyFunctionFlags(
+                FUNC_NetReliable
+            )
+        );
     }
     for (const FName PropertyName : {
         FName(TEXT("FragGrenadeCount")),
@@ -11101,6 +11830,296 @@ bool FBHInventoryTransferContractTest::RunTest(const FString& Parameters)
                 *PropertyName.ToString()),
             Property && Property->HasAnyPropertyFlags(CPF_Net));
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHKeycardInventoryReplicationContractTest,
+    "BrokenHorizon.Inventory.KeycardOwnership.ReplicationContract",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHKeycardInventoryReplicationContractTest::RunTest(
+    const FString& Parameters
+)
+{
+    const UClass* CharacterClass = ABHCharacter::StaticClass();
+    const FProperty* OwnedKeycardsProperty = FindFProperty<FProperty>(
+        CharacterClass,
+        FName(TEXT("OwnedKeycards"))
+    );
+    const UFunction* OwnedKeycardsRepNotify =
+        CharacterClass->FindFunctionByName(
+            FName(TEXT("OnRep_OwnedKeycards"))
+        );
+
+    TestTrue(
+        TEXT("Keycard ownership is a replicated character property"),
+        OwnedKeycardsProperty &&
+            OwnedKeycardsProperty->HasAnyPropertyFlags(CPF_Net)
+    );
+    TestNotNull(
+        TEXT("Keycard ownership has a replication notification handler"),
+        OwnedKeycardsRepNotify
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHInventoryMissionItemPresentationTest,
+    "BrokenHorizon.Inventory.MissionItems.Presentation",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHInventoryMissionItemPresentationTest::RunTest(
+    const FString& Parameters
+)
+{
+    const TArray<FName> MissionItemIDs = {
+        FName(TEXT("RedKeycard")),
+        FName(TEXT("MissionToken"))
+    };
+
+    TestEqual(
+        TEXT("Inventory preserves mission-item identity order"),
+        UBHInventoryWidget::FormatMissionItemSummary(MissionItemIDs),
+        FString(TEXT("RedKeycard, MissionToken"))
+    );
+
+    const TArray<FName> EmptyMissionItems;
+    TestEqual(
+        TEXT("Empty mission inventory is explicit"),
+        UBHInventoryWidget::FormatMissionItemSummary(EmptyMissionItems),
+        FString(TEXT("NONE"))
+    );
+
+    const FProperty* MissionItemIDsProperty = FindFProperty<FProperty>(
+        FBHInventorySnapshot::StaticStruct(),
+        FName(TEXT("MissionItemIDs"))
+    );
+    TestTrue(
+        TEXT("Inventory snapshot exposes mission-item identities"),
+        MissionItemIDsProperty &&
+            MissionItemIDsProperty->HasAnyPropertyFlags(CPF_BlueprintVisible)
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHMissionItemContainerContractTest,
+    "BrokenHorizon.Inventory.MissionCache.AuthorityContract",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHMissionItemContainerContractTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+    const UClass* ContainerClass = ABHMissionItemContainer::StaticClass();
+    TestTrue(
+        TEXT("Mission cache remains an interactable actor"),
+        ContainerClass->ImplementsInterface(UBHInteractable::StaticClass())
+    );
+
+    const ABHMissionItemContainer* Defaults =
+        GetDefault<ABHMissionItemContainer>();
+    TestNotNull(TEXT("Mission cache defaults exist"), Defaults);
+    if (!Defaults)
+    {
+        return false;
+    }
+
+    TestTrue(
+        TEXT("Mission cache replicates its world state"),
+        Defaults->GetIsReplicated()
+    );
+    TestEqual(
+        TEXT("Mission cache defaults to the First Light credential"),
+        Defaults->GetMissionItemID(),
+        FName(TEXT("RedKeycard"))
+    );
+    TestTrue(
+        TEXT("Mission cache starts empty"),
+        Defaults->GetStoredMissionItemID().IsNone()
+    );
+    TestEqual(
+        TEXT("Empty mission cache exposes the store interaction"),
+        Defaults->GetInteractionText_Implementation().ToString(),
+        FString(TEXT("Press [F] to STORE RedKeycard IN MISSION CACHE"))
+    );
+
+    for (const FName PropertyName : {
+        FName(TEXT("PersistenceID")),
+        FName(TEXT("MissionItemID")),
+        FName(TEXT("StoredMissionItemID"))
+    })
+    {
+        const FProperty* Property = FindFProperty<FProperty>(
+            ContainerClass,
+            PropertyName
+        );
+        TestTrue(
+            *FString::Printf(
+                TEXT("Mission cache field %s remains replicated"),
+                *PropertyName.ToString()
+            ),
+            Property && Property->HasAnyPropertyFlags(CPF_Net)
+        );
+    }
+
+    TestNotNull(
+        TEXT("Mission cache refreshes clients after stored-state replication"),
+        ContainerClass->FindFunctionByName(
+            FName(TEXT("OnRep_StoredMissionItemID"))
+        )
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHMissionItemContainerPromptPresentationTest,
+    "BrokenHorizon.Inventory.MissionCache.PromptPresentation",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHMissionItemContainerPromptPresentationTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    TestEqual(
+        TEXT("Unconfigured mission cache explains its missing setup"),
+        ABHMissionItemContainer::BuildInteractionText(
+            NAME_None,
+            NAME_None
+        ).ToString(),
+        FString(TEXT("MISSION CACHE UNCONFIGURED"))
+    );
+    TestEqual(
+        TEXT("Empty mission cache gives an explicit store action"),
+        ABHMissionItemContainer::BuildInteractionText(
+            FName(TEXT("RedKeycard")),
+            NAME_None
+        ).ToString(),
+        FString(TEXT("Press [F] to STORE RedKeycard IN MISSION CACHE"))
+    );
+    TestEqual(
+        TEXT("Stored mission cache gives an explicit retrieve action"),
+        ABHMissionItemContainer::BuildInteractionText(
+            FName(TEXT("RedKeycard")),
+            FName(TEXT("RedKeycard"))
+        ).ToString(),
+        FString(TEXT("Press [F] to RETRIEVE RedKeycard FROM MISSION CACHE"))
+    );
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHSalvagePickupPromptPresentationTest,
+    "BrokenHorizon.Gameplay.Interaction.SalvagePickupPrompt",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHSalvagePickupPromptPresentationTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    TestEqual(
+        TEXT("Ammunition salvage exposes the recovery input"),
+        ABHSalvagePickup::BuildInteractionText(
+            EBHSalvagePickupType::Ammunition,
+            30
+        ).ToString(),
+        FString(TEXT("Press [F] to RECOVER AMMO // 30"))
+    );
+    TestEqual(
+        TEXT("Anti-vehicle salvage names its recovery payload"),
+        ABHSalvagePickup::BuildInteractionText(
+            EBHSalvagePickupType::AntiVehicleRounds,
+            2
+        ).ToString(),
+        FString(TEXT("Press [F] to RECOVER ANTI-VEHICLE // 2"))
+    );
+    TestEqual(
+        TEXT("Invalid quantities are clamped for presentation"),
+        ABHSalvagePickup::BuildInteractionText(
+            EBHSalvagePickupType::FragGrenades,
+            -4
+        ).ToString(),
+        FString(TEXT("Press [F] to RECOVER FRAG // 0"))
+    );
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHRaidSabotagePromptPresentationTest,
+    "BrokenHorizon.Gameplay.Interaction.RaidSabotagePrompt",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHRaidSabotagePromptPresentationTest::RunTest(
+    const FString& Parameters
+)
+{
+    (void)Parameters;
+
+    TestEqual(
+        TEXT("Available raid targets expose the sabotage input"),
+        ABHRaidSabotageTarget::BuildInteractionText(false).ToString(),
+        FString(TEXT("Press [F] to PLANT DEMOLITION CHARGES"))
+    );
+    TestEqual(
+        TEXT("Sabotaged raid targets expose their resolved state"),
+        ABHRaidSabotageTarget::BuildInteractionText(true).ToString(),
+        FString(TEXT("Demolition Charges Armed"))
+    );
+
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHDoorCredentialPolicyTest,
+    "BrokenHorizon.Gameplay.Interaction.DoorCredentialPolicy",
+    EAutomationTestFlags::EditorContext |
+        EAutomationTestFlags::EngineFilter
+)
+
+bool FBHDoorCredentialPolicyTest::RunTest(const FString& Parameters)
+{
+    const FName RequiredKeycardID(TEXT("RedKeycard"));
+    const FName WrongKeycardID(TEXT("WrongKeycard"));
+
+    const TArray<FName> NoKeycards;
+    const TArray<FName> WrongKeycard = { WrongKeycardID };
+    const TArray<FName> CorrectKeycard = { RequiredKeycardID };
+
+    TestFalse(
+        TEXT("A locked door rejects a player with no keycard"),
+        ABHDoor::HasRequiredKeycard(RequiredKeycardID, NoKeycards)
+    );
+    TestFalse(
+        TEXT("A locked door rejects the wrong keycard"),
+        ABHDoor::HasRequiredKeycard(RequiredKeycardID, WrongKeycard)
+    );
+    TestTrue(
+        TEXT("A locked door accepts the required keycard"),
+        ABHDoor::HasRequiredKeycard(RequiredKeycardID, CorrectKeycard)
+    );
+    TestFalse(
+        TEXT("A locked door with no configured credential does not unlock by keycard"),
+        ABHDoor::HasRequiredKeycard(NAME_None, CorrectKeycard)
+    );
     return true;
 }
 

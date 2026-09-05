@@ -11,6 +11,7 @@ import unreal
 
 MAP_PATH = "/Game/BrokenHorizon/Maps/L_FirstLight_Graybox"
 TAG = "BH_Auto_FirstLight"
+OBJECTIVE_ID = "EliminateGuard"
 REBUILD_EXISTING = False
 
 FOLDERS = {
@@ -171,9 +172,25 @@ def _place_gameplay():
     classes = {key: _class(path) for key, path in ASSETS.items()}
     _spawn_actor(unreal.PlayerStart, unreal.Vector(0, 0, 120), "FL_PlayerStart", FOLDERS["gameplay"])
 
-    keycard = _spawn_actor(classes["keycard"], unreal.Vector(2760, -260, 115), "FL_RedKeycard", FOLDERS["gameplay"])
+    # Place the card on clear floor immediately in front of the admin desk.
+    keycard = _spawn_actor(classes["keycard"], unreal.Vector(2450, 0, 20), "FL_RedKeycard", FOLDERS["gameplay"])
     _set(keycard, "keycard_id", unreal.Name("RedKeycard"))
     _set(keycard, "persistence_id", unreal.Name("FirstLightRedKeycard"))
+    keycard_mesh = keycard.get_editor_property("keycard_mesh")
+    keycard_material = unreal.load_asset(
+        "/Game/BrokenHorizon/Environment/WorldKit/Materials/M_BH_Keycard"
+    )
+    if keycard_mesh and keycard_material:
+        # Keep the actor/root at unit scale so its interaction collision is
+        # not flattened by the graybox card's presentation scale.
+        keycard.set_actor_scale3d(unreal.Vector(1.0, 1.0, 1.0))
+        keycard_mesh.set_editor_property(
+            "relative_scale3d",
+            unreal.Vector(0.5, 1.0, 0.05),
+        )
+        keycard_mesh.set_material(0, keycard_material)
+    else:
+        _warning("Red keycard material is unavailable; visual review remains pending.")
 
     door = _spawn_actor(classes["door"], unreal.Vector(4200, 0, 0), "FL_LockedSecurityDoor", FOLDERS["gameplay"])
     # UE's Python reflection removes the leading b from bool UPROPERTY names.
@@ -211,6 +228,9 @@ def _place_gameplay():
             "FL_Guard_%02d" % index,
             FOLDERS["gameplay"],
         )
+        enemy.set_objective_id_to_complete_on_death(
+            unreal.Name(OBJECTIVE_ID)
+        )
         _set(enemy, "patrol_points", patrol_points)
 
     cover_class = unreal.load_class(
@@ -234,7 +254,7 @@ def _place_gameplay():
         )
 
     extraction = _spawn_actor(classes["extraction"], unreal.Vector(8000, 0, 80), "FL_ExtractionZone", FOLDERS["gameplay"])
-    _set(extraction, "required_objective_id", unreal.Name("EliminateGuard"))
+    _set(extraction, "required_objective_id", unreal.Name(OBJECTIVE_ID))
     _set(extraction, "extraction_objective_id", unreal.Name("ReachExtraction"))
 
     nav = _spawn_actor(unreal.NavMeshBoundsVolume, unreal.Vector(4300, 0, 300), "FL_NavMeshBounds", FOLDERS["navigation"])

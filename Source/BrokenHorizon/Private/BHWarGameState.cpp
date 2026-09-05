@@ -6,14 +6,17 @@
 #include "BHAmbientWarDirector.h"
 #include "BHCombatStatusWidget.h"
 #include "BHAmmoSupply.h"
+#include "BHArmoredThreat.h"
 #include "BHEnemySoldier.h"
 #include "BHDoor.h"
 #include "BHExtractionZone.h"
 #include "BHKeycard.h"
+#include "BHMissionItemContainer.h"
 #include "BHFieldTransport.h"
 #include "BHFragGrenade.h"
 #include "BHHealthComponent.h"
 #include "BHInteractable.h"
+#include "BHInteractionPromptWidget.h"
 #include "BHInjuryComponent.h"
 #include "BHMissionData.h"
 #include "BHOpenWorldOperationDirector.h"
@@ -35,12 +38,14 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Containers/Ticker.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformMisc.h"
 #include "HighResScreenshot.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 #include "ProfilingDebugging/CsvProfiler.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
@@ -56,6 +61,7 @@ namespace
 bool bBHTestServerTravelIssued = false;
 bool bBHTestServerTravelCompleted = false;
 bool bBHTestTransportTravelPersistence = false;
+bool bBHTestTransportCasualtyPersistence = false;
 bool bBHTestOperationCompletionAfterTravel = false;
 bool bBHTestPrepareCrashRecovery = false;
 bool bBHTestRestoreCrashRecovery = false;
@@ -63,9 +69,24 @@ bool bBHTestRenderedTraversalIssued = false;
 bool bBHTestRenderedUIReviewIssued = false;
 bool bBHTestSquadPingScreenshotIssued = false;
 bool bBHTestWatercraftDeliveryIssued = false;
+bool bBHTestCivilianAidDeliveryIssued = false;
 bool bBHTestInventoryTransferIssued = false;
+bool bBHTestMissionCacheTransferIssued = false;
+bool bBHTestArmoredThreatTargetingIssued = false;
 bool bBHTestWeaponRoleRuntimeIssued = false;
 bool bBHTestWorldKitModuleIssued = false;
+bool bBHTestOperationFailureIssued = false;
+int32 BHTestMissionCacheTransferPhase = 0;
+int32 BHTestArmoredThreatTargetingPhase = 0;
+int32 BHTestArmoredThreatTargetingAttempts = 0;
+FVector BHTestArmoredThreatTargetingFirstFarLocation = FVector::ZeroVector;
+FVector BHTestArmoredThreatTargetingSecondNearLocation = FVector::ZeroVector;
+FVector BHTestArmoredThreatTargetingFirstNearLocation = FVector::ZeroVector;
+FVector BHTestArmoredThreatTargetingSecondOutOfRangeLocation = FVector::ZeroVector;
+int32 BHTestDefenseAGarrisonPhase = 0;
+int32 BHTestDefenseAGarrisonWaitAttempts = 0;
+FName BHTestDefenseAGarrisonCasualtyID = NAME_None;
+bool bBHTestDefenseAWave2Spawned = false;
 FName BHTestTransportPersistenceID = NAME_None;
 }
 #endif
@@ -119,6 +140,12 @@ ABHWarGameState::GetActiveOperationSnapshot() const
     return ActiveOperationSnapshot;
 }
 
+FBHActiveOperationSnapshotChangedSignature&
+ABHWarGameState::OnActiveOperationSnapshotChanged()
+{
+    return ActiveOperationSnapshotChanged;
+}
+
 void ABHWarGameState::PublishActiveOperationSnapshot(
     const FBHActiveOperationSnapshot& NewSnapshot
 )
@@ -128,12 +155,19 @@ void ABHWarGameState::PublishActiveOperationSnapshot(
         return;
     }
 
+    UBHWarSubsystem* WarSubsystem = ResolveWarSubsystem();
+
+    if (!IsValid(WarSubsystem))
+    {
+        return;
+    }
+
+    BoundWarSubsystem = WarSubsystem;
     ActiveOperationSnapshot = NewSnapshot;
-    ActiveOperationSnapshot.Revision = FMath::Max(
-        1,
-        ActiveOperationSnapshot.Revision
-    );
+    ActiveOperationSnapshot.Revision =
+        WarSubsystem->AllocateReplicatedSnapshotRevision();
     ForceNetUpdate();
+    BroadcastActiveOperationSnapshotChanged();
 
     UE_LOG(
         LogTemp,
@@ -209,11 +243,19 @@ void ABHWarGameState::ClearActiveOperationSnapshot()
         return;
     }
 
-    const int32 NextRevision =
-        ActiveOperationSnapshot.Revision + 1;
+    UBHWarSubsystem* WarSubsystem = ResolveWarSubsystem();
+
+    if (!IsValid(WarSubsystem))
+    {
+        return;
+    }
+
+    BoundWarSubsystem = WarSubsystem;
     ActiveOperationSnapshot = FBHActiveOperationSnapshot();
-    ActiveOperationSnapshot.Revision = NextRevision;
+    ActiveOperationSnapshot.Revision =
+        WarSubsystem->AllocateReplicatedSnapshotRevision();
     ForceNetUpdate();
+    BroadcastActiveOperationSnapshotChanged();
 }
 
 void ABHWarGameState::BeginPlay()
@@ -460,12 +502,299 @@ void ABHWarGameState::BeginPlay()
 
             if (FParse::Param(
                     FCommandLine::Get(),
+                    TEXT("BHTestCivilianAidDeliveryWhenOccupied")))
+            {
+                FTimerHandle CivilianAidDeliveryTimer;
+                GetWorldTimerManager().SetTimer(
+                    CivilianAidDeliveryTimer,
+                    FTimerDelegate::CreateWeakLambda(
+                        this,
+                        [this]()
+                        {
+                            if (bBHTestCivilianAidDeliveryIssued)
+                            {
+                                return;
+                            }
+
+                            ABHCharacter* Player = nullptr;
+                            for (TActorIterator<ABHCharacter> It(GetWorld());
+                                 It;
+                                 ++It)
+                            {
+                                if (It->HasAuthority() &&
+                                    It->IsPlayerControlled())
+                                {
+                                    Player = *It;
+                                    break;
+                                }
+                            }
+
+                            ABHFieldTransport* Transport = nullptr;
+                            for (TActorIterator<ABHFieldTransport> It(
+                                     GetWorld());
+                                 It;
+                                 ++It)
+                            {
+                                if (IsValid(*It) &&
+                                    It->GetPersistenceID() ==
+                                        FName(TEXT("FirstLightWatercraft01")))
+                                {
+                                    Transport = *It;
+                                    break;
+                                }
+                            }
+
+                            if (!IsValid(Player) ||
+                                !IsValid(Transport) ||
+                                !IsValid(BoundWarSubsystem))
+                            {
+                                return;
+                            }
+
+                            const FName SourceSectorID =
+                                FName(TEXT("WesternFOB"));
+                            BoundWarSubsystem->ResetCampaign();
+                            BoundWarSubsystem->SetSectorOwnerForTesting(
+                                SourceSectorID,
+                                EBHWarFaction::Friendly
+                            );
+                            BoundWarSubsystem->SetSectorSupplyForTesting(
+                                SourceSectorID,
+                                80.0f
+                            );
+
+                            const FVector FixtureSourceLocation =
+                                Transport->GetActorLocation() +
+                                FVector(5000.0f, 0.0f, 0.0f);
+
+                            ABHSectorResupplyStation* SourceStation = nullptr;
+                            for (TActorIterator<ABHSectorResupplyStation> It(
+                                     GetWorld());
+                                 It;
+                                 ++It)
+                            {
+                                if (IsValid(*It) &&
+                                    It->GetSectorID() == SourceSectorID)
+                                {
+                                    SourceStation = *It;
+                                    break;
+                                }
+                            }
+
+                            if (!IsValid(SourceStation))
+                            {
+                                SourceStation = GetWorld()->SpawnActor<
+                                    ABHSectorResupplyStation>(
+                                    ABHSectorResupplyStation::StaticClass(),
+                                    FixtureSourceLocation,
+                                    FRotator::ZeroRotator
+                                );
+                                if (IsValid(SourceStation))
+                                {
+                                    SourceStation->ConfigureStation(
+                                        SourceSectorID
+                                    );
+                                }
+                            }
+
+                            if (!IsValid(SourceStation))
+                            {
+                                return;
+                            }
+
+                            SourceStation->SetActorLocation(
+                                FixtureSourceLocation,
+                                false
+                            );
+
+                            Transport->ConfigureAuthoredCargo(
+                                0.0f,
+                                NAME_None,
+                                NAME_None
+                            );
+                            IBHInteractable::Execute_Interact(
+                                Transport,
+                                Player
+                            );
+                            if (Transport->GetOccupant() != Player)
+                            {
+                                bBHTestCivilianAidDeliveryIssued = true;
+                                UE_LOG(
+                                    LogTemp,
+                                    Error,
+                                    TEXT(
+                                        "BH_TEST_CIVILIAN_AID_DELIVERY_"
+                                        "OCCUPIED result=failure stage=board"
+                                    )
+                                );
+                                return;
+                            }
+
+                            Transport->SetActorLocation(
+                                SourceStation->GetActorLocation() +
+                                FVector(0.0f, 0.0f, 40.0f)
+                            );
+                            Transport->ExecuteCivilianAidTransferForTesting();
+
+                            const FName DestinationSectorID =
+                                Transport->GetCargoDestinationSectorID();
+                            const bool bLoaded =
+                                Transport->GetCargoType() ==
+                                    EBHWarConvoyCargoType::CivilianAid &&
+                                Transport->GetCargoSupply() >
+                                    KINDA_SMALL_NUMBER &&
+                                !DestinationSectorID.IsNone();
+                            if (!bLoaded)
+                            {
+                                bBHTestCivilianAidDeliveryIssued = true;
+                                UE_LOG(
+                                    LogTemp,
+                                    Error,
+                                    TEXT(
+                                        "BH_TEST_CIVILIAN_AID_DELIVERY_"
+                                        "OCCUPIED result=failure stage=load "
+                                        "cargo=%.1f destination=%s"
+                                    ),
+                                    Transport->GetCargoSupply(),
+                                    *DestinationSectorID.ToString()
+                                );
+                                return;
+                            }
+
+                            const FBHWarSectorState DestinationBefore =
+                                BoundWarSubsystem->GetSectorState(
+                                    DestinationSectorID
+                                );
+                            ABHSectorResupplyStation* DestinationStation =
+                                nullptr;
+                            for (TActorIterator<ABHSectorResupplyStation> It(
+                                     GetWorld());
+                                 It;
+                                 ++It)
+                            {
+                                if (IsValid(*It) &&
+                                    It->GetSectorID() == DestinationSectorID)
+                                {
+                                    DestinationStation = *It;
+                                    break;
+                                }
+                            }
+
+                            if (!IsValid(DestinationStation))
+                            {
+                                DestinationStation = GetWorld()->SpawnActor<
+                                    ABHSectorResupplyStation>(
+                                    ABHSectorResupplyStation::StaticClass(),
+                                    FixtureSourceLocation +
+                                        FVector(1200.0f, 0.0f, 0.0f),
+                                    FRotator::ZeroRotator
+                                );
+                                if (IsValid(DestinationStation))
+                                {
+                                    DestinationStation->ConfigureStation(
+                                        DestinationSectorID
+                                    );
+                                }
+                            }
+
+                            if (!IsValid(DestinationStation))
+                            {
+                                bBHTestCivilianAidDeliveryIssued = true;
+                                UE_LOG(
+                                    LogTemp,
+                                    Error,
+                                    TEXT(
+                                        "BH_TEST_CIVILIAN_AID_DELIVERY_"
+                                        "OCCUPIED result=failure "
+                                        "stage=destination_station"
+                                    )
+                                );
+                                return;
+                            }
+
+                            DestinationStation->SetActorLocation(
+                                FixtureSourceLocation +
+                                FVector(1200.0f, 0.0f, 0.0f),
+                                false
+                            );
+
+                            Transport->SetActorLocation(
+                                DestinationStation->GetActorLocation() +
+                                FVector(0.0f, 0.0f, 40.0f)
+                            );
+                            Transport->ExecuteCivilianAidTransferForTesting();
+
+                            const FBHWarSectorState DestinationAfter =
+                                BoundWarSubsystem->GetSectorState(
+                                    DestinationSectorID
+                                );
+                            const bool bDelivered =
+                                Transport->GetCargoSupply() <=
+                                    KINDA_SMALL_NUMBER &&
+                                Transport->GetCargoType() ==
+                                    EBHWarConvoyCargoType::MilitarySupply &&
+                                DestinationAfter.CivilianSupport >
+                                    DestinationBefore.CivilianSupport;
+                            bBHTestCivilianAidDeliveryIssued = true;
+                            UE_LOG(
+                                LogTemp,
+                                Display,
+                                TEXT(
+                                    "BH_TEST_CIVILIAN_AID_DELIVERY_OCCUPIED "
+                                    "result=%s id=%s source=%s destination=%s "
+                                    "remaining=%.1f occupant=%d "
+                                    "support=%.1f->%.1f"
+                                ),
+                                bDelivered ? TEXT("success") : TEXT("failure"),
+                                *Transport->GetPersistenceID().ToString(),
+                                *SourceSectorID.ToString(),
+                                *DestinationSectorID.ToString(),
+                                Transport->GetCargoSupply(),
+                                IsValid(Transport->GetOccupant()) ? 1 : 0,
+                                DestinationBefore.CivilianSupport,
+                                DestinationAfter.CivilianSupport
+                            );
+                        }
+                    ),
+                    0.5f,
+                    true
+                );
+            }
+
+            if (FParse::Param(
+                    FCommandLine::Get(),
                     TEXT("BHTestInventoryTransferRuntime")))
             {
                 GetWorldTimerManager().SetTimer(
                     InventoryTransferRuntimeTestTimer,
                     this,
                     &ABHWarGameState::RunInventoryTransferRuntimeTest,
+                    0.5f,
+                    true
+                );
+            }
+
+            if (FParse::Param(
+                    FCommandLine::Get(),
+                    TEXT("BHTestMissionCacheTransferRuntime")))
+            {
+                GetWorldTimerManager().SetTimer(
+                    MissionCacheTransferRuntimeTestTimer,
+                    this,
+                    &ABHWarGameState::RunMissionCacheTransferRuntimeTest,
+                    0.5f,
+                    true
+                );
+            }
+
+            if (FParse::Param(
+                    FCommandLine::Get(),
+                    TEXT("BHTestArmoredThreatTargetingRuntime")))
+            {
+                GetWorldTimerManager().SetTimer(
+                    ArmoredThreatTargetSelectionRuntimeTestTimer,
+                    this,
+                    &ABHWarGameState::RunArmoredThreatTargetSelectionRuntimeTest,
                     0.5f,
                     true
                 );
@@ -608,6 +937,34 @@ void ABHWarGameState::BeginPlay()
                 );
             }
 
+            if (FParse::Param(
+                    FCommandLine::Get(),
+                    TEXT("BHTestDefenseAGarrisonPersistence")))
+            {
+                GetWorldTimerManager().SetTimer(
+                    DefenseAGarrisonPersistenceTestTimer,
+                    this,
+                    &ABHWarGameState::RunDefenseAGarrisonPersistenceTest,
+                    0.5f,
+                    true,
+                    2.0f
+                );
+            }
+
+            if (FParse::Param(
+                    FCommandLine::Get(),
+                    TEXT("BHTestOperationFailure")))
+            {
+                GetWorldTimerManager().SetTimer(
+                    OperationFailureTestTimer,
+                    this,
+                    &ABHWarGameState::RunOperationFailureTest,
+                    0.5f,
+                    true,
+                    1.0f
+                );
+            }
+
             if (bBHTestServerTravelIssued &&
                 !bBHTestServerTravelCompleted)
             {
@@ -682,6 +1039,14 @@ void ABHWarGameState::BeginPlay()
                                     RestoredTransport)
                                     ? RestoredTransport->GetOccupant()
                                     : nullptr;
+                                const int32 RestoredIncapacitatedCount =
+                                    IsValid(Driver)
+                                        ? Driver
+                                            ->GetIncapacitatedFieldSquadCount()
+                                        : 0;
+                                const bool bCasualtyRestored =
+                                    !bBHTestTransportCasualtyPersistence ||
+                                    RestoredIncapacitatedCount == 1;
                                 const bool bRestored =
                                     IsValid(RestoredTransport) &&
                                     IsValid(Driver) &&
@@ -691,7 +1056,35 @@ void ABHWarGameState::BeginPlay()
                                         9.0f,
                                         0.1f) &&
                                     Driver->IsFieldSquadEmbarked() &&
-                                    Driver->GetLivingFieldSquadCount() == 2;
+                                    Driver->GetLivingFieldSquadCount() == 2 &&
+                                    bCasualtyRestored;
+
+                                if (bBHTestTransportCasualtyPersistence)
+                                {
+                                    UE_LOG(
+                                        LogTemp,
+                                        Display,
+                                        TEXT(
+                                            "BH_TEST_TRANSPORT_CASUALTY_"
+                                            "RESTORED result=%s "
+                                            "living=%d incapacitated=%d "
+                                            "rescue_target=%s"
+                                        ),
+                                        bCasualtyRestored
+                                            ? TEXT("success")
+                                            : TEXT("failure"),
+                                        IsValid(Driver)
+                                            ? Driver
+                                                ->GetLivingFieldSquadCount()
+                                            : -1,
+                                        RestoredIncapacitatedCount,
+                                        IsValid(Driver)
+                                            ? *Driver
+                                                ->GetFieldSquadRescueTargetID()
+                                                .ToString()
+                                            : TEXT("None")
+                                    );
+                                }
 
                                 if (bRestored &&
                                     bBHTestOperationCompletionAfterTravel)
@@ -1043,6 +1436,13 @@ void ABHWarGameState::BeginPlay()
                                     TEXT(
                                         "BHTestTransportTravelPersistence"
                                     ));
+                            bBHTestTransportCasualtyPersistence =
+                                FParse::Param(
+                                    FCommandLine::Get(),
+                                    TEXT(
+                                        "BHTestTransportCasualtyPersistence"
+                                    )
+                                );
                             bBHTestOperationCompletionAfterTravel =
                                 FParse::Param(
                                     FCommandLine::Get(),
@@ -1212,12 +1612,20 @@ void ABHWarGameState::BeginPlay()
                                         false) &&
                                     Character->GetLivingFieldSquadCount() ==
                                         2;
+                                const bool bCasualtyPrepared =
+                                    !bBHTestTransportCasualtyPersistence ||
+                                    (
+                                        bSquadPrepared &&
+                                        Character
+                                            ->PrepareFieldSquadCasualtyForTransportTest()
+                                    );
                                 const bool bPrepared =
                                     IsValid(Character) &&
                                     IsValid(Transport) &&
                                     IsValid(SaveSubsystem) &&
                                     bOperationPrepared &&
-                                    bSquadPrepared;
+                                    bSquadPrepared &&
+                                    bCasualtyPrepared;
 
                                 if (FParse::Param(
                                         FCommandLine::Get(),
@@ -2475,11 +2883,14 @@ void ABHWarGameState::RunRenderedUIReviewTest()
         ReviewMode == TEXT("WAR_MAP_DEPLOYMENT");
     const bool bCustomDifficultyReview =
         ReviewMode == TEXT("CUSTOM_DIFFICULTY");
+    const bool bInteractionPromptReview =
+        ReviewMode == TEXT("HUD_INTERACTION_PROMPT");
     const bool bGamepadPromptReview =
         ReviewMode == TEXT("HUD_GAMEPAD_PROMPTS");
     const bool bBothPromptReview =
         ReviewMode == TEXT("HUD_BOTH_PROMPTS");
     if (ReviewMode != TEXT("HUD") &&
+        !bInteractionPromptReview &&
         !bGamepadPromptReview &&
         !bBothPromptReview &&
         !bPauseReview &&
@@ -2528,6 +2939,10 @@ void ABHWarGameState::RunRenderedUIReviewTest()
     }
 
     Player->SetCanBeDamaged(false);
+    if (bInteractionPromptReview)
+    {
+        Player->SetActorTickEnabled(false);
+    }
     if (bGamepadPromptReview || bBothPromptReview)
     {
         if (UGameInstance* GameInstance = GetGameInstance())
@@ -2678,6 +3093,38 @@ void ABHWarGameState::RunRenderedUIReviewTest()
                 It->SetCivilianSupport(68.0f);
             }
         }
+
+        if (bInteractionPromptReview)
+        {
+            bool bPromptApplied = false;
+            for (TObjectIterator<UBHInteractionPromptWidget> It;
+                It;
+                ++It)
+            {
+                if (IsValid(*It) &&
+                    (*It)->GetWorld() == World &&
+                    (*It)->IsInViewport())
+                {
+                    (*It)->SetInteractionText(NSLOCTEXT(
+                        "BrokenHorizon",
+                        "RenderedInteractionPrompt",
+                        "Press [F] to Pick Up Red Keycard"
+                    ));
+                    (*It)->SetVisibility(ESlateVisibility::Visible);
+                    bPromptApplied = true;
+                    break;
+                }
+            }
+
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_RENDERED_UI_REVIEW prompt_fixture applied=%d"
+                ),
+                bPromptApplied ? 1 : 0
+            );
+        }
     }
 
     const FString ReportDirectory = FPaths::Combine(
@@ -2708,11 +3155,32 @@ void ABHWarGameState::RunRenderedUIReviewTest()
         *FPaths::GetPath(OutputPath),
         true
     );
-    FScreenshotRequest::RequestScreenshot(
-        OutputPath,
-        true,
-        false
-    );
+    if (bInteractionPromptReview)
+    {
+        const FString DelayedScreenshotPath = OutputPath;
+        FTSTicker::GetCoreTicker().AddTicker(
+            FTickerDelegate::CreateLambda(
+                [DelayedScreenshotPath](float)
+                {
+                    FScreenshotRequest::RequestScreenshot(
+                        DelayedScreenshotPath,
+                        true,
+                        false
+                    );
+                    return false;
+                }
+            ),
+            0.25f
+        );
+    }
+    else
+    {
+        FScreenshotRequest::RequestScreenshot(
+            OutputPath,
+            true,
+            false
+        );
+    }
     UE_LOG(
         LogTemp,
         Display,
@@ -3016,6 +3484,510 @@ void ABHWarGameState::RunInventoryTransferRuntimeTest()
     GetWorldTimerManager().ClearTimer(InventoryTransferRuntimeTestTimer);
 }
 
+void ABHWarGameState::RunMissionCacheTransferRuntimeTest()
+{
+    if (bBHTestMissionCacheTransferIssued || !HasAuthority())
+    {
+        return;
+    }
+
+    ABHCharacter* StoreOwner = nullptr;
+    ABHCharacter* RetrieveOwner = nullptr;
+    for (TActorIterator<ABHCharacter> It(GetWorld()); It; ++It)
+    {
+        ABHCharacter* Candidate = *It;
+        if (!IsValid(Candidate) || !Candidate->HasAuthority() ||
+            !Candidate->IsPlayerControlled())
+        {
+            continue;
+        }
+
+        if (!IsValid(StoreOwner))
+        {
+            StoreOwner = Candidate;
+        }
+        else if (Candidate != StoreOwner)
+        {
+            RetrieveOwner = Candidate;
+            break;
+        }
+    }
+
+    ABHMissionItemContainer* MissionCache = nullptr;
+    for (TActorIterator<ABHMissionItemContainer> It(GetWorld()); It; ++It)
+    {
+        if (IsValid(*It) &&
+            It->GetPersistenceID() ==
+                FName(TEXT("FirstLightMissionCache01")))
+        {
+            MissionCache = *It;
+            break;
+        }
+    }
+
+    if (!IsValid(StoreOwner) || !IsValid(RetrieveOwner) ||
+        !IsValid(MissionCache))
+    {
+        return;
+    }
+
+    if (!MissionCache->Implements<UBHInteractable>() ||
+        MissionCache->GetMissionItemID().IsNone())
+    {
+        bBHTestMissionCacheTransferIssued = true;
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT(
+                "BH_TEST_MISSION_CACHE_TRANSFER result=failure "
+                "stage=configuration container=%s"
+            ),
+            *MissionCache->GetPersistenceID().ToString()
+        );
+        GetWorldTimerManager().ClearTimer(
+            MissionCacheTransferRuntimeTestTimer
+        );
+        return;
+    }
+
+    const FName MissionItemID = MissionCache->GetMissionItemID();
+    if (BHTestMissionCacheTransferPhase == 0)
+    {
+        StoreOwner->RemoveKeycard(MissionItemID);
+        RetrieveOwner->RemoveKeycard(MissionItemID);
+        MissionCache->RestoreStoredMissionItem(NAME_None);
+        StoreOwner->AddKeycard(MissionItemID);
+        BHTestMissionCacheTransferPhase = 1;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_MISSION_CACHE_TRANSFER stage=setup "
+                "container=%s store_owner=%s retrieve_owner=%s item=%s"
+            ),
+            *MissionCache->GetPersistenceID().ToString(),
+            *StoreOwner->GetName(),
+            *RetrieveOwner->GetName(),
+            *MissionItemID.ToString()
+        );
+        return;
+    }
+
+    if (BHTestMissionCacheTransferPhase == 1)
+    {
+        IBHInteractable::Execute_Interact(MissionCache, StoreOwner);
+        const bool bStored =
+            MissionCache->GetStoredMissionItemID() == MissionItemID &&
+            !StoreOwner->HasKeycard(MissionItemID) &&
+            !RetrieveOwner->HasKeycard(MissionItemID);
+        if (!bStored)
+        {
+            bBHTestMissionCacheTransferIssued = true;
+            UE_LOG(
+                LogTemp,
+                Error,
+                TEXT(
+                    "BH_TEST_MISSION_CACHE_TRANSFER result=failure "
+                    "stage=store stored=%s store_owner_has=%d "
+                    "retrieve_owner_has=%d"
+                ),
+                *MissionCache->GetStoredMissionItemID().ToString(),
+                StoreOwner->HasKeycard(MissionItemID) ? 1 : 0,
+                RetrieveOwner->HasKeycard(MissionItemID) ? 1 : 0
+            );
+            GetWorldTimerManager().ClearTimer(
+                MissionCacheTransferRuntimeTestTimer
+            );
+            return;
+        }
+
+        BHTestMissionCacheTransferPhase = 2;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_MISSION_CACHE_TRANSFER stage=store "
+                "result=success owner=%s"
+            ),
+            *StoreOwner->GetName()
+        );
+        return;
+    }
+
+    if (BHTestMissionCacheTransferPhase == 2)
+    {
+        IBHInteractable::Execute_Interact(MissionCache, RetrieveOwner);
+        const bool bRetrieved =
+            MissionCache->GetStoredMissionItemID().IsNone() &&
+            !StoreOwner->HasKeycard(MissionItemID) &&
+            RetrieveOwner->HasKeycard(MissionItemID);
+        if (!bRetrieved)
+        {
+            bBHTestMissionCacheTransferIssued = true;
+            UE_LOG(
+                LogTemp,
+                Error,
+                TEXT(
+                    "BH_TEST_MISSION_CACHE_TRANSFER result=failure "
+                    "stage=retrieve stored=%s store_owner_has=%d "
+                    "retrieve_owner_has=%d"
+                ),
+                *MissionCache->GetStoredMissionItemID().ToString(),
+                StoreOwner->HasKeycard(MissionItemID) ? 1 : 0,
+                RetrieveOwner->HasKeycard(MissionItemID) ? 1 : 0
+            );
+            GetWorldTimerManager().ClearTimer(
+                MissionCacheTransferRuntimeTestTimer
+            );
+            return;
+        }
+
+        BHTestMissionCacheTransferPhase = 3;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_MISSION_CACHE_TRANSFER stage=retrieve "
+                "result=success owner=%s"
+            ),
+            *RetrieveOwner->GetName()
+        );
+        return;
+    }
+
+    const bool bPassed =
+        MissionCache->GetStoredMissionItemID().IsNone() &&
+        !StoreOwner->HasKeycard(MissionItemID) &&
+        RetrieveOwner->HasKeycard(MissionItemID);
+    bBHTestMissionCacheTransferIssued = true;
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_TEST_MISSION_CACHE_TRANSFER result=%s "
+            "container=%s item=%s store_owner=%s retrieve_owner=%s "
+            "owner_a_has=%d owner_b_has=%d stored=%s"
+        ),
+        bPassed ? TEXT("success") : TEXT("failure"),
+        *MissionCache->GetPersistenceID().ToString(),
+        *MissionItemID.ToString(),
+        *StoreOwner->GetName(),
+        *RetrieveOwner->GetName(),
+        StoreOwner->HasKeycard(MissionItemID) ? 1 : 0,
+        RetrieveOwner->HasKeycard(MissionItemID) ? 1 : 0,
+        *MissionCache->GetStoredMissionItemID().ToString()
+    );
+    GetWorldTimerManager().ClearTimer(MissionCacheTransferRuntimeTestTimer);
+}
+
+void ABHWarGameState::RunArmoredThreatTargetSelectionRuntimeTest()
+{
+    if (bBHTestArmoredThreatTargetingIssued || !HasAuthority())
+    {
+        return;
+    }
+
+    TArray<ABHCharacter*> Players;
+    for (FConstPlayerControllerIterator Iterator =
+             GetWorld()->GetPlayerControllerIterator();
+         Iterator;
+         ++Iterator)
+    {
+        APlayerController* PlayerController = Iterator->Get();
+        ABHCharacter* Player = IsValid(PlayerController)
+            ? Cast<ABHCharacter>(PlayerController->GetPawn())
+            : nullptr;
+        if (IsValid(Player) && Player->HasAuthority() &&
+            Player->IsPlayerControlled())
+        {
+            Players.Add(Player);
+        }
+    }
+
+    ABHArmoredThreat* Threat = nullptr;
+    for (TActorIterator<ABHArmoredThreat> It(GetWorld()); It; ++It)
+    {
+        if (IsValid(*It) &&
+            It->GetPersistenceID() == FName(TEXT("FirstLightArmoredThreat01")))
+        {
+            Threat = *It;
+            break;
+        }
+    }
+
+    if (Players.Num() < 2 || !IsValid(Threat))
+    {
+        ++BHTestArmoredThreatTargetingAttempts;
+        if (BHTestArmoredThreatTargetingAttempts < 20)
+        {
+            return;
+        }
+
+        bBHTestArmoredThreatTargetingIssued = true;
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT(
+                "BH_TEST_ARMORED_THREAT_TARGETING result=failure "
+                "stage=setup players=%d threat=%d"
+            ),
+            Players.Num(),
+            IsValid(Threat) ? 1 : 0
+        );
+        GetWorldTimerManager().ClearTimer(
+            ArmoredThreatTargetSelectionRuntimeTestTimer
+        );
+        return;
+    }
+
+    if (BHTestArmoredThreatTargetingPhase == 0)
+    {
+        auto PositionTestPlayer = [](ABHCharacter* Player,
+                                     const FVector& Location)
+        {
+            if (IsValid(Player->GetCharacterMovement()))
+            {
+                Player->GetCharacterMovement()->StopMovementImmediately();
+                Player->GetCharacterMovement()->SetMovementMode(MOVE_None);
+            }
+            Player->SetActorLocation(
+                Location,
+                false,
+                nullptr,
+                ETeleportType::TeleportPhysics
+            );
+        };
+        const float ContactRange = Threat->GetContactRange();
+        const float NearDistance = FMath::Clamp(
+            ContactRange * 0.20f,
+            500.0f,
+            900.0f
+        );
+        const float FarDistance = FMath::Max(
+            NearDistance + 300.0f,
+            FMath::Min(ContactRange * 0.55f, ContactRange - 250.0f)
+        );
+        const float OutOfRangeDistance = ContactRange + 600.0f;
+
+        TArray<FVector> Directions;
+        Directions.Add(FVector(1.0f, 0.0f, 0.0f));
+        Directions.Add(FVector(0.0f, 1.0f, 0.0f));
+        Directions.Add(FVector(-1.0f, 0.0f, 0.0f));
+        Directions.Add(FVector(0.0f, -1.0f, 0.0f));
+
+        auto IsVisibleFromThreat = [this, Threat, &Players](
+                                        const FVector& TargetLocation)
+        {
+            FHitResult Hit;
+            FCollisionQueryParams Params(
+                SCENE_QUERY_STAT(ArmoredThreatTargetingFixture),
+                true,
+                Threat
+            );
+            for (ABHCharacter* Player : Players)
+            {
+                Params.AddIgnoredActor(Player);
+            }
+
+            const bool bBlocked = GetWorld()->LineTraceSingleByChannel(
+                Hit,
+                Threat->GetActorLocation() + FVector(0.0f, 0.0f, 80.0f),
+                TargetLocation + FVector(0.0f, 0.0f, 60.0f),
+                ECC_Visibility,
+                Params
+            );
+            return !bBlocked;
+        };
+
+        bool bFoundVisiblePair = false;
+        for (int32 FirstDirectionIndex = 0;
+             FirstDirectionIndex < Directions.Num() && !bFoundVisiblePair;
+             ++FirstDirectionIndex)
+        {
+            for (int32 SecondDirectionIndex = 0;
+                 SecondDirectionIndex < Directions.Num();
+                 ++SecondDirectionIndex)
+            {
+                if (FirstDirectionIndex == SecondDirectionIndex)
+                {
+                    continue;
+                }
+
+                const FVector FirstFarLocation = Threat->GetActorLocation() +
+                    Directions[FirstDirectionIndex] * FarDistance;
+                const FVector SecondNearLocation = Threat->GetActorLocation() +
+                    Directions[SecondDirectionIndex] * NearDistance;
+                if (!IsVisibleFromThreat(FirstFarLocation) ||
+                    !IsVisibleFromThreat(SecondNearLocation))
+                {
+                    continue;
+                }
+
+                BHTestArmoredThreatTargetingFirstFarLocation =
+                    FirstFarLocation;
+                BHTestArmoredThreatTargetingSecondNearLocation =
+                    SecondNearLocation;
+                BHTestArmoredThreatTargetingFirstNearLocation =
+                    Threat->GetActorLocation() +
+                    Directions[FirstDirectionIndex] * NearDistance;
+                BHTestArmoredThreatTargetingSecondOutOfRangeLocation =
+                    Threat->GetActorLocation() +
+                    Directions[SecondDirectionIndex] * OutOfRangeDistance;
+                bFoundVisiblePair = true;
+                break;
+            }
+        }
+
+        if (!bFoundVisiblePair)
+        {
+            bBHTestArmoredThreatTargetingIssued = true;
+            UE_LOG(
+                LogTemp,
+                Error,
+                TEXT(
+                    "BH_TEST_ARMORED_THREAT_TARGETING result=failure "
+                    "stage=visibility threat=%s"
+                ),
+                *Threat->GetPersistenceID().ToString()
+            );
+            GetWorldTimerManager().ClearTimer(
+                ArmoredThreatTargetSelectionRuntimeTestTimer
+            );
+            return;
+        }
+
+        PositionTestPlayer(
+            Players[0],
+            BHTestArmoredThreatTargetingFirstFarLocation
+        );
+        PositionTestPlayer(
+            Players[1],
+            BHTestArmoredThreatTargetingSecondNearLocation
+        );
+        BHTestArmoredThreatTargetingPhase = 1;
+        BHTestArmoredThreatTargetingAttempts = 0;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_ARMORED_THREAT_TARGETING stage=setup "
+                "result=success threat=%s first_far=%s second_near=%s"
+            ),
+            *Threat->GetPersistenceID().ToString(),
+            *Players[0]->GetName(),
+            *Players[1]->GetName()
+        );
+        return;
+    }
+
+    if (BHTestArmoredThreatTargetingPhase == 1)
+    {
+        if (Threat->HasPlayerContact() &&
+            Threat->GetCurrentTarget() == Players[1])
+        {
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_TEST_ARMORED_THREAT_TARGETING stage=initial "
+                    "result=success initial_target=%s"
+                ),
+                *Players[1]->GetName()
+            );
+            auto RepositionTestPlayer = [](ABHCharacter* Player,
+                                           const FVector& Location)
+            {
+                Player->SetActorLocation(
+                    Location,
+                    false,
+                    nullptr,
+                    ETeleportType::TeleportPhysics
+                );
+            };
+            RepositionTestPlayer(
+                Players[0],
+                BHTestArmoredThreatTargetingFirstNearLocation
+            );
+            RepositionTestPlayer(
+                Players[1],
+                BHTestArmoredThreatTargetingSecondOutOfRangeLocation
+            );
+            BHTestArmoredThreatTargetingPhase = 2;
+            BHTestArmoredThreatTargetingAttempts = 0;
+            return;
+        }
+
+        ++BHTestArmoredThreatTargetingAttempts;
+        if (BHTestArmoredThreatTargetingAttempts < 20)
+        {
+            return;
+        }
+
+        bBHTestArmoredThreatTargetingIssued = true;
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT(
+                "BH_TEST_ARMORED_THREAT_TARGETING result=failure "
+                "stage=initial contact=%d target=%s"
+            ),
+            Threat->HasPlayerContact() ? 1 : 0,
+            IsValid(Threat->GetCurrentTarget())
+                ? *Threat->GetCurrentTarget()->GetName()
+                : TEXT("None")
+        );
+        GetWorldTimerManager().ClearTimer(
+            ArmoredThreatTargetSelectionRuntimeTestTimer
+        );
+        return;
+    }
+
+    if (BHTestArmoredThreatTargetingPhase == 2 &&
+        Threat->HasPlayerContact() &&
+        Threat->GetCurrentTarget() == Players[0])
+    {
+        bBHTestArmoredThreatTargetingIssued = true;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_ARMORED_THREAT_TARGETING result=success "
+                "threat=%s initial_target=%s switched_target=%s"
+            ),
+            *Threat->GetPersistenceID().ToString(),
+            *Players[1]->GetName(),
+            *Players[0]->GetName()
+        );
+        GetWorldTimerManager().ClearTimer(
+            ArmoredThreatTargetSelectionRuntimeTestTimer
+        );
+        return;
+    }
+
+    ++BHTestArmoredThreatTargetingAttempts;
+    if (BHTestArmoredThreatTargetingAttempts < 20)
+    {
+        return;
+    }
+
+    bBHTestArmoredThreatTargetingIssued = true;
+    UE_LOG(
+        LogTemp,
+        Error,
+        TEXT(
+            "BH_TEST_ARMORED_THREAT_TARGETING result=failure "
+            "stage=switch contact=%d target=%s"
+        ),
+        Threat->HasPlayerContact() ? 1 : 0,
+        IsValid(Threat->GetCurrentTarget())
+            ? *Threat->GetCurrentTarget()->GetName()
+            : TEXT("None")
+    );
+    GetWorldTimerManager().ClearTimer(
+        ArmoredThreatTargetSelectionRuntimeTestTimer
+    );
+}
+
 void ABHWarGameState::RunWeaponRoleRuntimeTest()
 {
     if (bBHTestWeaponRoleRuntimeIssued || !HasAuthority())
@@ -3041,6 +4013,38 @@ void ABHWarGameState::RunWeaponRoleRuntimeTest()
     {
         return;
     }
+
+    const EBHWeaponRole OriginalRole = Weapon->GetWeaponRole();
+    const int32 OriginalMagazineAmmo = Weapon->GetMagazineAmmo();
+    const int32 OriginalReserveAmmo = Weapon->GetReserveAmmo();
+    ON_SCOPE_EXIT
+    {
+        // Leave the player's fixture intact for inventory and subsequent runtime checks.
+        const bool bRoleRestored = Weapon->EquipWeaponRole(OriginalRole, true);
+        const bool bAmmoRestored = Weapon->RestoreAmmoState(
+            OriginalMagazineAmmo,
+            OriginalReserveAmmo
+        );
+        const bool bRestored = bRoleRestored && bAmmoRestored &&
+            Weapon->GetWeaponRole() == OriginalRole &&
+            Weapon->GetMagazineAmmo() == OriginalMagazineAmmo &&
+            Weapon->GetReserveAmmo() == OriginalReserveAmmo;
+        if (!bRestored)
+        {
+            UE_LOG(LogTemp, Error, TEXT("BH_TEST_WEAPON_ROLE_RUNTIME_RESTORE result=failure"));
+        }
+        else
+        {
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT("BH_TEST_WEAPON_ROLE_RUNTIME_RESTORE result=success role=%d magazine=%d reserve=%d"),
+                static_cast<int32>(OriginalRole),
+                OriginalMagazineAmmo,
+                OriginalReserveAmmo
+            );
+        }
+    };
 
     const bool bMarksman = Weapon->EquipWeaponRole(EBHWeaponRole::Marksman, true);
     const bool bSupport = Weapon->EquipWeaponRole(EBHWeaponRole::Support, true);
@@ -3102,6 +4106,7 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
     {
         ABHCharacter* Player = nullptr;
         ABHKeycard* Keycard = nullptr;
+        ABHMissionItemContainer* MissionCache = nullptr;
         ABHExtractionZone* Extraction = nullptr;
         for (TActorIterator<ABHCharacter> It(World); It; ++It)
         {
@@ -3138,6 +4143,15 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
                 break;
             }
         }
+        for (TActorIterator<ABHMissionItemContainer> It(World); It; ++It)
+        {
+            if (It->GetPersistenceID() ==
+                FName(TEXT("FirstLightMissionCache01")))
+            {
+                MissionCache = *It;
+                break;
+            }
+        }
         for (TActorIterator<ABHExtractionZone> It(World); It; ++It)
         {
             Extraction = *It;
@@ -3154,7 +4168,9 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
             return;
         }
 
-        if (!IsValid(Keycard) || !IsValid(Extraction) ||
+        if (!IsValid(Keycard) || !IsValid(MissionCache) ||
+            !MissionCache->Implements<UBHInteractable>() ||
+            !IsValid(Extraction) ||
             Player->GetCurrentObjectiveID() !=
                 BHObjectiveIds::FindRedKeycard)
         {
@@ -3163,10 +4179,12 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
                 Warning,
                 TEXT(
                     "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE_DIAGNOSTIC "
-                    "player=%s keycard=%s extraction=%s objective=%s"
+                    "player=%s keycard=%s mission_cache=%s "
+                    "extraction=%s objective=%s"
                 ),
                 IsValid(Player) ? TEXT("true") : TEXT("false"),
                 IsValid(Keycard) ? TEXT("true") : TEXT("false"),
+                IsValid(MissionCache) ? TEXT("true") : TEXT("false"),
                 IsValid(Extraction) ? TEXT("true") : TEXT("false"),
                 IsValid(Player)
                     ? *Player->GetCurrentObjectiveID().ToString()
@@ -3193,6 +4211,53 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
                 "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=keycard "
                 "result=success"
             )
+        );
+
+        const FName RedKeycardID = FName(TEXT("RedKeycard"));
+        if (MissionCache->GetStoredMissionItemID() != NAME_None)
+        {
+            FailTest(TEXT("mission_cache_initial_state"));
+            return;
+        }
+
+        IBHInteractable::Execute_Interact(MissionCache, Player);
+        if (MissionCache->GetStoredMissionItemID() != RedKeycardID ||
+            Player->HasKeycard(RedKeycardID) ||
+            Player->GetCurrentObjectiveID() !=
+                BHObjectiveIds::UnlockSecurityDoor)
+        {
+            FailTest(TEXT("mission_cache_store"));
+            return;
+        }
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE "
+                "step=mission_cache_store result=success "
+                "container=%s"
+            ),
+            *MissionCache->GetPersistenceID().ToString()
+        );
+
+        IBHInteractable::Execute_Interact(MissionCache, Player);
+        if (MissionCache->GetStoredMissionItemID() != NAME_None ||
+            !Player->HasKeycard(RedKeycardID) ||
+            Player->GetCurrentObjectiveID() !=
+                BHObjectiveIds::UnlockSecurityDoor)
+        {
+            FailTest(TEXT("mission_cache_retrieve"));
+            return;
+        }
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE "
+                "step=mission_cache_retrieve result=success "
+                "container=%s"
+            ),
+            *MissionCache->GetPersistenceID().ToString()
         );
     }
     else if (FirstLightPlayableRouteTestPhase == 1)
@@ -3257,22 +4322,137 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
                 }
             }
         }
+        ABHExtractionZone* Extraction =
+            FirstLightPlayableRouteTestExtraction.Get();
+        if (!IsValid(Player) || !IsValid(Extraction) ||
+            Player->GetCurrentObjectiveID() != BHObjectiveIds::EliminateGuard)
+        {
+            FailTest(TEXT("pre_guard_extraction_setup"));
+            return;
+        }
+
+        const FVector PriorLocation = Player->GetActorLocation();
+        if (!Player->SetActorLocation(
+                Extraction->GetActorLocation(),
+                false,
+                nullptr,
+                ETeleportType::TeleportPhysics
+            ))
+        {
+            FailTest(TEXT("pre_guard_extraction_approach"));
+            return;
+        }
+        Player->UpdateOverlaps();
+
+        const bool bGatePreserved =
+            Player->GetCurrentObjectiveID() == BHObjectiveIds::EliminateGuard &&
+            !Player->IsObjectiveCompleted(BHObjectiveIds::EliminateGuard) &&
+            !Player->IsMissionComplete();
+        const bool bRestored = Player->SetActorLocation(
+            PriorLocation,
+            false,
+            nullptr,
+            ETeleportType::TeleportPhysics
+        );
+        Player->UpdateOverlaps();
+        if (!bGatePreserved)
+        {
+            FailTest(TEXT("pre_guard_extraction_gate"));
+            return;
+        }
+        if (!bRestored)
+        {
+            FailTest(TEXT("pre_guard_extraction_restore"));
+            return;
+        }
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE "
+                "step=pre_guard_extraction_gate result=success "
+                "objective=%s mission_complete=%d"
+            ),
+            *Player->GetCurrentObjectiveID().ToString(),
+            Player->IsMissionComplete() ? 1 : 0
+        );
+    }
+    else if (FirstLightPlayableRouteTestPhase == 3)
+    {
+        ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
+        if (!IsValid(Player))
+        {
+            for (TActorIterator<ABHCharacter> It(World); It; ++It)
+            {
+                if (It->HasAuthority() && IsValid(It->GetPlayerState()))
+                {
+                    Player = *It;
+                    FirstLightPlayableRouteTestPlayer = Player;
+                    break;
+                }
+            }
+        }
         TArray<ABHEnemySoldier*> ObjectiveGuards;
+        int32 ObjectiveGuardCandidates = 0;
         for (TActorIterator<ABHEnemySoldier> It(World); It; ++It)
         {
+            const bool bHasRouteObjective =
+                It->GetObjectiveIdToCompleteOnDeath() ==
+                BHObjectiveIds::EliminateGuard;
+            if (bHasRouteObjective)
+            {
+                ++ObjectiveGuardCandidates;
+                UE_LOG(
+                    LogTemp,
+                    Display,
+                    TEXT(
+                        "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE "
+                        "guard_candidate name=%s faction=%d dead=%d "
+                        "defense_tag=%d objective=%s health=%.1f"
+                    ),
+                    *It->GetName(),
+                    static_cast<int32>(It->GetCombatFaction()),
+                    It->IsDead() ? 1 : 0,
+                    It->ActorHasTag(
+                        FName(TEXT("BH_Auto_DefenseA_Garrison"))
+                    ) ? 1 : 0,
+                    *It->GetObjectiveIdToCompleteOnDeath().ToString(),
+                    IsValid(It->GetHealthComponent())
+                        ? It->GetHealthComponent()->GetCurrentHealth()
+                        : -1.0f
+                );
+            }
+
             if (!It->IsDead() &&
                 It->GetCombatFaction() ==
                     EBHCombatFaction::Hostile &&
-                (!It->HasAnyFlags(RF_Transient) ||
-                 It->GetObjectiveIdToCompleteOnDeath() ==
-                    BHObjectiveIds::EliminateGuard))
+                !It->ActorHasTag(
+                    FName(TEXT("BH_Auto_DefenseA_Garrison"))
+                ) &&
+                bHasRouteObjective)
             {
                 ObjectiveGuards.Add(*It);
             }
         }
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE "
+                "guard_selection candidates=%d selected=%d"
+            ),
+            ObjectiveGuardCandidates,
+            ObjectiveGuards.Num()
+        );
         if (!IsValid(Player))
         {
             FailTest(TEXT("route_player"));
+            return;
+        }
+        if (ObjectiveGuardCandidates != 3 ||
+            ObjectiveGuards.Num() != 3)
+        {
+            FailTest(TEXT("objective_guards_contract"));
             return;
         }
         for (ABHEnemySoldier* Guard : ObjectiveGuards)
@@ -3318,7 +4498,7 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
             FirstLightPlayableRouteCombatPasses
         );
     }
-    else if (FirstLightPlayableRouteTestPhase == 3)
+    else if (FirstLightPlayableRouteTestPhase == 4)
     {
         ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
         if (!IsValid(Player))
@@ -3396,7 +4576,7 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
             PickupRounds
         );
     }
-    else if (FirstLightPlayableRouteTestPhase == 4)
+    else if (FirstLightPlayableRouteTestPhase == 5)
     {
         ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
         if (!IsValid(Player))
@@ -3426,7 +4606,7 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
             return;
         }
     }
-    else if (FirstLightPlayableRouteTestPhase == 5)
+    else if (FirstLightPlayableRouteTestPhase == 6)
     {
         ABHCharacter* Player = FirstLightPlayableRouteTestPlayer.Get();
         if (!IsValid(Player))
@@ -3524,6 +4704,779 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
     }
 
     ++FirstLightPlayableRouteTestPhase;
+}
+
+void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
+{
+    UWorld* World = GetWorld();
+    const auto FailTest = [this](const TCHAR* Reason)
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT(
+                "BH_TEST_DEFENSE_A_GARRISON result=failure "
+                "phase=%d reason=%s"
+            ),
+            BHTestDefenseAGarrisonPhase,
+            Reason
+        );
+        GetWorldTimerManager().ClearTimer(
+            DefenseAGarrisonPersistenceTestTimer
+        );
+        FPlatformMisc::RequestExit(false);
+    };
+
+    if (!HasAuthority() || !IsValid(World))
+    {
+        FailTest(TEXT("authority_or_world"));
+        return;
+    }
+
+    ABHCharacter* Player = nullptr;
+    for (TActorIterator<ABHCharacter> It(World); It; ++It)
+    {
+        if (It->HasAuthority() && It->IsPlayerControlled())
+        {
+            Player = *It;
+            break;
+        }
+    }
+
+    if (!IsValid(Player))
+    {
+        return;
+    }
+
+    TArray<ABHEnemySoldier*> Garrison;
+    for (TActorIterator<ABHEnemySoldier> It(World); It; ++It)
+    {
+        if (IsValid(*It) &&
+            It->ActorHasTag(FName(TEXT("BH_Auto_DefenseA_Garrison"))))
+        {
+            Garrison.Add(*It);
+        }
+    }
+
+    if (Garrison.IsEmpty())
+    {
+        FailTest(TEXT("authored_garrison_missing"));
+        return;
+    }
+
+    const auto CountLivingActiveAuthoredGarrison =
+        [&Garrison]() -> int32
+    {
+        int32 LivingActiveCount = 0;
+        for (ABHEnemySoldier* Enemy : Garrison)
+        {
+            if (IsValid(Enemy) &&
+                !Enemy->IsDead() &&
+                Enemy->IsOperationGarrisonActive())
+            {
+                ++LivingActiveCount;
+            }
+        }
+
+        return LivingActiveCount;
+    };
+
+    const auto GatherRuntimeOperationHostiles =
+        [World]() -> TArray<ABHEnemySoldier*>
+    {
+        TArray<ABHEnemySoldier*> Hostiles;
+        for (TActorIterator<ABHEnemySoldier> It(World); It; ++It)
+        {
+            ABHEnemySoldier* Enemy = *It;
+            if (IsValid(Enemy) &&
+                !Enemy->IsDead() &&
+                Enemy->HasAnyFlags(RF_Transient) &&
+                Enemy->GetCombatFaction() ==
+                    EBHCombatFaction::Hostile &&
+                Enemy->GetObjectiveIdToCompleteOnDeath().IsNone() &&
+                !Enemy->ActorHasTag(
+                    FName(TEXT("BH_Auto_DefenseA_Garrison"))))
+            {
+                Hostiles.Add(Enemy);
+            }
+        }
+
+        return Hostiles;
+    };
+
+    const auto KillOperationEnemy =
+        [Player](ABHEnemySoldier* Enemy) -> bool
+    {
+        UBHHealthComponent* Health =
+            IsValid(Enemy) ? Enemy->GetHealthComponent() : nullptr;
+        return IsValid(Health) &&
+            Health->ApplyDamage(
+                Health->GetCurrentHealth() + 1.0f,
+                Player
+            ) > 0.0f;
+    };
+
+    const auto KillOperationHostiles =
+        [&KillOperationEnemy](const TArray<ABHEnemySoldier*>& Hostiles)
+            -> int32
+    {
+        int32 KilledCount = 0;
+        for (ABHEnemySoldier* Enemy : Hostiles)
+        {
+            if (KillOperationEnemy(Enemy))
+            {
+                ++KilledCount;
+            }
+        }
+
+        return KilledCount;
+    };
+
+    if (BHTestDefenseAGarrisonPhase == 0)
+    {
+        const TArray<FName> ExpectedGarrisonIDs = {
+            FName(TEXT("DefenseA_FL_DefenseA_Garrison_01_West")),
+            FName(TEXT("DefenseA_FL_DefenseA_Garrison_02_East")),
+            FName(TEXT("DefenseA_FL_DefenseA_Garrison_03_NorthWest")),
+            FName(TEXT("DefenseA_FL_DefenseA_Garrison_04_NorthEast")),
+            FName(TEXT("DefenseA_FL_DefenseA_Garrison_05_OuterWest")),
+            FName(TEXT("DefenseA_FL_DefenseA_Garrison_06_OuterEast")),
+        };
+        if (Garrison.Num() != ExpectedGarrisonIDs.Num())
+        {
+            FailTest(TEXT("garrison_identity_count"));
+            return;
+        }
+        for (const FName ExpectedID : ExpectedGarrisonIDs)
+        {
+            bool bFoundExpectedID = false;
+            for (ABHEnemySoldier* Enemy : Garrison)
+            {
+                if (IsValid(Enemy) &&
+                    Enemy->GetFieldOperativeID() == ExpectedID)
+                {
+                    bFoundExpectedID = true;
+                    break;
+                }
+            }
+            if (!bFoundExpectedID)
+            {
+                FailTest(TEXT("garrison_identity_contract"));
+                return;
+            }
+        }
+        for (ABHEnemySoldier* Enemy : Garrison)
+        {
+            if (!IsValid(Enemy) || Enemy->IsDead() ||
+                Enemy->IsOperationGarrisonActive())
+            {
+                FailTest(TEXT("garrison_not_dormant"));
+                return;
+            }
+        }
+
+        UBHWarSubsystem* WarSubsystem =
+            GetGameInstance()
+                ? GetGameInstance()->GetSubsystem<UBHWarSubsystem>()
+                : nullptr;
+        if (!IsValid(WarSubsystem))
+        {
+            FailTest(TEXT("war_subsystem_missing"));
+            return;
+        }
+
+        FName OperationSectorID = NAME_None;
+        for (const FBHWarSectorState& Sector :
+             WarSubsystem->GetSectorStates())
+        {
+            if (WarSubsystem->IsViableOperation(
+                    Sector.SectorID,
+                    EBHWarPriorityType::Defend
+                ))
+            {
+                OperationSectorID = Sector.SectorID;
+                break;
+            }
+        }
+
+        if (OperationSectorID.IsNone())
+        {
+            FailTest(TEXT("no_viable_defense_sector"));
+            return;
+        }
+
+        ++BHTestDefenseAGarrisonWaitAttempts;
+        Player->PrepareDeploymentModeForTest();
+        if (!Player->BeginOperationInWorld(
+                OperationSectorID,
+                EBHWarPriorityType::Defend
+            ))
+        {
+            if (BHTestDefenseAGarrisonWaitAttempts >= 30)
+            {
+                FailTest(TEXT("operation_start"));
+            }
+            return;
+        }
+
+        BHTestDefenseAGarrisonPhase = 1;
+        BHTestDefenseAGarrisonWaitAttempts = 0;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_DEFENSE_A_GARRISON step=operation_started "
+                "result=success sector=%s"
+            ),
+            *OperationSectorID.ToString()
+        );
+        return;
+    }
+
+    if (BHTestDefenseAGarrisonPhase == 1)
+    {
+        const FBHOpenWorldOperationState State =
+            Player->GetOpenWorldOperationState();
+        if (!Player->IsRuntimeWarOperation() ||
+            !State.bHasSnapshot ||
+            !State.bOperationActivated ||
+            State.OperationVariationIndex != 0)
+        {
+            ++BHTestDefenseAGarrisonWaitAttempts;
+            if (BHTestDefenseAGarrisonWaitAttempts >= 30)
+            {
+                FailTest(TEXT("operation_not_active"));
+            }
+            return;
+        }
+
+        ABHEnemySoldier* Casualty = nullptr;
+        for (ABHEnemySoldier* Enemy : Garrison)
+        {
+            if (IsValid(Enemy) && !Enemy->IsDead() &&
+                Enemy->IsOperationGarrisonActive())
+            {
+                Casualty = Enemy;
+                break;
+            }
+        }
+
+        if (!IsValid(Casualty) ||
+            !IsValid(Casualty->GetHealthComponent()))
+        {
+            FailTest(TEXT("active_garrison_casualty_target"));
+            return;
+        }
+
+        BHTestDefenseAGarrisonCasualtyID =
+            Casualty->GetFieldOperativeID();
+        if (BHTestDefenseAGarrisonCasualtyID.IsNone() ||
+            Casualty->GetHealthComponent()->ApplyDamage(
+                Casualty->GetHealthComponent()->GetCurrentHealth() + 1.0f,
+                Player
+            ) <= 0.0f)
+        {
+            FailTest(TEXT("casualty_damage"));
+            return;
+        }
+
+        BHTestDefenseAGarrisonPhase = 2;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_DEFENSE_A_GARRISON step=casualty "
+                "result=success id=%s"
+            ),
+            *BHTestDefenseAGarrisonCasualtyID.ToString()
+        );
+        return;
+    }
+
+    if (BHTestDefenseAGarrisonPhase == 2)
+    {
+        const FBHOpenWorldOperationState State =
+            Player->GetOpenWorldOperationState();
+        if (!State.bHasSnapshot || State.EnemyCasualties < 1)
+        {
+            ++BHTestDefenseAGarrisonWaitAttempts;
+            if (BHTestDefenseAGarrisonWaitAttempts >= 30)
+            {
+                FailTest(TEXT("casualty_not_recorded"));
+            }
+            return;
+        }
+
+        UBHSaveSubsystem* SaveSubsystem =
+            GetGameInstance()
+                ? GetGameInstance()->GetSubsystem<UBHSaveSubsystem>()
+                : nullptr;
+        if (!IsValid(SaveSubsystem) || !SaveSubsystem->SaveProgress())
+        {
+            FailTest(TEXT("checkpoint_save"));
+            return;
+        }
+
+        BHTestDefenseAGarrisonPhase = 3;
+        if (!SaveSubsystem->LoadProgress())
+        {
+            FailTest(TEXT("checkpoint_load"));
+            return;
+        }
+
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_DEFENSE_A_GARRISON step=checkpoint_reload "
+                "result=success"
+            )
+        );
+        return;
+    }
+
+    if (BHTestDefenseAGarrisonPhase == 3)
+    {
+        const FBHOpenWorldOperationState RestoredState =
+            Player->GetOpenWorldOperationState();
+        if (!Player->IsRuntimeWarOperation() ||
+            !RestoredState.bHasSnapshot ||
+            !RestoredState.bOperationActivated)
+        {
+            ++BHTestDefenseAGarrisonWaitAttempts;
+            if (BHTestDefenseAGarrisonWaitAttempts >= 40)
+            {
+                FailTest(TEXT("operation_restore"));
+            }
+            return;
+        }
+
+        ABHEnemySoldier* RestoredCasualty = nullptr;
+        int32 LivingActiveGarrisonCount = 0;
+        TArray<ABHEnemySoldier*> LivingAuthoredWave;
+        for (ABHEnemySoldier* Enemy : Garrison)
+        {
+            if (!IsValid(Enemy))
+            {
+                continue;
+            }
+
+            if (Enemy->GetFieldOperativeID() ==
+                BHTestDefenseAGarrisonCasualtyID)
+            {
+                RestoredCasualty = Enemy;
+                continue;
+            }
+
+            if (!Enemy->IsDead() && Enemy->IsOperationGarrisonActive())
+            {
+                ++LivingActiveGarrisonCount;
+                LivingAuthoredWave.Add(Enemy);
+            }
+        }
+
+        if (!IsValid(RestoredCasualty) ||
+            !RestoredCasualty->IsDead() ||
+            RestoredCasualty->IsOperationGarrisonActive() ||
+            LivingActiveGarrisonCount != RestoredState.LivingEnemyCount ||
+            RestoredState.EnemyCasualties < 1 ||
+            RestoredState.CurrentWave != 1 ||
+            RestoredState.OperationVariationIndex != 0)
+        {
+            FailTest(TEXT("garrison_restore_state"));
+            return;
+        }
+
+        const int32 ClearedCount =
+            KillOperationHostiles(LivingAuthoredWave);
+        if (ClearedCount != LivingActiveGarrisonCount)
+        {
+            FailTest(TEXT("wave1_clear_damage"));
+            return;
+        }
+
+        BHTestDefenseAGarrisonPhase = 4;
+        BHTestDefenseAGarrisonWaitAttempts = 0;
+        UE_LOG(
+            LogTemp,
+            Display,
+            TEXT(
+                "BH_TEST_DEFENSE_A_GARRISON step=wave1_cleared "
+                "result=success restored_living=%d casualties=%d"
+            ),
+            LivingActiveGarrisonCount,
+            RestoredState.EnemyCasualties
+        );
+        return;
+    }
+
+    if (BHTestDefenseAGarrisonPhase == 4)
+    {
+        const FBHOpenWorldOperationState State =
+            Player->GetOpenWorldOperationState();
+        const FBHActiveOperationSnapshot Snapshot =
+            GetActiveOperationSnapshot();
+        if (State.bHasSnapshot &&
+            State.bOperationActivated &&
+            State.bWaitingForWave)
+        {
+            if (State.CurrentWave != 1 ||
+                State.LivingEnemyCount != 0 ||
+                State.SecondsUntilNextWave <= 0.0f ||
+                Snapshot.Phase !=
+                    EBHActiveOperationPhase::AwaitingWave ||
+                !Snapshot.OperationState.bHasSnapshot ||
+                Snapshot.OperationState.SecondsUntilNextWave <= 0.0f ||
+                CountLivingActiveAuthoredGarrison() != 0)
+            {
+                FailTest(TEXT("awaiting_wave_state"));
+                return;
+            }
+
+            BHTestDefenseAGarrisonPhase = 5;
+            BHTestDefenseAGarrisonWaitAttempts = 0;
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_TEST_DEFENSE_A_GARRISON "
+                    "step=awaiting_wave2 result=success countdown=%.1f"
+                ),
+                State.SecondsUntilNextWave
+            );
+            return;
+        }
+
+        ++BHTestDefenseAGarrisonWaitAttempts;
+        if (BHTestDefenseAGarrisonWaitAttempts >= 30)
+        {
+            FailTest(TEXT("awaiting_wave_timeout"));
+        }
+        return;
+    }
+
+    if (BHTestDefenseAGarrisonPhase == 5)
+    {
+        const FBHOpenWorldOperationState State =
+            Player->GetOpenWorldOperationState();
+        if (State.bHasSnapshot &&
+            State.bOperationActivated &&
+            !State.bWaitingForWave &&
+            State.CurrentWave == 2 &&
+            State.LivingEnemyCount > 0)
+        {
+            const TArray<ABHEnemySoldier*> RuntimeHostiles =
+                GatherRuntimeOperationHostiles();
+            if (CountLivingActiveAuthoredGarrison() != 0 ||
+                RuntimeHostiles.Num() != State.LivingEnemyCount)
+            {
+                FailTest(TEXT("wave2_runtime_spawn"));
+                return;
+            }
+
+            const int32 ClearedCount =
+                KillOperationHostiles(RuntimeHostiles);
+            if (ClearedCount != RuntimeHostiles.Num())
+            {
+                FailTest(TEXT("wave2_clear_damage"));
+                return;
+            }
+
+            bBHTestDefenseAWave2Spawned = true;
+            BHTestDefenseAGarrisonPhase = 6;
+            BHTestDefenseAGarrisonWaitAttempts = 0;
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_TEST_DEFENSE_A_GARRISON "
+                    "step=wave2_spawned result=success runtime=%d"
+                ),
+                RuntimeHostiles.Num()
+            );
+            return;
+        }
+
+        ++BHTestDefenseAGarrisonWaitAttempts;
+        if (BHTestDefenseAGarrisonWaitAttempts >= 40)
+        {
+            FailTest(TEXT("wave2_spawn_timeout"));
+        }
+        return;
+    }
+
+    if (BHTestDefenseAGarrisonPhase == 6)
+    {
+        if (!bBHTestDefenseAWave2Spawned)
+        {
+            FailTest(TEXT("wave2_not_observed"));
+            return;
+        }
+
+        const FBHOpenWorldOperationState State =
+            Player->GetOpenWorldOperationState();
+        if (!State.bHasSnapshot || !State.bOperationActivated)
+        {
+            ++BHTestDefenseAGarrisonWaitAttempts;
+            if (BHTestDefenseAGarrisonWaitAttempts >= 40)
+            {
+                FailTest(TEXT("post_wave2_operation_state"));
+            }
+            return;
+        }
+
+        if (CountLivingActiveAuthoredGarrison() != 0)
+        {
+            FailTest(TEXT("authored_garrison_reactivated"));
+            return;
+        }
+
+        if (State.bSecuringObjective)
+        {
+            if (!Player->SetActorLocation(
+                    State.OperationCenter + FVector(0.0f, 0.0f, 50.0f),
+                    false,
+                    nullptr,
+                    ETeleportType::TeleportPhysics
+                ))
+            {
+                FailTest(TEXT("hold_position_set"));
+                return;
+            }
+            Player->UpdateOverlaps();
+            BHTestDefenseAGarrisonPhase = 7;
+            BHTestDefenseAGarrisonWaitAttempts = 0;
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_TEST_DEFENSE_A_GARRISON "
+                    "step=final_hold_started result=success wave=%d"
+                ),
+                State.CurrentWave
+            );
+            return;
+        }
+
+        if (State.bWaitingForWave)
+        {
+            if (State.CurrentWave >= State.DefenseWaveCount ||
+                State.LivingEnemyCount != 0 ||
+                State.SecondsUntilNextWave <= 0.0f)
+            {
+                FailTest(TEXT("later_wave_countdown"));
+                return;
+            }
+            return;
+        }
+
+        const TArray<ABHEnemySoldier*> RuntimeHostiles =
+            GatherRuntimeOperationHostiles();
+        if (State.LivingEnemyCount > 0)
+        {
+            if (RuntimeHostiles.Num() != State.LivingEnemyCount)
+            {
+                FailTest(TEXT("later_wave_runtime_spawn"));
+                return;
+            }
+
+            const int32 ClearedCount =
+                KillOperationHostiles(RuntimeHostiles);
+            if (ClearedCount != RuntimeHostiles.Num())
+            {
+                FailTest(TEXT("later_wave_clear_damage"));
+                return;
+            }
+
+            BHTestDefenseAGarrisonWaitAttempts = 0;
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_TEST_DEFENSE_A_GARRISON "
+                    "step=later_wave_cleared result=success "
+                    "wave=%d runtime=%d"
+                ),
+                State.CurrentWave,
+                RuntimeHostiles.Num()
+            );
+            return;
+        }
+
+        ++BHTestDefenseAGarrisonWaitAttempts;
+        if (BHTestDefenseAGarrisonWaitAttempts >= 60)
+        {
+            FailTest(TEXT("final_hold_timeout"));
+        }
+        return;
+    }
+
+    if (BHTestDefenseAGarrisonPhase == 7)
+    {
+        const FBHActiveOperationSnapshot Snapshot =
+            GetActiveOperationSnapshot();
+        if (Snapshot.OperationState.bHasSnapshot &&
+            Snapshot.Phase == EBHActiveOperationPhase::DebriefSuccess &&
+            Player->IsMissionComplete())
+        {
+            if (!Snapshot.OperationState.bSecuringObjective ||
+                Snapshot.OperationState.CurrentWave <
+                    Snapshot.OperationState.DefenseWaveCount ||
+                CountLivingActiveAuthoredGarrison() != 0)
+            {
+                FailTest(TEXT("terminal_success_snapshot"));
+                return;
+            }
+
+            UE_LOG(
+                LogTemp,
+                Display,
+                TEXT(
+                    "BH_TEST_DEFENSE_A_GARRISON result=success "
+                    "wave2_spawned=%d terminal_phase=%d wave=%d "
+                    "casualties=%d"
+                ),
+                bBHTestDefenseAWave2Spawned ? 1 : 0,
+                static_cast<int32>(Snapshot.Phase),
+                Snapshot.OperationState.CurrentWave,
+                Snapshot.OperationState.EnemyCasualties
+            );
+            GetWorldTimerManager().ClearTimer(
+                DefenseAGarrisonPersistenceTestTimer
+            );
+            FPlatformMisc::RequestExit(false);
+            return;
+        }
+
+        const FBHOpenWorldOperationState State =
+            Player->GetOpenWorldOperationState();
+        if (State.bHasSnapshot && State.bSecuringObjective)
+        {
+            Player->SetActorLocation(
+                State.OperationCenter + FVector(0.0f, 0.0f, 50.0f),
+                false,
+                nullptr,
+                ETeleportType::TeleportPhysics
+            );
+            Player->UpdateOverlaps();
+        }
+
+        ++BHTestDefenseAGarrisonWaitAttempts;
+        if (BHTestDefenseAGarrisonWaitAttempts >= 80)
+        {
+            FailTest(TEXT("terminal_success_timeout"));
+        }
+    }
+}
+
+void ABHWarGameState::RunOperationFailureTest()
+{
+    if (bBHTestOperationFailureIssued)
+    {
+        GetWorldTimerManager().ClearTimer(OperationFailureTestTimer);
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!HasAuthority() || !IsValid(World) || !IsValid(BoundWarSubsystem))
+    {
+        return;
+    }
+
+    TArray<ABHCharacter*> Participants;
+    FName OperationSectorID = NAME_None;
+    EBHWarPriorityType OperationType = EBHWarPriorityType::None;
+    for (TActorIterator<ABHCharacter> It(World); It; ++It)
+    {
+        ABHCharacter* Participant = *It;
+        if (!IsValid(Participant) ||
+            !Participant->HasAuthority() ||
+            !Participant->IsPlayerControlled() ||
+            !Participant->IsRuntimeWarOperation() ||
+            Participant->GetAssignedWarSectorID().IsNone() ||
+            Participant->GetAssignedWarPriorityType() ==
+                EBHWarPriorityType::None ||
+            Participant->IsMissionComplete() ||
+            Participant->IsMissionFailed())
+        {
+            continue;
+        }
+
+        if (Participants.IsEmpty())
+        {
+            OperationSectorID = Participant->GetAssignedWarSectorID();
+            OperationType = Participant->GetAssignedWarPriorityType();
+        }
+        else if (
+            Participant->GetAssignedWarSectorID() != OperationSectorID ||
+            Participant->GetAssignedWarPriorityType() != OperationType)
+        {
+            continue;
+        }
+
+        Participants.Add(Participant);
+    }
+
+    if (Participants.Num() < 2)
+    {
+        return;
+    }
+
+    ABHOpenWorldOperationDirector* Director = nullptr;
+    for (TActorIterator<ABHOpenWorldOperationDirector> It(World); It; ++It)
+    {
+        if (IsValid(*It) &&
+            (*It)->HasAuthority() &&
+            (*It)->IsOperationActivated() &&
+            (*It)->IsOperationInProgress())
+        {
+            Director = *It;
+            break;
+        }
+    }
+
+    if (!IsValid(Director))
+    {
+        return;
+    }
+
+    Director->FailOperationForTesting();
+
+    int32 FailedParticipantCount = 0;
+    for (ABHCharacter* Participant : Participants)
+    {
+        if (IsValid(Participant) && Participant->IsMissionFailed())
+        {
+            ++FailedParticipantCount;
+        }
+    }
+
+    const bool bFailureVerified =
+        FailedParticipantCount == Participants.Num() &&
+        !Director->IsOperationInProgress();
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT(
+            "BH_TEST_OPERATION_FAILURE result=%s sector=%s type=%d "
+            "participants=%d failed=%d director_in_progress=%d"
+        ),
+        bFailureVerified ? TEXT("success") : TEXT("failure"),
+        *OperationSectorID.ToString(),
+        static_cast<int32>(OperationType),
+        Participants.Num(),
+        FailedParticipantCount,
+        Director->IsOperationInProgress() ? 1 : 0
+    );
+
+    bBHTestOperationFailureIssued = true;
+    GetWorldTimerManager().ClearTimer(OperationFailureTestTimer);
+
+    if (!bFailureVerified)
+    {
+        FPlatformMisc::RequestExit(false);
+    }
 }
 
 void ABHWarGameState::RunFieldSquadContextOwnershipTest()
@@ -3917,6 +5870,8 @@ void ABHWarGameState::OnRep_WarStateSnapshot()
 
 void ABHWarGameState::OnRep_ActiveOperationSnapshot()
 {
+    BroadcastActiveOperationSnapshotChanged();
+
     UE_LOG(
         LogTemp,
         Display,
@@ -3928,6 +5883,11 @@ void ABHWarGameState::OnRep_ActiveOperationSnapshot()
         static_cast<int32>(ActiveOperationSnapshot.Phase),
         *ActiveOperationSnapshot.SectorID.ToString()
     );
+}
+
+void ABHWarGameState::BroadcastActiveOperationSnapshotChanged()
+{
+    ActiveOperationSnapshotChanged.Broadcast(ActiveOperationSnapshot);
 }
 
 void ABHWarGameState::PublishAuthoritativeSnapshot()
@@ -3946,7 +5906,7 @@ void ABHWarGameState::PublishAuthoritativeSnapshot()
 
     BoundWarSubsystem = WarSubsystem;
     const int32 NextRevision =
-        FMath::Max(1, WarStateSnapshot.Revision + 1);
+        WarSubsystem->AllocateReplicatedSnapshotRevision();
     WarStateSnapshot =
         WarSubsystem->CaptureReplicatedSnapshot(NextRevision);
     ForceNetUpdate();

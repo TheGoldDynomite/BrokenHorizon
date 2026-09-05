@@ -164,13 +164,16 @@ public:
 
     void ApplyWeaponConfig(const FBHRifleConfig& NewConfig);
 
+    void ReportFireNoise();
+
     bool PerformHitscan(
         const FVector& CameraOrigin,
         const FVector& CameraDirection,
         float SpreadDegrees,
         AController* InstigatorController,
         FHitResult* OutHitResult = nullptr,
-        bool* bOutHadBlockingHit = nullptr
+        bool* bOutHadBlockingHit = nullptr,
+        bool bPlayFirePresentation = true
     );
 
     void PlayReplicatedFirePresentation(

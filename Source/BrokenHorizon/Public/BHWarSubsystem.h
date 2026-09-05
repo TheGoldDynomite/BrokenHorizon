@@ -7,6 +7,7 @@
 #include "BHWarSubsystem.generated.h"
 
 class FSubsystemCollectionBase;
+class UNetConnection;
 struct FBHWarStateSnapshot;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
@@ -41,6 +42,12 @@ public:
     FBHWarStateSnapshot CaptureReplicatedSnapshot(
         int32 Revision
     ) const;
+
+    /**
+     * Allocates a server snapshot revision that survives seamless travel.
+     * The GameState is recreated during travel, while this subsystem persists.
+     */
+    int32 AllocateReplicatedSnapshotRevision();
 
     bool ApplyReplicatedSnapshot(
         const FBHWarStateSnapshot& Snapshot
@@ -1231,6 +1238,9 @@ private:
 
     bool bApplyingReplicatedSnapshot = false;
     int32 LastAppliedReplicatedSnapshotRevision = INDEX_NONE;
+    // Seamless travel keeps this connection; a reconnect starts a new revision stream.
+    TWeakObjectPtr<UNetConnection> LastAppliedReplicatedSnapshotConnection;
+    int32 ReplicatedSnapshotRevision = 0;
     FBHCampaignDifficultyProfile CampaignDifficulty;
     FBHCampaignProgressionState CampaignProgression;
     float SimulationAccumulator = 0.0f;

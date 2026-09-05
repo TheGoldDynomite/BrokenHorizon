@@ -274,6 +274,9 @@ struct BROKENHORIZON_API FBHOpenWorldOperationState
     bool bHasSnapshot = false;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "War")
+    FName OperationID = NAME_None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "War")
     bool bOperationActivated = false;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame, Category = "War")

@@ -19,6 +19,7 @@ param(
     [switch]$RenderedPseudoLocalization,
     [switch]$Smoke,
     [switch]$FirstLight,
+    [switch]$DefenseAGarrison,
     [switch]$Packaged,
     [string]$EngineRoot,
     [string]$LogPrefix = "BHValidation"
@@ -44,7 +45,7 @@ $editorCmd = Join-Path $EngineRoot "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $logDirectory = Join-Path $projectRoot "Saved\Logs"
 New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
 
-if (-not ($Build -or $Tests -or $Assets -or $AudioFX -or $Localization -or $Performance -or $RenderedPerformance -or $RenderedTraversalPerformance -or $RenderedWorldPerformance -or $NetworkBudget -or $NetworkScale -or $NetworkImpairment -or $RenderedMultiplayer -or $RenderedMultiplayerScale -or $RenderedMultiplayerSoak -or $RenderedUI -or $RenderedPseudoLocalization -or $Smoke -or $FirstLight -or $Packaged)) {
+if (-not ($Build -or $Tests -or $Assets -or $AudioFX -or $Localization -or $Performance -or $RenderedPerformance -or $RenderedTraversalPerformance -or $RenderedWorldPerformance -or $NetworkBudget -or $NetworkScale -or $NetworkImpairment -or $RenderedMultiplayer -or $RenderedMultiplayerScale -or $RenderedMultiplayerSoak -or $RenderedUI -or $RenderedPseudoLocalization -or $Smoke -or $FirstLight -or $DefenseAGarrison -or $Packaged)) {
     $Build = $true
     $Tests = $true
     $Smoke = $true
@@ -673,7 +674,51 @@ if ($FirstLight) {
     $firstLightLogName = "$LogPrefix-FirstLight.log"
     $firstLightLog = Join-Path $logDirectory $firstLightLogName
     Remove-Item -LiteralPath $firstLightLog -Force -ErrorAction SilentlyContinue
-    Invoke-CheckedProcess -FilePath $editor -Label "First Light smoke" -Arguments @(
+    Invoke-CheckedProcess -FilePath $editor -Label "First Light playable route" -Arguments @(
+        $uproject,
+        $manifest.maps.firstLight,
+        "-game",
+        "-nullrhi",
+        "-unattended",
+        "-nosound",
+        "-NoSplash",
+        "-DDC-ForceMemoryCache",
+        "-BHTestFirstLightPlayableRoute",
+        "-abslog=$firstLightLog"
+    )
+    Assert-CleanLog `
+        -LogPath $firstLightLog `
+        -Label "First Light playable route" `
+        -AdditionalFailurePatterns @(
+            "tile limit reached",
+            "Recreating dtNavMesh instance .* due mismatch",
+            "Navmesh .* will be loaded empty because it has been built with different navmesh settings",
+            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE result=failure",
+            "Supply .*BHAmmoSupply_.* has no persistence ID"
+        )
+
+    $firstLightContent = Get-Content -Raw -LiteralPath $firstLightLog
+    if ($firstLightContent -notmatch
+            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=keycard result=success" -or
+        $firstLightContent -notmatch
+            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=mission_cache_store result=success" -or
+        $firstLightContent -notmatch
+            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=mission_cache_retrieve result=success" -or
+        $firstLightContent -notmatch
+            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=door result=success" -or
+        $firstLightContent -notmatch
+            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=guards result=success" -or
+        $firstLightContent -notmatch
+            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=ammo_drop result=success" -or
+        $firstLightContent -notmatch
+            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE_COMPLETE result=success objectives=4") {
+        throw "First Light playable route did not complete. See $firstLightLog"
+    }
+
+    $navigationGrenadeLogName = "$LogPrefix-FirstLight-NavigationGrenade.log"
+    $navigationGrenadeLog = Join-Path $logDirectory $navigationGrenadeLogName
+    Remove-Item -LiteralPath $navigationGrenadeLog -Force -ErrorAction SilentlyContinue
+    Invoke-CheckedProcess -FilePath $editor -Label "First Light navigation grenade" -Arguments @(
         $uproject,
         $manifest.maps.firstLight,
         "-game",
@@ -683,50 +728,115 @@ if ($FirstLight) {
         "-NoSplash",
         "-DDC-ForceMemoryCache",
         "-BHTestNavigationGrenade",
-        "-BHTestFirstLightPlayableRoute",
-        "-abslog=$firstLightLog"
+        "-abslog=$navigationGrenadeLog"
     )
     Assert-CleanLog `
-        -LogPath $firstLightLog `
-        -Label "First Light smoke" `
+        -LogPath $navigationGrenadeLog `
+        -Label "First Light navigation grenade" `
         -AdditionalFailurePatterns @(
             "tile limit reached",
             "Recreating dtNavMesh instance .* due mismatch",
             "Navmesh .* will be loaded empty because it has been built with different navmesh settings",
             "BH_TEST_NAVIGATION_GRENADE result=failure",
-            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE result=failure",
             "Supply .*BHAmmoSupply_.* has no persistence ID"
         )
 
-    $firstLightContent = Get-Content -Raw -LiteralPath $firstLightLog
-    if ($firstLightContent -notmatch
+    $navigationGrenadeContent = Get-Content -Raw -LiteralPath $navigationGrenadeLog
+    if ($navigationGrenadeContent -notmatch
             "BH_TEST_NAVIGATION_GRENADE result=success" -or
-        $firstLightContent -notmatch
+        $navigationGrenadeContent -notmatch
             "BH_TEST_NAVIGATION_GRENADE_COMPLETE" -or
-        $firstLightContent -notmatch "BH_FRAG_EXPLODED" -or
-        $firstLightContent -notmatch
-            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=keycard result=success" -or
-        $firstLightContent -notmatch
-            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=door result=success" -or
-        $firstLightContent -notmatch
-            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=guards result=success" -or
-        $firstLightContent -notmatch
-            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=ammo_drop result=success" -or
-        $firstLightContent -notmatch
-            "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE_COMPLETE result=success objectives=4") {
-        throw "First Light smoke did not complete its navigation and playable-route fixtures. See $firstLightLog"
+        $navigationGrenadeContent -notmatch "BH_FRAG_EXPLODED") {
+        throw "First Light navigation grenade fixture did not complete. See $navigationGrenadeLog"
     }
 
     $navigationFallbackCount = @(
         Select-String `
-            -LiteralPath $firstLightLog `
+            -LiteralPath $navigationGrenadeLog `
             -Pattern "BH_AI_NAVIGATION_FALLBACK"
     ).Count
     $navigationFallbackLimit = 12
     if ($navigationFallbackCount -gt $navigationFallbackLimit) {
-        throw "First Light smoke observed $navigationFallbackCount AI navigation fallbacks (limit $navigationFallbackLimit). See $firstLightLog"
+        throw "First Light navigation grenade observed $navigationFallbackCount AI navigation fallbacks (limit $navigationFallbackLimit). See $navigationGrenadeLog"
     }
-    Write-Host "[First Light smoke] Navigation fallbacks: $navigationFallbackCount/$navigationFallbackLimit"
+    Write-Host "[First Light navigation grenade] Navigation fallbacks: $navigationFallbackCount/$navigationFallbackLimit"
+}
+
+if ($DefenseAGarrison) {
+    $defenseAGarrisonLogName = "$LogPrefix-DefenseAGarrison.log"
+    $defenseAGarrisonLog = Join-Path $logDirectory $defenseAGarrisonLogName
+    Remove-Item -LiteralPath $defenseAGarrisonLog -Force -ErrorAction SilentlyContinue
+
+    # Isolate the fixture from the user's campaign save. The runtime converts
+    # this suffix into the two exact slot names below.
+    $defenseAGarrisonSaveSuffix =
+        "DefenseAGarrison_$([Guid]::NewGuid().ToString('N'))"
+    $saveDirectory = [IO.Path]::GetFullPath(
+        (Join-Path $projectRoot "Saved\SaveGames")
+    )
+    $projectRootResolved = [IO.Path]::GetFullPath($projectRoot).TrimEnd('\')
+    $expectedSaveDirectory = [IO.Path]::GetFullPath(
+        (Join-Path $projectRootResolved "Saved\SaveGames")
+    )
+    if (-not $saveDirectory.Equals(
+            $expectedSaveDirectory,
+            [StringComparison]::OrdinalIgnoreCase
+        )) {
+        throw "Defense A fixture save directory escaped the project: $saveDirectory"
+    }
+
+    $defenseAGarrisonSaveFiles = @(
+        "BrokenHorizon_Checkpoint_$defenseAGarrisonSaveSuffix.sav",
+        "BrokenHorizon_Checkpoint_Backup_$defenseAGarrisonSaveSuffix.sav"
+    )
+    foreach ($saveFileName in $defenseAGarrisonSaveFiles) {
+        $savePath = Join-Path $saveDirectory $saveFileName
+        if (Test-Path -LiteralPath $savePath) {
+            throw "Refusing to overwrite an existing Defense A fixture save: $savePath"
+        }
+    }
+
+    try {
+        Invoke-CheckedProcess -FilePath $editor -Label "Defense A garrison persistence" -Arguments @(
+            $uproject,
+            $manifest.maps.firstLight,
+            "-game",
+            "-nullrhi",
+            "-unattended",
+            "-nosound",
+            "-NoSplash",
+            "-DDC-ForceMemoryCache",
+            "-BHTestDefenseAGarrisonPersistence",
+            "-BHTestSaveSlotSuffix=$defenseAGarrisonSaveSuffix",
+            "-abslog=$defenseAGarrisonLog"
+        )
+        Assert-CleanLog `
+            -LogPath $defenseAGarrisonLog `
+            -Label "Defense A garrison persistence" `
+            -AdditionalFailurePatterns @(
+                "BH_TEST_DEFENSE_A_GARRISON result=failure"
+            )
+
+        $defenseAGarrisonContent = Get-Content -Raw -LiteralPath $defenseAGarrisonLog
+        if ($defenseAGarrisonContent -notmatch
+                "BH_TEST_DEFENSE_A_GARRISON step=operation_started result=success" -or
+            $defenseAGarrisonContent -notmatch
+                "BH_TEST_DEFENSE_A_GARRISON step=casualty result=success" -or
+            $defenseAGarrisonContent -notmatch
+                "BH_TEST_DEFENSE_A_GARRISON step=checkpoint_reload result=success" -or
+            $defenseAGarrisonContent -notmatch
+                "BH_TEST_DEFENSE_A_GARRISON result=success") {
+            throw "Defense A garrison persistence fixture did not complete. See $defenseAGarrisonLog"
+        }
+    }
+    finally {
+        foreach ($saveFileName in $defenseAGarrisonSaveFiles) {
+            $savePath = Join-Path $saveDirectory $saveFileName
+            if (Test-Path -LiteralPath $savePath) {
+                Remove-Item -LiteralPath $savePath -Force
+            }
+        }
+    }
 }
 
 if ($Packaged) {

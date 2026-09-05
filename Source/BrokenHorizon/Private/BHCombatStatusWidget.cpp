@@ -805,6 +805,52 @@ void UBHCombatStatusWidget::NotifyGrenadeThreat(
     InvalidateLayoutAndVolatility();
 }
 
+void UBHCombatStatusWidget::NotifyArmoredThreat(
+    AActor* SourceActor,
+    FVector SourceDirection,
+    float DistanceCentimeters,
+    bool bActive
+)
+{
+    if (!IsValid(SourceActor))
+    {
+        return;
+    }
+
+    if (!bActive)
+    {
+        ArmoredThreats.RemoveAll(
+            [SourceActor](const FArmoredThreatState& Threat)
+            {
+                return Threat.SourceActor.Get() == SourceActor;
+            }
+        );
+        InvalidateLayoutAndVolatility();
+        return;
+    }
+
+    FArmoredThreatState* ExistingThreat =
+        ArmoredThreats.FindByPredicate(
+            [SourceActor](const FArmoredThreatState& Threat)
+            {
+                return Threat.SourceActor.Get() == SourceActor;
+            }
+        );
+
+    if (!ExistingThreat)
+    {
+        ExistingThreat = &ArmoredThreats.AddDefaulted_GetRef();
+        ExistingThreat->SourceActor = SourceActor;
+    }
+
+    ExistingThreat->DirectionAngleRadians =
+        ResolveRelativeDirectionAngle(SourceDirection);
+    ExistingThreat->DistanceCentimeters =
+        FMath::Max(0.0f, DistanceCentimeters);
+
+    InvalidateLayoutAndVolatility();
+}
+
 void UBHCombatStatusWidget::SetInjuryState(
     bool bBleeding,
     float BleedRate,
@@ -1148,6 +1194,23 @@ void UBHCombatStatusWidget::SetVehicleReadiness(
     InvalidateLayoutAndVolatility();
 }
 
+void UBHCombatStatusWidget::SetVehicleLogisticsStatus(
+    bool bVisible,
+    float CargoSupply,
+    EBHWarConvoyCargoType CargoType,
+    const FText& DestinationName
+)
+{
+    VehicleCargoStatusLine = bVisible
+        ? BuildVehicleCargoStatusLine(
+            CargoSupply,
+            CargoType,
+            DestinationName.ToString()
+        )
+        : FString();
+    InvalidateLayoutAndVolatility();
+}
+
 void UBHCombatStatusWidget::SetStrategicSituation(
     bool bVisible,
     const FText& SectorDisplayName,
@@ -1459,6 +1522,113 @@ FString UBHCombatStatusWidget::BuildFieldSquadStatusLabel(
         );
 }
 
+FString UBHCombatStatusWidget::BuildFieldSquadDebriefStatusLabel(
+    int32 LivingOperatives,
+    int32 IncapacitatedOperatives,
+    int32 MembersRequiringEvacuation,
+    int32 MembersNeedingService
+)
+{
+    const int32 SafeLiving = FMath::Max(0, LivingOperatives);
+    const int32 SafeIncapacitated = FMath::Clamp(
+        IncapacitatedOperatives,
+        0,
+        SafeLiving
+    );
+    const int32 SafeEvacuation = FMath::Clamp(
+        MembersRequiringEvacuation,
+        0,
+        FMath::Max(0, SafeLiving - SafeIncapacitated)
+    );
+    const int32 SafeService = FMath::Clamp(
+        MembersNeedingService,
+        0,
+        SafeLiving
+    );
+    const int32 CombatEffective = FMath::Max(
+        0,
+        SafeLiving - SafeIncapacitated - SafeEvacuation
+    );
+
+    const TCHAR* Recommendation =
+        SafeEvacuation > 0
+            ? TEXT("RECOVER MEDEVAC CASUALTIES BEFORE NEXT DEPLOYMENT")
+        : SafeIncapacitated > 0
+            ? TEXT("STABILIZE DOWNED OPERATIVES BEFORE NEXT DEPLOYMENT")
+        : SafeService > 0
+            ? TEXT("SERVICE FIRETEAM AT FRIENDLY SUPPORT")
+        : CombatEffective > 0
+            ? TEXT("FIRETEAM READY FOR NEXT DEPLOYMENT")
+            : TEXT("RECRUIT A FIELD FIRETEAM BEFORE NEXT DEPLOYMENT");
+
+    return FString::Printf(
+        TEXT(
+            "NEXT DEPLOYMENT // EFFECTIVE %d/%d // DOWN %d // MEDEVAC %d\n"
+            "%s"
+        ),
+        CombatEffective,
+        SafeLiving,
+        SafeIncapacitated,
+        SafeEvacuation,
+        Recommendation
+    );
+}
+
+FString UBHCombatStatusWidget::BuildResupplyWaypointLabel(
+    const FString& SectorDisplayName,
+    int32 MembersNeedingService
+)
+{
+    FString SafeSectorDisplayName =
+        SectorDisplayName.TrimStartAndEnd();
+    if (SafeSectorDisplayName.IsEmpty())
+    {
+        SafeSectorDisplayName = TEXT("FRIENDLY SUPPORT");
+    }
+
+    const int32 SafeMembersNeedingService =
+        FMath::Max(0, MembersNeedingService);
+    return SafeMembersNeedingService > 0
+        ? FString::Printf(
+            TEXT(
+                "FIRETEAM SERVICE // %d NEED SERVICE // %s"
+            ),
+            SafeMembersNeedingService,
+            *SafeSectorDisplayName
+        )
+        : SafeSectorDisplayName;
+}
+
+FString UBHCombatStatusWidget::BuildVehicleCargoStatusLine(
+    float CargoSupply,
+    EBHWarConvoyCargoType CargoType,
+    const FString& DestinationDisplayName
+)
+{
+    const float SafeCargoSupply = FMath::Max(0.0f, CargoSupply);
+
+    if (SafeCargoSupply <= KINDA_SMALL_NUMBER)
+    {
+        return FString();
+    }
+
+    const TCHAR* CargoLabel =
+        CargoType == EBHWarConvoyCargoType::CivilianAid
+            ? TEXT("AID")
+            : TEXT("SUPPLY");
+    FString SafeDestination = DestinationDisplayName.TrimStartAndEnd();
+    SafeDestination = SafeDestination.IsEmpty()
+        ? TEXT("DESTINATION PENDING")
+        : SafeDestination.ToUpper();
+
+    return FString::Printf(
+        TEXT("%s %.0f // TO %s"),
+        CargoLabel,
+        SafeCargoSupply,
+        *SafeDestination
+    );
+}
+
 FString UBHCombatStatusWidget::BuildFieldSquadContextStatusLine(
     const FString& ActionLabel,
     const FString& TargetLabel,
@@ -1544,6 +1714,16 @@ FString UBHCombatStatusWidget::BuildSquadPingWaypointLabel(
     );
 }
 
+FString UBHCombatStatusWidget::BuildArmoredThreatWarningLabel(
+    float DistanceCentimeters
+)
+{
+    return FString::Printf(
+        TEXT("ARMORED CONTACT // %.0f M"),
+        FMath::Max(0.0f, DistanceCentimeters) / 100.0f
+    );
+}
+
 bool UBHCombatStatusWidget::IsSquadPingTargetVisible(
     bool bBlockingHit,
     const AActor* HitActor,
@@ -1571,6 +1751,7 @@ void UBHCombatStatusWidget::NativeTick(
         NearMissFeedbackRemaining - SafeDeltaTime
     );
     const bool bHadGrenadeThreats = !GrenadeThreats.IsEmpty();
+    const bool bHadArmoredThreats = !ArmoredThreats.IsEmpty();
 
     for (int32 ThreatIndex = GrenadeThreats.Num() - 1;
         ThreatIndex >= 0;
@@ -1593,9 +1774,20 @@ void UBHCombatStatusWidget::NativeTick(
         }
     }
 
+    for (int32 ThreatIndex = ArmoredThreats.Num() - 1;
+        ThreatIndex >= 0;
+        --ThreatIndex)
+    {
+        if (!ArmoredThreats[ThreatIndex].SourceActor.IsValid())
+        {
+            ArmoredThreats.RemoveAtSwap(ThreatIndex);
+        }
+    }
+
     LowHealthPulseTime += SafeDeltaTime;
     InjuryPulseTime += SafeDeltaTime;
     GrenadeWarningPulseTime += SafeDeltaTime;
+    ArmoredThreatPulseTime += SafeDeltaTime;
 
     if (NearMissFeedbackRemaining <= 0.0f)
     {
@@ -1621,6 +1813,8 @@ void UBHCombatStatusWidget::NativeTick(
         NearMissFeedbackRemaining > 0.0f ||
         bHadGrenadeThreats ||
         !GrenadeThreats.IsEmpty() ||
+        bHadArmoredThreats ||
+        !ArmoredThreats.IsEmpty() ||
         bLowHealth ||
         bIsBleeding ||
         bMedicalTreatmentActive)
@@ -2281,7 +2475,12 @@ int32 UBHCombatStatusWidget::NativePaint(
     {
         const FVector2D WidgetSize =
             AllottedGeometry.GetLocalSize();
-        const FVector2D PanelSize(420.0f, 86.0f);
+        const bool bCargoStatusVisible =
+            !VehicleCargoStatusLine.IsEmpty();
+        const float PanelHeight = bCargoStatusVisible
+            ? 108.0f
+            : 86.0f;
+        const FVector2D PanelSize(420.0f, PanelHeight);
         const FVector2D PanelPosition(
             FMath::Max(
                 18.0f,
@@ -2313,18 +2512,33 @@ int32 UBHCombatStatusWidget::NativePaint(
                         0.64f,
                         0.98f
                     );
-        const FString ReadinessLabel = FString::Printf(
-            TEXT(
-                "FIELD TRANSPORT // %s\n"
-                "SPEED %03d KM/H // FUEL %d%% // HULL %d%%"
-            ),
-            bVehicleImmobilized
-                ? TEXT("IMMOBILIZED")
-                : TEXT("MOBILE"),
-            FMath::RoundToInt(VehicleSpeedKPH),
-            FMath::RoundToInt(VehicleFuelPercentage * 100.0f),
-            FMath::RoundToInt(VehicleHullPercentage * 100.0f)
-        );
+        const FString ReadinessLabel = bCargoStatusVisible
+            ? FString::Printf(
+                TEXT(
+                    "FIELD TRANSPORT // %s\n"
+                    "SPEED %03d KM/H // FUEL %d%% // HULL %d%%\n"
+                    "%s"
+                ),
+                bVehicleImmobilized
+                    ? TEXT("IMMOBILIZED")
+                    : TEXT("MOBILE"),
+                FMath::RoundToInt(VehicleSpeedKPH),
+                FMath::RoundToInt(VehicleFuelPercentage * 100.0f),
+                FMath::RoundToInt(VehicleHullPercentage * 100.0f),
+                *VehicleCargoStatusLine
+            )
+            : FString::Printf(
+                TEXT(
+                    "FIELD TRANSPORT // %s\n"
+                    "SPEED %03d KM/H // FUEL %d%% // HULL %d%%"
+                ),
+                bVehicleImmobilized
+                    ? TEXT("IMMOBILIZED")
+                    : TEXT("MOBILE"),
+                FMath::RoundToInt(VehicleSpeedKPH),
+                FMath::RoundToInt(VehicleFuelPercentage * 100.0f),
+                FMath::RoundToInt(VehicleHullPercentage * 100.0f)
+            );
 
         FSlateDrawElement::MakeBox(
             OutDrawElements,
@@ -2355,7 +2569,7 @@ int32 UBHCombatStatusWidget::NativePaint(
             OutDrawElements,
             MaxLayer + 3,
             AllottedGeometry.ToPaintGeometry(
-                FVector2D(384.0f, 50.0f),
+                FVector2D(384.0f, bCargoStatusVisible ? 72.0f : 50.0f),
                 FSlateLayoutTransform(
                     PanelPosition + FVector2D(18.0f, 10.0f)
                 )
@@ -2367,10 +2581,11 @@ int32 UBHCombatStatusWidget::NativePaint(
         );
 
         const FVector2D BarSize(184.0f, 6.0f);
+        const float BarY = bCargoStatusVisible ? 92.0f : 70.0f;
         const FVector2D FuelBarPosition =
-            PanelPosition + FVector2D(18.0f, 70.0f);
+            PanelPosition + FVector2D(18.0f, BarY);
         const FVector2D HullBarPosition =
-            PanelPosition + FVector2D(218.0f, 70.0f);
+            PanelPosition + FVector2D(218.0f, BarY);
 
         for (const FVector2D& BarPosition :
             { FuelBarPosition, HullBarPosition })
@@ -2417,6 +2632,102 @@ int32 UBHCombatStatusWidget::NativePaint(
             ReadinessColor
         );
         MaxLayer += 3;
+    }
+
+    const FArmoredThreatState* ActiveArmoredThreat = nullptr;
+
+    for (const FArmoredThreatState& Threat : ArmoredThreats)
+    {
+        if (!Threat.SourceActor.IsValid())
+        {
+            continue;
+        }
+
+        if (!ActiveArmoredThreat ||
+            Threat.DistanceCentimeters <
+                ActiveArmoredThreat->DistanceCentimeters)
+        {
+            ActiveArmoredThreat = &Threat;
+        }
+    }
+
+    if (ActiveArmoredThreat)
+    {
+        const FVector2D WidgetSize =
+            AllottedGeometry.GetLocalSize();
+        const float Pulse =
+            0.5f +
+            (0.5f * FMath::Sin(ArmoredThreatPulseTime * 7.0f));
+        const FLinearColor WarningColor(
+            1.0f,
+            FMath::Lerp(0.28f, 0.62f, Pulse),
+            0.02f,
+            FMath::Lerp(0.82f, 1.0f, Pulse)
+        );
+
+        MaxLayer = DrawDirectionChevron(
+            AllottedGeometry,
+            OutDrawElements,
+            MaxLayer + 1,
+            ActiveArmoredThreat->DirectionAngleRadians,
+            WarningColor
+        );
+
+        if (WidgetSize.X > 1.0f && WidgetSize.Y > 1.0f)
+        {
+            const FVector2D PanelSize(360.0f, 46.0f);
+            const FVector2D PanelPosition(
+                (WidgetSize.X - PanelSize.X) * 0.5f,
+                WidgetSize.Y * 0.55f
+            );
+            const FString WarningLabel =
+                BuildArmoredThreatWarningLabel(
+                    ActiveArmoredThreat->DistanceCentimeters
+                );
+
+            FSlateDrawElement::MakeBox(
+                OutDrawElements,
+                MaxLayer + 1,
+                AllottedGeometry.ToPaintGeometry(
+                    PanelSize,
+                    FSlateLayoutTransform(PanelPosition)
+                ),
+                FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")),
+                ESlateDrawEffect::None,
+                FLinearColor(0.10f, 0.035f, 0.0f, 0.86f)
+            );
+            DrawPolyline(
+                AllottedGeometry,
+                OutDrawElements,
+                MaxLayer + 2,
+                {
+                    PanelPosition,
+                    PanelPosition +
+                        FVector2D(PanelSize.X, 0.0f),
+                    PanelPosition + PanelSize,
+                    PanelPosition +
+                        FVector2D(0.0f, PanelSize.Y),
+                    PanelPosition
+                },
+                WarningColor,
+                3.0f
+            );
+            FSlateDrawElement::MakeText(
+                OutDrawElements,
+                MaxLayer + 3,
+                AllottedGeometry.ToPaintGeometry(
+                    FVector2D(324.0f, 28.0f),
+                    FSlateLayoutTransform(
+                        PanelPosition + FVector2D(18.0f, 10.0f)
+                    )
+                ),
+                WarningLabel,
+                FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18),
+                ESlateDrawEffect::None,
+                WarningColor
+            );
+            MaxLayer += 3;
+        }
     }
 
     const FGrenadeThreatState* ActiveGrenadeThreat = nullptr;

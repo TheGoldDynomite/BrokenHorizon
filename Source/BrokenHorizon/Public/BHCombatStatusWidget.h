@@ -49,6 +49,13 @@ public:
         float TimeUntilDetonation
     );
 
+    void NotifyArmoredThreat(
+        AActor* SourceActor,
+        FVector SourceDirection,
+        float DistanceCentimeters,
+        bool bActive
+    );
+
     UFUNCTION(BlueprintCallable, Category = "Combat Status")
     void SetInjuryState(
         bool bBleeding,
@@ -175,6 +182,14 @@ public:
     );
 
     UFUNCTION(BlueprintCallable, Category = "Combat Status")
+    void SetVehicleLogisticsStatus(
+        bool bVisible,
+        float CargoSupply,
+        EBHWarConvoyCargoType CargoType,
+        const FText& DestinationName
+    );
+
+    UFUNCTION(BlueprintCallable, Category = "Combat Status")
     void SetStrategicSituation(
         bool bVisible,
         const FText& SectorDisplayName,
@@ -259,6 +274,24 @@ public:
         const FString& SquadOrderPrompt = FString(TEXT("C"))
     );
 
+    static FString BuildFieldSquadDebriefStatusLabel(
+        int32 LivingOperatives,
+        int32 IncapacitatedOperatives,
+        int32 MembersRequiringEvacuation,
+        int32 MembersNeedingService
+    );
+
+    static FString BuildResupplyWaypointLabel(
+        const FString& SectorDisplayName,
+        int32 MembersNeedingService
+    );
+
+    static FString BuildVehicleCargoStatusLine(
+        float CargoSupply,
+        EBHWarConvoyCargoType CargoType,
+        const FString& DestinationDisplayName
+    );
+
     static FString BuildFieldSquadContextStatusLine(
         const FString& ActionLabel,
         const FString& TargetLabel,
@@ -282,6 +315,10 @@ public:
         bool bBlockingHit,
         const AActor* HitActor,
         const AActor* TrackedActor
+    );
+
+    static FString BuildArmoredThreatWarningLabel(
+        float DistanceCentimeters
     );
 
 protected:
@@ -376,6 +413,13 @@ private:
         float RefreshRemaining = 0.0f;
     };
 
+    struct FArmoredThreatState
+    {
+        TWeakObjectPtr<AActor> SourceActor;
+        float DirectionAngleRadians = 0.0f;
+        float DistanceCentimeters = 0.0f;
+    };
+
     float ResolveRelativeDirectionAngle(
         const FVector& SourceDirection
     ) const;
@@ -389,6 +433,7 @@ private:
     float DamageDirectionAngleRadians = 0.0f;
     float NearMissDirectionAngleRadians = 0.0f;
     float GrenadeWarningPulseTime = 0.0f;
+    float ArmoredThreatPulseTime = 0.0f;
     float LowHealthPulseTime = 0.0f;
     float InjuryPulseTime = 0.0f;
     float CurrentBleedRate = 0.0f;
@@ -410,6 +455,7 @@ private:
     bool bLegInjured = false;
     bool bMedicalTreatmentActive = false;
     bool bControlledBreathing = false;
+    TArray<FArmoredThreatState> ArmoredThreats;
     bool bOperationWaypointVisible = false;
     bool bOperationWaypointActive = false;
     FText OperationSectorDisplayName;
@@ -470,6 +516,7 @@ private:
     float VehicleFuelPercentage = 1.0f;
     float VehicleHullPercentage = 1.0f;
     float VehicleSpeedKPH = 0.0f;
+    FString VehicleCargoStatusLine;
     bool bStrategicSituationVisible = false;
     FText StrategicSectorDisplayName;
     EBHWarFaction StrategicSectorOwner =

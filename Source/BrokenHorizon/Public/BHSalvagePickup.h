@@ -28,6 +28,11 @@ class BROKENHORIZON_API ABHSalvagePickup
 public:
     ABHSalvagePickup();
 
+    static FText BuildInteractionText(
+        EBHSalvagePickupType Type,
+        int32 InQuantity
+    );
+
     virtual void Interact_Implementation(AActor* InteractingActor) override;
     virtual FText GetInteractionText_Implementation() const override;
 

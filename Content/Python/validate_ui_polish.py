@@ -87,6 +87,16 @@ def _validate_style_contract():
         )
 
     _require_fragments(
+        "Source/BrokenHorizon/BHCharacter.cpp",
+        (
+            "void ABHCharacter::EnsureInteractionPromptWidget()",
+            "if (IsValid(InteractionPromptWidget) || !IsPlayerControlled())",
+            "EnsureInteractionPromptWidget();",
+            "BH_INTERACTION_PROMPT_NATIVE_RETRY",
+        ),
+    )
+
+    _require_fragments(
         "Source/BrokenHorizon/Private/BHMainMenuWidget.cpp",
         (
             "EnsureMainMenuButtonLabel(",
@@ -232,12 +242,12 @@ def _validate_style_contract():
             '"FIRETEAM // %d/%d // READY"',
             "FieldSquadMembersNeedingService > 0",
             '"MOUNTED // VEHICLE PROTECTED"',
-            '"ORDER HOLD // C FOLLOW"',
-            '"ORDER FOLLOW // AIM + C MOVE/HOLD"',
+            'TEXT("ORDER HOLD // [%s] FOLLOW")',
+            'TEXT("ORDER FOLLOW // AIM + [%s] MOVE/HOLD")',
             "if (bFieldSquadStatusVisible)",
             "bSquadPingWaypointVisible",
             "FLinearColor(1.0f, 0.72f, 0.12f, 0.98f)",
-            "210.0f",
+            "264.0f",
         ),
     )
     _require_fragments(
@@ -256,7 +266,7 @@ def _validate_style_contract():
         (
             "if (IsNotificationActive())",
             "PendingNotifications.ContainsByPredicate(",
-            "QueueNotification(Message, NotificationPriority, AudioCue);",
+            "QueueNotification(\n            Message,\n            NotificationPriority,\n            AudioCue,",
             "const FPendingNotification NextNotification =",
             "NextNotification.Priority",
             "PendingNotifications.Reset();",

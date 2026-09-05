@@ -6,6 +6,7 @@
 #include "BHKeycard.generated.h"
 
 class UStaticMeshComponent;
+class UBoxComponent;
 
 UCLASS()
 class BROKENHORIZON_API ABHKeycard : public AActor, public IBHInteractable
@@ -26,6 +27,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Keycard")
     TObjectPtr<UStaticMeshComponent> KeycardMesh;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Keycard")
+    TObjectPtr<UBoxComponent> InteractionCollision;
 
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Persistence")
     FName PersistenceID = NAME_None;

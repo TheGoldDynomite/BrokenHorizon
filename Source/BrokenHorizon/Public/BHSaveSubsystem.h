@@ -48,6 +48,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Save")
     bool SaveProgress();
 
+    bool SaveProgressForCharacter(ABHCharacter* Character);
+
     bool SavePlayerResources();
 
     UFUNCTION(BlueprintCallable, Category = "Save")
@@ -98,8 +100,6 @@ private:
     static constexpr int32 SaveUserIndex = 0;
 
     bool IsClientCampaignWorld(const UWorld* World) const;
-
-    bool SaveProgressForCharacter(ABHCharacter* Character);
 
     ABHCharacter* FindPlayerCharacter(UWorld* World) const;
 

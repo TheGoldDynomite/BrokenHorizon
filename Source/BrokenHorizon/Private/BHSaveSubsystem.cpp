@@ -9,6 +9,7 @@
 #include "BHHealthComponent.h"
 #include "BHInjuryComponent.h"
 #include "BHKeycard.h"
+#include "BHMissionItemContainer.h"
 #include "BHMissionData.h"
 #include "BHPlayerResolver.h"
 #include "BHSaveGame.h"
@@ -792,6 +793,26 @@ bool UBHSaveSubsystem::SaveProgressForCharacter(
     CaptureWarState(SaveData, GetGameInstance());
     SaveData->ConsumedWorldItemIDs =
         RuntimeConsumedWorldItemIDs.Array();
+
+    SaveData->MissionItemContainerStates.Reset();
+    for (TActorIterator<ABHMissionItemContainer> ContainerIt(World);
+        ContainerIt;
+        ++ContainerIt)
+    {
+        const ABHMissionItemContainer* Container = *ContainerIt;
+        if (!IsValid(Container) ||
+            Container->GetPersistenceID().IsNone())
+        {
+            continue;
+        }
+
+        FBHMissionItemContainerSaveState& ContainerState =
+            SaveData->MissionItemContainerStates.AddDefaulted_GetRef();
+        ContainerState.PersistenceID = Container->GetPersistenceID();
+        ContainerState.MissionItemID = Container->GetMissionItemID();
+        ContainerState.StoredMissionItemID =
+            Container->GetStoredMissionItemID();
+    }
 
     SaveData->DefeatedEnemyStates.Reset();
     for (const TPair<FName, FBHPendingDefeatedEnemyState>& Pair :
@@ -1969,6 +1990,7 @@ bool UBHSaveSubsystem::ValidatePersistenceIDs(
     TMap<FName, const AActor*> DoorIDs;
     TMap<FName, const AActor*> SupplyIDs;
     TMap<FName, const AActor*> TransportIDs;
+    TMap<FName, const AActor*> MissionItemContainerIDs;
 
     for (TActorIterator<ABHKeycard> KeycardIt(World);
         KeycardIt;
@@ -2133,6 +2155,58 @@ bool UBHSaveSubsystem::ValidatePersistenceIDs(
         }
 
         TransportIDs.Add(PersistenceID, Transport);
+    }
+
+    for (TActorIterator<ABHMissionItemContainer> ContainerIt(World);
+        ContainerIt;
+        ++ContainerIt)
+    {
+        const ABHMissionItemContainer* Container = *ContainerIt;
+        const FName PersistenceID = Container->GetPersistenceID();
+
+        if (PersistenceID.IsNone())
+        {
+            UE_LOG(
+                LogTemp,
+                Error,
+                TEXT("Mission item container %s has no persistence ID."),
+                *Container->GetPathName()
+            );
+            bValid = false;
+            continue;
+        }
+
+        if (Container->GetMissionItemID().IsNone())
+        {
+            UE_LOG(
+                LogTemp,
+                Error,
+                TEXT("Mission item container %s has no mission item ID."),
+                *Container->GetPathName()
+            );
+            bValid = false;
+            continue;
+        }
+
+        if (const AActor* const* Existing =
+                MissionItemContainerIDs.Find(PersistenceID))
+        {
+            UE_LOG(
+                LogTemp,
+                Error,
+                TEXT(
+                    "Duplicate mission item container persistence ID %s "
+                    "on %s and %s."
+                ),
+                *PersistenceID.ToString(),
+                *(*Existing)->GetPathName(),
+                *Container->GetPathName()
+            );
+            bValid = false;
+            continue;
+        }
+
+        MissionItemContainerIDs.Add(PersistenceID, Container);
     }
 
     return bValid;
@@ -2628,6 +2702,35 @@ bool UBHSaveSubsystem::ApplySaveData(
         Door->RestoreUnlockedState(
             UnlockedDoors.Contains(Door->GetPersistenceID())
         );
+    }
+
+    for (TActorIterator<ABHMissionItemContainer> ContainerIt(World);
+        ContainerIt;
+        ++ContainerIt)
+    {
+        ABHMissionItemContainer* Container = *ContainerIt;
+        const FBHMissionItemContainerSaveState* SavedState =
+            SaveData->MissionItemContainerStates.FindByPredicate(
+                [Container](
+                    const FBHMissionItemContainerSaveState& Candidate
+                )
+                {
+                    return Candidate.PersistenceID ==
+                        Container->GetPersistenceID();
+                }
+            );
+
+        if (SavedState &&
+            SavedState->MissionItemID == Container->GetMissionItemID())
+        {
+            Container->RestoreStoredMissionItem(
+                SavedState->StoredMissionItemID
+            );
+        }
+        else
+        {
+            Container->RestoreStoredMissionItem(NAME_None);
+        }
     }
 
     RuntimeConsumedWorldItemIDs.Reset();

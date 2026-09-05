@@ -27,9 +27,14 @@ param(
     [string]$LogPrefix = "G3-Multiplayer",
     [switch]$RequireActiveOperation,
     [switch]$RequireWatercraftDelivery,
+    [switch]$RequireCivilianAidDelivery,
+    [switch]$RequireMissionCacheTransfer,
+    [switch]$RequireArmoredThreatTargeting,
     [switch]$RequireServerTravel,
     [switch]$RequireTransportPersistence,
+    [switch]$RequireTransportCasualtyPersistence,
     [switch]$RequireOperationCompletion,
+    [switch]$RequireOperationFailure,
     [switch]$RequireContextOwnership,
     [switch]$RequireMedicalRecoveryReplication,
     [switch]$RequireCustomDifficultyReplication,
@@ -48,8 +53,22 @@ if ($RequireTransportPersistence -and -not $RequireServerTravel) {
 if ($RequireOperationCompletion -and -not $RequireTransportPersistence) {
     throw "Operation completion validation requires transport persistence travel."
 }
+if ($RequireOperationFailure -and -not $RequireActiveOperation) {
+    throw "Operation failure validation requires -RequireActiveOperation."
+}
+if ($RequireOperationFailure -and
+    $OperationType -notin @("Attack", "Defend", "Raid")) {
+    throw "Operation failure validation requires a tactical operation type."
+}
+if ($RequireOperationFailure -and $RequireServerTravel) {
+    throw "Operation failure validation is a reconnect fixture, not a travel fixture."
+}
 if ($RequireHostRecovery -and -not $RequireTransportPersistence) {
     throw "Host recovery validation requires transport persistence travel."
+}
+if ($RequireTransportCasualtyPersistence -and
+    -not $RequireTransportPersistence) {
+    throw "Transport casualty validation requires transport persistence travel."
 }
 if ($RequireCorruptPrimaryRecovery -and -not $RequireHostRecovery) {
     throw "Corrupt-primary recovery validation requires -RequireHostRecovery."
@@ -304,6 +323,12 @@ try {
     if ($RequireTransportPersistence) {
         $commonArguments += "-BHTestTransportTravelPersistence"
     }
+    if ($RequireTransportCasualtyPersistence) {
+        $commonArguments += "-BHTestTransportCasualtyPersistence"
+    }
+    if ($RequireOperationFailure) {
+        $commonArguments += "-BHTestOperationFailure"
+    }
     if ($RequireMedicalRecoveryReplication) {
         $commonArguments += "-BHTestMedicalRecoveryReplication"
     }
@@ -338,6 +363,7 @@ try {
         "-abslog=$hostLog"
     ) + $commonArguments
     if ($RequireTransportPersistence -or
+        $RequireMissionCacheTransfer -or
         $RequireActiveOperation -or
         $SoakSeconds -gt 0)
     {
@@ -359,11 +385,24 @@ try {
         }
         if ($OperationType -eq "Attack") {
             $hostArguments += "-BHTestForceAttackTarget"
+        }
+        if ($RequireOperationFailure -or
+            $RequireTransportPersistence -or
+            $OperationType -eq "Attack") {
             $hostArguments += "-BHTestBeginCommittedOperation"
         }
     }
     if ($RequireWatercraftDelivery) {
         $hostArguments += "-BHTestWatercraftDeliveryWhenOccupied"
+    }
+    if ($RequireCivilianAidDelivery) {
+        $hostArguments += "-BHTestCivilianAidDeliveryWhenOccupied"
+    }
+    if ($RequireMissionCacheTransfer) {
+        $hostArguments += "-BHTestMissionCacheTransferRuntime"
+    }
+    if ($RequireArmoredThreatTargeting) {
+        $hostArguments += "-BHTestArmoredThreatTargetingRuntime"
     }
     if ($RequireContextOwnership) {
         $hostArguments += "-BHTestFieldSquadContextOwnership"
@@ -689,12 +728,127 @@ try {
             -Label "$OperationType operation routing"
     }
 
+    $operationFailureVerified = $false
+    $operationFailureReconnected = $false
+    if ($RequireOperationFailure) {
+        $hostContent = Wait-ForLogMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_TEST_OPERATION_FAILURE result=success .*participants=2 failed=2 director_in_progress=0" `
+            -Label "Authoritative operation failure fixture"
+        $hostContent = Wait-ForLogMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_SHARED_OPERATION_FAILURE_DEBRIEF .*participants=2" `
+            -Label "Shared operation failure debrief handoff"
+
+        $failureStatePattern =
+            "BH_MISSION_STATE_REPLICATED .*complete=0 failed=1"
+        $initialContent = Wait-ForLogMarker `
+            -LogPath $initialClientLog `
+            -Pattern $failureStatePattern `
+            -Label "Initial client terminal failure state"
+        $secondContent = Wait-ForLogMarker `
+            -LogPath $secondClientLog `
+            -Pattern $failureStatePattern `
+            -Label "Second client terminal failure state"
+
+        $debriefClientPattern =
+            "BH_TEST_OPERATION_DEBRIEF_CLIENT result=success"
+        $initialContent = Wait-ForLogMarker `
+            -LogPath $initialClientLog `
+            -Pattern $debriefClientPattern `
+            -Label "Initial client operation debrief"
+        $secondContent = Wait-ForLogMarker `
+            -LogPath $secondClientLog `
+            -Pattern $debriefClientPattern `
+            -Label "Second client operation debrief"
+        $operationFailureVerified = $true
+    }
+
 
     if ($RequireWatercraftDelivery) {
         $hostContent = Wait-ForLogMarker `
             -LogPath $hostLog `
             -Pattern "BH_TEST_WATERCRAFT_DELIVERY_OCCUPIED .*remaining=0\.0 occupant=1" `
             -Label "Occupied watercraft cargo delivery"
+    }
+
+    if ($RequireCivilianAidDelivery) {
+        $hostContent = Wait-ForLogMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_TEST_CIVILIAN_AID_DELIVERY_OCCUPIED result=success .*remaining=0\.0 occupant=1" `
+            -Label "Occupied civilian-aid transport delivery"
+        $hostContent = Wait-ForLogMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_FIELD_CIVILIAN_AID_CHECKPOINT stage=load .*result=success" `
+            -Label "Civilian-aid load checkpoint"
+        $hostContent = Wait-ForLogMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_FIELD_CIVILIAN_AID_CHECKPOINT stage=delivery .*result=success" `
+            -Label "Civilian-aid delivery checkpoint"
+    }
+
+    $missionCacheOwnerCounts = @()
+    $missionCacheTransferVerified = $false
+    $missionCacheRejoinVerified = $false
+    if ($RequireMissionCacheTransfer) {
+        $hostContent = Wait-ForLogMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_TEST_MISSION_CACHE_TRANSFER result=success .*owner_a_has=0 owner_b_has=1 stored=None" `
+            -Label "Two-player mission-cache owner transfer"
+        $initialContent = Wait-ForLogMarker `
+            -LogPath $initialClientLog `
+            -Pattern "BH_MISSION_CACHE_REPLICATED container=FirstLightMissionCache01 stored=(RedKeycard|None)" `
+            -Label "Initial client mission-cache replication"
+        $secondContent = Wait-ForLogMarker `
+            -LogPath $secondClientLog `
+            -Pattern "BH_MISSION_CACHE_REPLICATED container=FirstLightMissionCache01 stored=(RedKeycard|None)" `
+            -Label "Second client mission-cache replication"
+
+        $ownerInventoryPattern =
+            "BH_KEYCARD_INVENTORY_REPLICATED mission_items=(?<count>[01])"
+        $missionCacheOwnerCounts = @(
+            @($initialContent, $secondContent) |
+                ForEach-Object {
+                    [regex]::Matches($_, $ownerInventoryPattern) |
+                        ForEach-Object {
+                            [int]$_.Groups["count"].Value
+                        }
+                } |
+                Sort-Object -Unique
+        )
+        if ($missionCacheOwnerCounts.Count -ne 2 -or
+            $missionCacheOwnerCounts[0] -ne 0 -or
+            $missionCacheOwnerCounts[1] -ne 1) {
+            throw "Mission-cache ownership did not converge to one owner. Counts=$($missionCacheOwnerCounts -join ',')"
+        }
+        $missionCacheTransferVerified = $true
+    }
+
+    $armoredThreatTargetingVerified = $false
+    $armoredThreatPresentationVerified = $false
+    if ($RequireArmoredThreatTargeting) {
+        $hostContent = Wait-ForLogMarker `
+            -LogPath $hostLog `
+            -Pattern "BH_TEST_ARMORED_THREAT_TARGETING result=success .*initial_target=\S+ switched_target=\S+" `
+            -Label "Two-player armored-threat target switching"
+        $initialContent = Wait-ForLogMarker `
+            -LogPath $initialClientLog `
+            -Pattern "BH_ARMORED_THREAT_STATE id=FirstLightArmoredThreat01 reason=replicated_target" `
+            -Label "Initial client armored-threat target replication"
+        $secondContent = Wait-ForLogMarker `
+            -LogPath $secondClientLog `
+            -Pattern "BH_ARMORED_THREAT_STATE id=FirstLightArmoredThreat01 reason=replicated_target" `
+            -Label "Second client armored-threat target replication"
+        $initialContent = Wait-ForLogMarker `
+            -LogPath $initialClientLog `
+            -Pattern "BH_ARMORED_THREAT_PRESENTATION local=1 threat=\S+ active=1 distance_m=\d+" `
+            -Label "Initial client armored-threat HUD presentation"
+        $secondContent = Wait-ForLogMarker `
+            -LogPath $secondClientLog `
+            -Pattern "BH_ARMORED_THREAT_PRESENTATION local=1 threat=\S+ active=1 distance_m=\d+" `
+            -Label "Second client armored-threat HUD presentation"
+        $armoredThreatTargetingVerified = $true
+        $armoredThreatPresentationVerified = $true
     }
 
     $crashPreparedContent = $null
@@ -746,7 +900,7 @@ try {
             "-abslog=$hostLog"
         ) + $commonArguments + @(
             "-BHTestSaveSlotSuffix=$runId",
-            "-BHTestServerTravelAfterSeconds=90",
+            "-BHTestServerTravelAfterSeconds=$travelDelaySeconds",
             "-BHTestRestoreCrashRecovery"
         )
         if ($RequireOperationCompletion) {
@@ -808,6 +962,12 @@ try {
                 -LogPath $hostLog `
                 -Pattern "BH_TEST_TRANSPORT_TRAVEL_RESTORED result=success" `
                 -Label "Transport and passenger travel restoration"
+        }
+        if ($RequireTransportCasualtyPersistence) {
+            $hostContent = Wait-ForLogMarker `
+                -LogPath $hostLog `
+                -Pattern "BH_TEST_TRANSPORT_CASUALTY_RESTORED result=success" `
+                -Label "Field-squad casualty travel restoration"
         }
         if ($RequireOperationCompletion) {
             $completionPattern =
@@ -873,6 +1033,26 @@ try {
         -Pattern "BH_WAR_SNAPSHOT_APPLIED" `
         -Label "Rejoining client snapshot"
 
+    if ($RequireOperationFailure) {
+        $rejoinContent = Wait-ForLogMarker `
+            -LogPath $rejoinClientLog `
+            -Pattern "BH_MISSION_STATE_REPLICATED .*complete=0 failed=1" `
+            -Label "Rejoining client terminal failure state"
+        $rejoinContent = Wait-ForLogMarker `
+            -LogPath $rejoinClientLog `
+            -Pattern "BH_TEST_OPERATION_DEBRIEF_RESTORED result=success failed=1" `
+            -Label "Rejoining client operation debrief"
+        $operationFailureReconnected = $true
+    }
+
+    if ($RequireMissionCacheTransfer) {
+        $rejoinContent = Wait-ForLogMarker `
+            -LogPath $rejoinClientLog `
+            -Pattern "BH_KEYCARD_INVENTORY_REPLICATED mission_items=1" `
+            -Label "Rejoining client mission-cache owner state"
+        $missionCacheRejoinVerified = $true
+    }
+
     if ($RequireNetworkCombatDensity) {
         $rejoinContent = Wait-ForLogMarker `
             -LogPath $rejoinClientLog `
@@ -931,12 +1111,17 @@ try {
         $initialOperationId -ne $rejoinOperationId) {
         throw "Operation identity diverged across reconnect."
     }
-    if ($RequireActiveOperation -and -not $RequireOperationCompletion -and
+    if ($RequireActiveOperation -and
+        -not $RequireOperationCompletion -and
+        -not $RequireOperationFailure -and
         (-not $initialOperationId -or -not $rejoinOperationId)) {
         throw "Active operation identity was required but not replicated."
     }
     if ($RequireOperationCompletion -and $rejoinOperationId) {
         throw "Completed operation remained active for the rejoining client."
+    }
+    if ($RequireOperationFailure -and $rejoinOperationId) {
+        throw "Failed operation remained active for the rejoining client."
     }
 
     $summary = [ordered]@{
@@ -962,7 +1147,28 @@ try {
         }
         serverTravelRequired = [bool]$RequireServerTravel
         transportPersistenceRequired = [bool]$RequireTransportPersistence
+        transportCasualtyPersistenceRequired =
+            [bool]$RequireTransportCasualtyPersistence
         operationCompletionRequired = [bool]$RequireOperationCompletion
+        operationFailureRequired = [bool]$RequireOperationFailure
+        operationFailureVerified = $operationFailureVerified
+        operationFailureReconnected = $operationFailureReconnected
+        civilianAidDeliveryRequired = [bool]$RequireCivilianAidDelivery
+        civilianAidDeliveryVerified =
+            -not $RequireCivilianAidDelivery -or
+            ($hostContent -match
+                "BH_TEST_CIVILIAN_AID_DELIVERY_OCCUPIED result=success .*remaining=0\.0 occupant=1" -and
+             $hostContent -match
+                "BH_FIELD_CIVILIAN_AID_CHECKPOINT stage=load .*result=success" -and
+             $hostContent -match
+                "BH_FIELD_CIVILIAN_AID_CHECKPOINT stage=delivery .*result=success")
+        missionCacheTransferRequired = [bool]$RequireMissionCacheTransfer
+        missionCacheTransferVerified = $missionCacheTransferVerified
+        missionCacheOwnerCounts = $missionCacheOwnerCounts
+        missionCacheRejoinVerified = $missionCacheRejoinVerified
+        armoredThreatTargetingRequired = [bool]$RequireArmoredThreatTargeting
+        armoredThreatTargetingVerified = $armoredThreatTargetingVerified
+        armoredThreatPresentationVerified = $armoredThreatPresentationVerified
         contextOwnershipRequired = [bool]$RequireContextOwnership
         contextOwnershipVerified =
             -not $RequireContextOwnership -or
@@ -1077,6 +1283,10 @@ try {
             $hostContent -match "BH_TEST_SERVER_TRAVEL_COMPLETE"
         transportPersistenceRestored = [bool]$RequireTransportPersistence -and
             $hostContent -match "BH_TEST_TRANSPORT_TRAVEL_RESTORED result=success"
+        transportCasualtyPersistenceRestored =
+            -not $RequireTransportCasualtyPersistence -or
+            $hostContent -match
+                "BH_TEST_TRANSPORT_CASUALTY_RESTORED result=success"
         operationCompletedAfterTravel = [bool]$RequireOperationCompletion -and
             $hostContent -match $completionPattern
         hostRecoveryCheckpointPrepared = [bool]$RequireHostRecovery -and
@@ -1110,7 +1320,10 @@ finally {
     foreach ($process in $launchedProcesses) {
         Stop-OwnedProcess -Process $process
     }
-    if ($RequireTransportPersistence -or $SoakSeconds -gt 0) {
+    if ($RequireTransportPersistence -or
+        $RequireMissionCacheTransfer -or
+        $RequireOperationFailure -or
+        $SoakSeconds -gt 0) {
         $testSaveNames = @(
             "BrokenHorizon_Checkpoint_$safeRunId.sav",
             "BrokenHorizon_Checkpoint_Backup_$safeRunId.sav"

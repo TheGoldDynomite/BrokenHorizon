@@ -1520,7 +1520,8 @@ void UBHWeaponComponent::TryFire()
             SpreadDegrees + FMath::Max(0.0f, Config.PelletSpreadDegrees),
             Controller,
             &PelletHit,
-            &bPelletBlockingHit
+            &bPelletBlockingHit,
+            false
         );
         bDamagedTarget |= bPelletDamagedTarget;
         bHadBlockingHit |= bPelletBlockingHit;
@@ -1528,6 +1529,14 @@ void UBHWeaponComponent::TryFire()
         {
             ShotHit = PelletHit;
         }
+    }
+    EquippedRifle->ReportFireNoise();
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        EquippedRifle->PlayReplicatedFirePresentation(
+            ShotHit,
+            bHadBlockingHit
+        );
     }
     if (UGameInstance* GameInstance = GetWorld()
         ? GetWorld()->GetGameInstance()
