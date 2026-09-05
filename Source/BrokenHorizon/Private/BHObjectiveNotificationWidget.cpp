@@ -84,11 +84,97 @@ void UBHObjectiveNotificationWidget::ShowDeferredStrategicNotification(
     );
 }
 
+void UBHObjectiveNotificationWidget::ShowKeyedNotification(
+    FName Source, const FText& Message, EBHNotificationPriority NotificationPriority, EBHNotificationAudioCue AudioCue)
+{
+    if (!Source.IsNone())
+    {
+        const bool bSameActive = IsNotificationActive() && ActiveSource == Source &&
+            ActivePriority == NotificationPriority && NotificationText->GetText().EqualTo(Message);
+        const bool bSamePending = PendingNotifications.ContainsByPredicate(
+            [&](const FPendingNotification& Item)
+            { return Item.Source == Source && Item.Priority == NotificationPriority && Item.Message.EqualTo(Message); });
+        if (bSameActive || bSamePending) { return; }
+        RemoveNotificationSource(Source, false);
+    }
+    if (!IsNotificationActive() && !bPresentationSuppressed && !PendingNotifications.IsEmpty())
+    {
+        QueueNotification(Message, NotificationPriority, AudioCue, false, false, Source);
+        TryPresentNextQueuedNotification();
+    }
+    else
+    {
+        ShowNotificationInternal(Message, NotificationPriority, AudioCue, false, Source);
+        if (!IsNotificationActive()) { TryPresentNextQueuedNotification(); }
+    }
+}
+
+void UBHObjectiveNotificationWidget::RemoveNotificationSource(FName Source, bool bPresentNext)
+{
+    if (Source.IsNone()) { return; }
+    PendingNotifications.RemoveAll([Source](const FPendingNotification& Item) { return Item.Source == Source; });
+    if (ActiveSource == Source)
+    {
+        ClearNotificationTimers();
+        bNotificationInProgress = false;
+        ActiveSource = NAME_None;
+        bActiveDeferDuringCombat = false;
+        SetVisibility(ESlateVisibility::Collapsed);
+        SetRenderOpacity(1.0f);
+        if (bPresentNext) { TryPresentNextQueuedNotification(); }
+    }
+}
+
+void UBHObjectiveNotificationWidget::CancelKeyedNotification(FName Source)
+{
+    RemoveNotificationSource(Source, true);
+}
+
+bool UBHObjectiveNotificationWidget::HasNotificationForSource(FName Source) const
+{
+    return !Source.IsNone() && ((IsNotificationActive() && ActiveSource == Source) ||
+        PendingNotifications.ContainsByPredicate([Source](const FPendingNotification& Item) { return Item.Source == Source; }));
+}
+
+void UBHObjectiveNotificationWidget::SetPresentationSuppressed(bool bSuppressed)
+{
+    if (bPresentationSuppressed == bSuppressed) { return; }
+    bPresentationSuppressed = bSuppressed;
+    if (bSuppressed)
+    {
+        ClearNotificationTimers();
+        SetVisibility(ESlateVisibility::Collapsed);
+        return;
+    }
+    if (IsNotificationActive())
+    {
+        const bool bHigherPriorityPending = PendingNotifications.ContainsByPredicate(
+            [this](const FPendingNotification& Item)
+            { return !ShouldDeferNotification(bCombatIntensityActive, Item.bDeferDuringCombat) &&
+                ShouldPreemptNotification(Item.Priority, ActivePriority); });
+        if (bHigherPriorityPending)
+        {
+            QueueNotification(NotificationText->GetText(), ActivePriority, ActiveAudioCue, true,
+                bActiveDeferDuringCombat, ActiveSource);
+            bNotificationInProgress = false;
+            ActiveSource = NAME_None;
+            TryPresentNextQueuedNotification();
+        }
+        else
+        {
+            PresentNotification(NotificationText->GetText(), ActivePriority, ActiveAudioCue,
+                ActiveSource, bActiveDeferDuringCombat);
+        }
+    }
+    else { TryPresentNextQueuedNotification(); }
+}
+
 void UBHObjectiveNotificationWidget::ShowNotificationInternal(
     const FText& Message,
     EBHNotificationPriority NotificationPriority,
     EBHNotificationAudioCue AudioCue,
-    bool bDeferDuringCombat
+    bool bDeferDuringCombat,
+    FName Source
 )
 {
     if (Message.IsEmpty())
@@ -96,15 +182,20 @@ void UBHObjectiveNotificationWidget::ShowNotificationInternal(
         return;
     }
 
-    if (ShouldDeferNotification(
+    if (IsNotificationActive() && ActiveSource == Source && NotificationText->GetText().EqualTo(Message))
+    {
+        return;
+    }
+
+    if (bPresentationSuppressed || ShouldDeferNotification(
             bCombatIntensityActive,
             bDeferDuringCombat))
     {
         const bool bAlreadyQueued =
             PendingNotifications.ContainsByPredicate(
-                [&Message](const FPendingNotification& Queued)
+                [&Message, Source](const FPendingNotification& Queued)
                 {
-                    return Queued.Message.EqualTo(Message);
+                    return Queued.Source == Source && Queued.Message.EqualTo(Message);
                 }
             );
         if (!bAlreadyQueued && MaxPendingNotifications > 0)
@@ -114,7 +205,8 @@ void UBHObjectiveNotificationWidget::ShowNotificationInternal(
                 NotificationPriority,
                 AudioCue,
                 false,
-                true
+                bDeferDuringCombat,
+                Source
             );
             UE_LOG(
                 LogTemp,
@@ -134,14 +226,14 @@ void UBHObjectiveNotificationWidget::ShowNotificationInternal(
     if (IsNotificationActive())
     {
         const bool bMatchesCurrent =
-            NotificationText->GetText().EqualTo(Message);
+            ActiveSource == Source && NotificationText->GetText().EqualTo(Message);
         const bool bAlreadyQueued =
             PendingNotifications.ContainsByPredicate(
-                [&Message](
+                [&Message, Source](
                     const FPendingNotification& QueuedNotification
                 )
                 {
-                    return QueuedNotification.Message.EqualTo(Message);
+                    return QueuedNotification.Source == Source && QueuedNotification.Message.EqualTo(Message);
                 }
             );
 
@@ -161,10 +253,11 @@ void UBHObjectiveNotificationWidget::ShowNotificationInternal(
                     ActivePriority,
                     ActiveAudioCue,
                     true,
-                    false
+                    bActiveDeferDuringCombat,
+                    ActiveSource
                 );
             }
-            PresentNotification(Message, NotificationPriority, AudioCue);
+            PresentNotification(Message, NotificationPriority, AudioCue, Source, bDeferDuringCombat);
             UE_LOG(
                 LogTemp,
                 Verbose,
@@ -184,7 +277,8 @@ void UBHObjectiveNotificationWidget::ShowNotificationInternal(
             NotificationPriority,
             AudioCue,
             false,
-            bDeferDuringCombat
+            bDeferDuringCombat,
+            Source
         );
         UE_LOG(
             LogTemp,
@@ -195,7 +289,7 @@ void UBHObjectiveNotificationWidget::ShowNotificationInternal(
         return;
     }
 
-    PresentNotification(Message, NotificationPriority, AudioCue);
+    PresentNotification(Message, NotificationPriority, AudioCue, Source, bDeferDuringCombat);
 }
 
 void UBHObjectiveNotificationWidget::SetCombatIntensityActive(
@@ -237,9 +331,12 @@ GetPendingDeferredStrategicNotificationCount() const
 void UBHObjectiveNotificationWidget::PresentNotification(
     const FText& Message,
     EBHNotificationPriority NotificationPriority,
-    EBHNotificationAudioCue AudioCue
+    EBHNotificationAudioCue AudioCue,
+    FName Source,
+    bool bDeferDuringCombat
 )
 {
+    if (bPresentationSuppressed) { return; }
     ClearNotificationTimers();
 
     if (Message.IsEmpty() || !IsValid(NotificationText))
@@ -279,6 +376,8 @@ void UBHObjectiveNotificationWidget::PresentNotification(
     NotificationText->SetText(Message);
     ActivePriority = NotificationPriority;
     ActiveAudioCue = AudioCue;
+    ActiveSource = Source;
+    bActiveDeferDuringCombat = bDeferDuringCombat;
     BHUIStyle::Apply(*this, EBHUIStyleContext::Overlay);
     FSlateFontInfo NotificationFont = NotificationText->GetFont();
     const int32 MessageLength = Message.ToString().Len();
@@ -328,6 +427,7 @@ void UBHObjectiveNotificationWidget::PresentNotification(
 
 void UBHObjectiveNotificationWidget::StartFadeOut()
 {
+    if (bPresentationSuppressed) { return; }
     UWorld* World = GetWorld();
 
     if (!IsValid(World) || FadeDuration <= KINDA_SMALL_NUMBER)
@@ -349,6 +449,7 @@ void UBHObjectiveNotificationWidget::StartFadeOut()
 
 void UBHObjectiveNotificationWidget::UpdateFadeOut()
 {
+    if (bPresentationSuppressed) { return; }
     UWorld* World = GetWorld();
 
     if (!IsValid(World))
@@ -373,6 +474,9 @@ void UBHObjectiveNotificationWidget::UpdateFadeOut()
 
 void UBHObjectiveNotificationWidget::HideNotification()
 {
+    if (bPresentationSuppressed) { return; }
+    ActiveSource = NAME_None;
+    bActiveDeferDuringCombat = false;
     ClearNotificationTimers();
     bNotificationInProgress = false;
     ActivePriority = EBHNotificationPriority::Normal;
@@ -388,7 +492,8 @@ void UBHObjectiveNotificationWidget::QueueNotification(
     EBHNotificationPriority NotificationPriority,
     EBHNotificationAudioCue AudioCue,
     bool bInsertAtFrontOfPriority,
-    bool bDeferDuringCombat
+    bool bDeferDuringCombat,
+    FName Source
 )
 {
     if (Message.IsEmpty() || MaxPendingNotifications <= 0)
@@ -396,6 +501,12 @@ void UBHObjectiveNotificationWidget::QueueNotification(
         return;
     }
 
+    // A preempted/resumed old background update must not replace a newer queued snapshot.
+    if (bInsertAtFrontOfPriority && bDeferDuringCombat &&
+        PendingNotifications.ContainsByPredicate([](const FPendingNotification& Item) { return Item.bDeferDuringCombat; }))
+    {
+        return;
+    }
     int32 CoalescedStrategicUpdates = 0;
     if (bDeferDuringCombat)
     {
@@ -431,6 +542,7 @@ void UBHObjectiveNotificationWidget::QueueNotification(
 
     FPendingNotification Notification;
     Notification.Message = Message;
+    Notification.Source = Source;
     Notification.Priority = NotificationPriority;
     Notification.AudioCue = AudioCue;
     Notification.bDeferDuringCombat = bDeferDuringCombat;
@@ -460,6 +572,7 @@ void UBHObjectiveNotificationWidget::QueueNotification(
 
 void UBHObjectiveNotificationWidget::TryPresentNextQueuedNotification()
 {
+    if (bPresentationSuppressed) { return; }
     const int32 NextIndex = PendingNotifications.IndexOfByPredicate(
         [this](const FPendingNotification& Pending)
         {
@@ -480,7 +593,9 @@ void UBHObjectiveNotificationWidget::TryPresentNextQueuedNotification()
     PresentNotification(
         NextNotification.Message,
         NextNotification.Priority,
-        NextNotification.AudioCue
+        NextNotification.AudioCue,
+        NextNotification.Source,
+        NextNotification.bDeferDuringCombat
     );
 }
 
@@ -577,6 +692,9 @@ void UBHObjectiveNotificationWidget::NativeDestruct()
 {
     ClearNotificationTimers();
     PendingNotifications.Reset();
+    ActiveSource = NAME_None;
+    bActiveDeferDuringCombat = false;
+    bPresentationSuppressed = false;
     bNotificationInProgress = false;
     bCombatIntensityActive = false;
     ActivePriority = EBHNotificationPriority::Normal;

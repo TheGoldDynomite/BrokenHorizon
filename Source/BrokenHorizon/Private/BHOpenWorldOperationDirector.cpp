@@ -1989,8 +1989,8 @@ void ABHOpenWorldOperationDirector::ActivateOperation()
                     "BrokenHorizon",
                     "OpenWorldDefenseStarted",
                     "OPEN-WORLD OPERATION ACTIVE\n\n"
-                    "Hold sector {0}. Enemy wave 1/{2} inbound.\n"
-                    "Friendly support: {1}."
+                    "Hold sector {0}. Expected enemy waves: {2}.\n"
+                    "Initial friendly support: {1}."
                 )
                 : OperationType == EBHWarPriorityType::Raid
                 ? NSLOCTEXT(

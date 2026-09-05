@@ -1074,6 +1074,9 @@ protected:
     void ExecuteInteraction(AActor* TargetActor);
 
     void RefreshObjectiveWidget();
+    void RefreshMissionPresentationVisibility();
+    bool HasTacticalOperationWaypoint() const;
+    void RefreshStrategicBriefing();
 
     void RefreshFragGrenadeHUD();
     void RefreshSmokeGrenadeHUD();
@@ -2510,6 +2513,7 @@ protected:
     TMap<FName, uint8> LastObservedSectorSupplyReadiness;
     bool bLastObservedOperationFundingReady = false;
     FName LastObservedOperationSupplySource = NAME_None;
+    FString LastStrategicBriefingContext;
     int32 LastPresentedOperationRevision = INDEX_NONE;
     FName LastPresentedOperationID = NAME_None;
     FName LastPresentedOperationSectorID = NAME_None;

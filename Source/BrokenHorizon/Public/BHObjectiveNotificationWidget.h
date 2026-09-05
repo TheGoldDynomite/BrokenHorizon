@@ -63,6 +63,14 @@ public:
     UFUNCTION(BlueprintPure, Category = "Objectives")
     int32 GetPendingDeferredStrategicNotificationCount() const;
 
+    // Native context ownership: replacement/cancellation never discard other sources.
+    void ShowKeyedNotification(FName Source, const FText& Message,
+        EBHNotificationPriority NotificationPriority, EBHNotificationAudioCue AudioCue = EBHNotificationAudioCue::None);
+    void CancelKeyedNotification(FName Source);
+    void SetPresentationSuppressed(bool bSuppressed);
+    bool IsPresentationSuppressed() const { return bPresentationSuppressed; }
+    bool HasNotificationForSource(FName Source) const;
+
     static bool ShouldPreemptNotification(
         EBHNotificationPriority Incoming,
         EBHNotificationPriority Active
@@ -122,6 +130,7 @@ private:
     struct FPendingNotification
     {
         FText Message;
+        FName Source = NAME_None;
         EBHNotificationPriority Priority =
             EBHNotificationPriority::Normal;
         EBHNotificationAudioCue AudioCue =
@@ -133,21 +142,26 @@ private:
         const FText& Message,
         EBHNotificationPriority NotificationPriority,
         EBHNotificationAudioCue AudioCue,
-        bool bDeferDuringCombat
+        bool bDeferDuringCombat,
+        FName Source = NAME_None
     );
 
     void PresentNotification(
         const FText& Message,
         EBHNotificationPriority NotificationPriority,
-        EBHNotificationAudioCue AudioCue
+        EBHNotificationAudioCue AudioCue,
+        FName Source = NAME_None,
+        bool bDeferDuringCombat = false
     );
     void QueueNotification(
         const FText& Message,
         EBHNotificationPriority NotificationPriority,
         EBHNotificationAudioCue AudioCue,
         bool bInsertAtFrontOfPriority = false,
-        bool bDeferDuringCombat = false
+        bool bDeferDuringCombat = false,
+        FName Source = NAME_None
     );
+    void RemoveNotificationSource(FName Source, bool bPresentNext);
     void TryPresentNextQueuedNotification();
     void StartFadeOut();
     void UpdateFadeOut();
@@ -164,6 +178,9 @@ private:
         EBHNotificationPriority::Normal;
     EBHNotificationAudioCue ActiveAudioCue =
         EBHNotificationAudioCue::QuietConfirmation;
+    FName ActiveSource = NAME_None;
+    bool bActiveDeferDuringCombat = false;
+    bool bPresentationSuppressed = false;
     bool bNotificationInProgress = false;
     bool bCombatIntensityActive = false;
     float FadeStartTime = 0.0f;

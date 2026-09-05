@@ -1,4 +1,5 @@
 #include "BHCharacter.h"
+#include "Private/BHDefenseAMultiplayerTest.h"
 
 // Strategic map input contract: EKeys::M,
 // Strategic deployment contract: SaveSubsystem->DeployOperation(
@@ -4852,6 +4853,7 @@ void ABHCharacter::SynchronizeReplicatedOperationPresentation()
     LastPresentedOperationID = Snapshot.OperationID;
     LastPresentedOperationSectorID = Snapshot.SectorID;
     LastPresentedOperationPhase = SnapshotPhase;
+    RefreshMissionPresentationVisibility();
 
     const bool bActiveOperation =
         Snapshot.Phase == EBHActiveOperationPhase::Approach ||
@@ -4981,7 +4983,7 @@ void ABHCharacter::SynchronizeReplicatedOperationPresentation()
 
     if (IsValid(ObjectiveWidget))
     {
-        ObjectiveWidget->SetVisibility(ESlateVisibility::Visible);
+        RefreshMissionPresentationVisibility();
     }
 
     const uint8 NotificationPhase =
@@ -5023,6 +5025,7 @@ void ABHCharacter::SynchronizeReplicatedOperationPresentation()
 
 void ABHCharacter::UpdateOperationWaypointHUD()
 {
+    RefreshMissionPresentationVisibility();
     if (!IsValid(CombatStatusWidget))
     {
         return;
@@ -5101,11 +5104,7 @@ void ABHCharacter::UpdateOperationWaypointHUD()
             EBHActiveOperationPhase::Securing ||
         OperationSnapshot.Phase ==
             EBHActiveOperationPhase::RaidExfiltration;
-    const bool bLocalDirectorHasWaypoint =
-        IsValid(OpenWorldOperationDirector) &&
-        OpenWorldOperationDirector->IsOperationInProgress();
-    const bool bShowWaypoint =
-        bSnapshotHasWaypoint || bLocalDirectorHasWaypoint;
+    const bool bShowWaypoint = HasTacticalOperationWaypoint();
 
     if (!bShowWaypoint)
     {
@@ -8583,6 +8582,12 @@ void ABHCharacter::RefreshReplicatedMissionPresentation()
 
         EnterMissionCompleteState(false);
     }
+#if !UE_BUILD_SHIPPING
+    if (IsLocallyControlled())
+    {
+        BHDefenseAMultiplayerTest::ObserveDebrief(MissionCompleteWidget, IsMissionComplete(), false);
+    }
+#endif
 }
 
 bool ABHCharacter::AdoptSharedMissionStateFrom(
@@ -8780,9 +8785,7 @@ void ABHCharacter::TogglePauseMenu()
     // with the modal pause menu for the center of the screen.
     if (IsValid(ObjectiveNotificationWidget))
     {
-        ObjectiveNotificationWidget->SetVisibility(
-            ESlateVisibility::Collapsed
-        );
+        ObjectiveNotificationWidget->SetPresentationSuppressed(true);
     }
 
     PlayerController->SetIgnoreMoveInput(true);
@@ -8810,9 +8813,7 @@ void ABHCharacter::TogglePauseMenu()
         PauseMenuWidget = nullptr;
         if (IsValid(ObjectiveNotificationWidget))
         {
-            ObjectiveNotificationWidget->SetVisibility(
-                ESlateVisibility::SelfHitTestInvisible
-            );
+            RefreshMissionPresentationVisibility();
         }
         PlayerController->SetIgnoreMoveInput(false);
         PlayerController->SetIgnoreLookInput(false);
@@ -8852,9 +8853,7 @@ void ABHCharacter::ResumeFromPause()
 
     if (IsValid(ObjectiveNotificationWidget))
     {
-        ObjectiveNotificationWidget->SetVisibility(
-            ESlateVisibility::SelfHitTestInvisible
-        );
+        RefreshMissionPresentationVisibility();
     }
 
     APlayerController* PlayerController =
@@ -12364,7 +12363,7 @@ bool ABHCharacter::BeginOperationInWorld(
 
     if (IsValid(ObjectiveWidget))
     {
-        ObjectiveWidget->SetVisibility(ESlateVisibility::Visible);
+        RefreshMissionPresentationVisibility();
     }
 
     if (IsValid(AmmoHUDWidget))
@@ -14965,6 +14964,7 @@ void ABHCharacter::DisplayStatusNotificationLocally(
 
     if (ObjectiveNotificationWidget)
     {
+        RefreshMissionPresentationVisibility();
         ObjectiveNotificationWidget->SetCombatIntensityActive(
             IsLocalCombatIntensityActive()
         );
@@ -15012,6 +15012,7 @@ void ABHCharacter::DisplayDeferredStrategicStatusNotificationLocally(
 
     if (ObjectiveNotificationWidget)
     {
+        RefreshMissionPresentationVisibility();
         ObjectiveNotificationWidget->SetCombatIntensityActive(
             IsLocalCombatIntensityActive()
         );
@@ -15158,7 +15159,7 @@ void ABHCharacter::ClientCompleteFieldRespawn_Implementation()
 
     if (IsValid(ObjectiveWidget))
     {
-        ObjectiveWidget->SetVisibility(ESlateVisibility::Visible);
+        RefreshMissionPresentationVisibility();
     }
 
     if (IsValid(AmmoHUDWidget))
@@ -15236,7 +15237,7 @@ void ABHCharacter::ClientConfirmOperationDeployment_Implementation(
 
     if (IsValid(ObjectiveWidget))
     {
-        ObjectiveWidget->SetVisibility(ESlateVisibility::Visible);
+        RefreshMissionPresentationVisibility();
     }
 }
 
@@ -15267,6 +15268,12 @@ void ABHCharacter::ClientPresentOperationDebrief_Implementation(
     {
         MissionCompleteWidget->ResetContinueRequest();
     }
+#if !UE_BUILD_SHIPPING
+    if (IsLocallyControlled())
+    {
+        BHDefenseAMultiplayerTest::ObserveDebrief(MissionCompleteWidget, IsMissionComplete());
+    }
+#endif
 }
 
 void ABHCharacter::ClientConfirmDebriefContinue_Implementation(
@@ -15286,6 +15293,9 @@ void ABHCharacter::ClientConfirmDebriefContinue_Implementation(
     {
         EnterPostOperationFreeRoam(true);
     }
+#if !UE_BUILD_SHIPPING
+    BHDefenseAMultiplayerTest::ObserveContinueAcknowledgement(ResolveOwningPlayerController());
+#endif
 }
 
 void ABHCharacter::RefreshObjectiveWidget()
@@ -15297,6 +15307,49 @@ void ABHCharacter::RefreshObjectiveWidget()
             ObjectiveComponent->GetCurrentObjectiveText()
         );
     }
+    RefreshMissionPresentationVisibility();
+}
+
+bool ABHCharacter::HasTacticalOperationWaypoint() const
+{
+    const ABHWarGameState* State = GetWorld() ? GetWorld()->GetGameState<ABHWarGameState>() : nullptr;
+    const EBHActiveOperationPhase Phase = IsValid(State) ? State->GetActiveOperationSnapshot().Phase : EBHActiveOperationPhase::None;
+    return Phase == EBHActiveOperationPhase::Approach || Phase == EBHActiveOperationPhase::Combat ||
+        Phase == EBHActiveOperationPhase::AwaitingWave || Phase == EBHActiveOperationPhase::Securing ||
+        Phase == EBHActiveOperationPhase::RaidExfiltration ||
+        (IsValid(OpenWorldOperationDirector) && OpenWorldOperationDirector->IsOperationInProgress());
+}
+
+void ABHCharacter::RefreshMissionPresentationVisibility()
+{
+    if (!IsLocallyControlled()) { return; }
+    const ABHWarGameState* State = GetWorld() ? GetWorld()->GetGameState<ABHWarGameState>() : nullptr;
+    const EBHActiveOperationPhase Phase = IsValid(State) ? State->GetActiveOperationSnapshot().Phase : EBHActiveOperationPhase::None;
+    const bool bTerminalSnapshot = Phase == EBHActiveOperationPhase::DebriefSuccess || Phase == EBHActiveOperationPhase::DebriefFailure;
+    const bool bTerminal = bIsHandlingDeath || bIsHandlingMissionComplete || bTerminalSnapshot;
+    if (IsValid(ObjectiveWidget))
+    {
+        const bool bHasObjective = IsValid(ObjectiveComponent) && !ObjectiveComponent->GetCurrentObjectiveID().IsNone() &&
+            !ObjectiveComponent->GetCurrentObjectiveText().IsEmpty();
+        ObjectiveWidget->SetVisibility(!bTerminal && bHasObjective && !HasTacticalOperationWaypoint()
+            ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+    }
+    if (IsValid(ObjectiveNotificationWidget))
+    {
+        ObjectiveNotificationWidget->SetPresentationSuppressed(bTerminal || bPauseMenuOpen);
+        const bool bTacticalActivated = (Phase != EBHActiveOperationPhase::None && Phase != EBHActiveOperationPhase::Approach) ||
+            (IsValid(OpenWorldOperationDirector) && OpenWorldOperationDirector->IsOperationActivated());
+        if (bTerminal || bTacticalActivated || AssignedWarSectorID.IsNone())
+        {
+            ObjectiveNotificationWidget->CancelKeyedNotification(FName(TEXT("StrategicBriefing")));
+        }
+    }
+#if !UE_BUILD_SHIPPING
+    BHDefenseAMultiplayerTest::ObservePresentation(ResolveOwningPlayerController(),
+        IsValid(ObjectiveWidget) && ObjectiveWidget->IsInViewport() && ObjectiveWidget->IsVisible(),
+        IsValid(ObjectiveNotificationWidget) && ObjectiveNotificationWidget->HasNotificationForSource(FName(TEXT("StrategicBriefing"))),
+        IsValid(ObjectiveNotificationWidget) && ObjectiveNotificationWidget->IsPresentationSuppressed());
+#endif
 }
 
 void ABHCharacter::ConfigureStrategicMissionPresentation()
@@ -15389,24 +15442,49 @@ void ABHCharacter::ConfigureStrategicMissionPresentation()
         }
     }
 
-    ShowPriorityStatusNotification(
-        FText::Format(
-            NSLOCTEXT(
-                "BrokenHorizon",
-                "StrategicMissionBriefingNotification",
-                "STRATEGIC BRIEFING\n\n{0}\n\n{1}"
-            ),
-            WarSubsystem->GetOperationTitle(
-                AssignedWarSectorID,
-                AssignedWarPriorityType
-            ),
-            WarSubsystem->GetOperationMissionBriefing(
-                AssignedWarSectorID,
-                AssignedWarPriorityType
-            )
-        ),
-        EBHNotificationPriority::High
-    );
+    RefreshStrategicBriefing();
+}
+
+void ABHCharacter::RefreshStrategicBriefing()
+{
+    if (!IsLocallyControlled()) { return; }
+    RefreshMissionPresentationVisibility();
+    const ABHWarGameState* State = GetWorld() ? GetWorld()->GetGameState<ABHWarGameState>() : nullptr;
+    const FBHActiveOperationSnapshot Snapshot = IsValid(State) ? State->GetActiveOperationSnapshot() : FBHActiveOperationSnapshot();
+    const bool bTacticalActivated = (Snapshot.Phase != EBHActiveOperationPhase::None && Snapshot.Phase != EBHActiveOperationPhase::Approach) ||
+        (IsValid(OpenWorldOperationDirector) && OpenWorldOperationDirector->IsOperationActivated());
+    if (bIsHandlingDeath || bIsHandlingMissionComplete || bTacticalActivated ||
+        AssignedWarSectorID.IsNone() || AssignedWarPriorityType == EBHWarPriorityType::None ||
+        !IsValid(ObjectiveComponent) || ObjectiveComponent->GetCurrentObjectiveID().IsNone())
+    {
+        if (IsValid(ObjectiveNotificationWidget))
+        {
+            ObjectiveNotificationWidget->CancelKeyedNotification(FName(TEXT("StrategicBriefing")));
+        }
+        return;
+    }
+    UGameInstance* Instance = GetGameInstance();
+    const UBHWarSubsystem* War = IsValid(Instance) ? Instance->GetSubsystem<UBHWarSubsystem>() : nullptr;
+    if (!IsValid(War)) { return; }
+    const FString Context = FString::Printf(TEXT("%s:%d:%s"), *AssignedWarSectorID.ToString(),
+        static_cast<int32>(AssignedWarPriorityType), *Snapshot.OperationID.ToString());
+    if (Context == LastStrategicBriefingContext) { return; }
+    APlayerController* LocalController = ResolveOwningPlayerController();
+    if (!IsValid(LocalController) || !LocalController->GetLocalPlayer()) { return; }
+    if (!IsValid(ObjectiveNotificationWidget) && ObjectiveNotificationWidgetClass)
+    {
+        ObjectiveNotificationWidget = CreateWidget<UBHObjectiveNotificationWidget>(LocalController, ObjectiveNotificationWidgetClass);
+        if (IsValid(ObjectiveNotificationWidget)) { ObjectiveNotificationWidget->AddToViewport(); }
+    }
+    if (!IsValid(ObjectiveNotificationWidget)) { return; }
+    RefreshMissionPresentationVisibility();
+    LastStrategicBriefingContext = Context;
+    // Generate from the current local assignment; an older authority RPC cannot overwrite this context.
+    ObjectiveNotificationWidget->ShowKeyedNotification(FName(TEXT("StrategicBriefing")), FText::Format(
+        NSLOCTEXT("BrokenHorizon", "StrategicMissionBriefingNotification", "STRATEGIC BRIEFING\n\n{0}\n\n{1}"),
+        War->GetOperationTitle(AssignedWarSectorID, AssignedWarPriorityType),
+        War->GetOperationMissionBriefing(AssignedWarSectorID, AssignedWarPriorityType)),
+        EBHNotificationPriority::High, EBHNotificationAudioCue::StrategicWarning);
 }
 
 bool ABHCharacter::StartOpenWorldOperationDirector(
@@ -16072,6 +16150,7 @@ void ABHCharacter::EnterMissionCompleteState(
     }
 
     bIsHandlingMissionComplete = true;
+    RefreshMissionPresentationVisibility();
 
     if (bWarMapOpen)
     {
@@ -16291,12 +16370,7 @@ void ABHCharacter::EnterCampaignEpilogueFreeRoam(
 
     GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 
-    if (IsValid(ObjectiveWidget))
-    {
-        ObjectiveWidget->SetVisibility(
-            ESlateVisibility::Collapsed
-        );
-    }
+    RefreshMissionPresentationVisibility();
 
     if (IsValid(AmmoHUDWidget))
     {
@@ -16380,12 +16454,7 @@ void ABHCharacter::EnterPostOperationFreeRoam(
 
     GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 
-    if (IsValid(ObjectiveWidget))
-    {
-        ObjectiveWidget->SetVisibility(
-            ESlateVisibility::Collapsed
-        );
-    }
+    RefreshMissionPresentationVisibility();
 
     if (IsValid(AmmoHUDWidget))
     {

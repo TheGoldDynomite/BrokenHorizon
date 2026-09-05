@@ -1,4 +1,5 @@
 #include "BHCombatStatusWidget.h"
+#include "BHDefenseAMultiplayerTest.h"
 
 #include "BHUIStyle.h"
 #include "BHUserSettingsSubsystem.h"
@@ -6,6 +7,9 @@
 #include "Components/TextBlock.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/GameInstance.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Rendering/SlateRenderer.h"
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 
@@ -118,12 +122,61 @@ int32 DrawDirectionChevron(
     );
 }
 
+// MakeText does not wrap to its paint geometry. Build and measure the lines we actually draw.
+struct FWrappedHUDText
+{
+    TArray<FString> Lines;
+    float LineHeight = 0.0f;
+    float Width = 0.0f;
+    float Height() const { return Lines.Num() * LineHeight; }
+};
+
+FWrappedHUDText WrapHUDText(const FString& Text, const FSlateFontInfo& Font, float MaxWidth)
+{
+    FWrappedHUDText Result;
+    const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+    Result.LineHeight = Measure->GetMaxCharacterHeight(Font) + 2.0f;
+    Result.Width = FMath::Max(1.0f, MaxWidth);
+    TArray<FString> Paragraphs;
+    Text.ParseIntoArrayLines(Paragraphs, false);
+    for (FString Remaining : Paragraphs)
+    {
+        while (Measure->Measure(FStringView(Remaining), Font).X > Result.Width && Remaining.Len() > 1)
+        {
+            int32 End = FMath::Clamp(Measure->FindLastWholeCharacterIndexBeforeOffset(
+                FStringView(Remaining), Font, FMath::FloorToInt(Result.Width)) + 1, 1, Remaining.Len());
+            int32 WordEnd = End;
+            while (WordEnd > 0 && !FChar::IsWhitespace(Remaining[WordEnd - 1])) { --WordEnd; }
+            if (WordEnd > 0) { End = WordEnd; }
+            Result.Lines.Add(Remaining.Left(End).TrimEnd());
+            Remaining = Remaining.Mid(End).TrimStart();
+        }
+        Result.Lines.Add(Remaining);
+    }
+    return Result;
+}
+
+void DrawWrappedHUDText(const FGeometry& Geometry, FSlateWindowElementList& DrawElements,
+    int32 LayerId, const FWrappedHUDText& Text, const FVector2D& Position,
+    const FSlateFontInfo& Font, const FLinearColor& Color)
+{
+    for (int32 Index = 0; Index < Text.Lines.Num(); ++Index)
+    {
+        FSlateDrawElement::MakeText(DrawElements, LayerId,
+            Geometry.ToPaintGeometry(FVector2D(Text.Width, Text.LineHeight),
+                FSlateLayoutTransform(Position + FVector2D(0.0f, Index * Text.LineHeight))),
+            Text.Lines[Index], Font, ESlateDrawEffect::None, Color);
+    }
+}
+
 int32 DrawOperationWaypoint(
     const FGeometry& Geometry,
     FSlateWindowElementList& DrawElements,
     int32 LayerId,
     float DirectionAngleRadians,
-    const FString& Label
+    const FString& Label,
+    const FVector2D& SafeInset,
+    float HealthLaneLeft
 )
 {
     const FVector2D WidgetSize = Geometry.GetLocalSize();
@@ -138,10 +191,11 @@ int32 DrawOperationWaypoint(
         -1.0f,
         1.0f
     );
-    const float MarkerX =
-        (WidgetSize.X * 0.5f) +
-        (NormalizedBearing * WidgetSize.X * 0.42f);
-    const float MarkerY = 28.0f;
+    const float CenterX = WidgetSize.X * 0.5f;
+    const float BearingRadius = FMath::Max(0.0f, FMath::Min(
+        CenterX - SafeInset.X - 28.0f, HealthLaneLeft - 28.0f - CenterX));
+    const float MarkerX = CenterX + NormalizedBearing * BearingRadius;
+    const float MarkerY = SafeInset.Y + 10.0f;
     const TArray<FVector2D> MarkerPoints = {
         FVector2D(MarkerX - 10.0f, MarkerY + 12.0f),
         FVector2D(MarkerX, MarkerY),
@@ -157,45 +211,13 @@ int32 DrawOperationWaypoint(
         4.0f
     );
 
-    int32 LineCount = 1;
-
-    for (int32 CharacterIndex = 0;
-        CharacterIndex < Label.Len();
-        ++CharacterIndex)
-    {
-        if (Label[CharacterIndex] == TEXT('\n'))
-        {
-            ++LineCount;
-        }
-    }
-    const float LabelWidth =
-        LineCount > 1 ? 680.0f : 460.0f;
-    const float LabelHeight =
-        26.0f * static_cast<float>(LineCount);
-    const FVector2D TextPosition(
-        FMath::Clamp(
-            MarkerX - (LabelWidth * 0.5f),
-            18.0f,
-            FMath::Max(18.0f, WidgetSize.X - LabelWidth - 18.0f)
-        ),
-        MarkerY + 17.0f
-    );
-
-    FSlateDrawElement::MakeText(
-        DrawElements,
-        LayerId + 1,
-        Geometry.ToPaintGeometry(
-            FVector2D(LabelWidth, LabelHeight),
-            FSlateLayoutTransform(TextPosition)
-        ),
-        Label,
-        FCoreStyle::GetDefaultFontStyle(
-            TEXT("Bold"),
-            LineCount > 1 ? 15 : 17
-        ),
-        ESlateDrawEffect::None,
-        FLinearColor(1.0f, 0.72f, 0.20f, 0.98f)
-    );
+    const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 15);
+    const float TextX = SafeInset.X + 18.0f;
+    const float TextWidth = FMath::Max(1.0f, FMath::Min(680.0f, FMath::Min(
+        (WidgetSize.X - 2.0f * SafeInset.X) * 0.58f, HealthLaneLeft - 24.0f - TextX)));
+    const FWrappedHUDText Wrapped = WrapHUDText(Label, Font, TextWidth);
+    DrawWrappedHUDText(Geometry, DrawElements, LayerId + 1, Wrapped,
+        FVector2D(TextX, MarkerY + 28.0f), Font, FLinearColor(1.0f, 0.72f, 0.20f, 0.98f));
 
     return LayerId + 1;
 }
@@ -943,6 +965,10 @@ void UBHCombatStatusWidget::SetOperationWaypoint(
     bOperationFuelShortfall =
         bOperationTravelEstimateVisible && bFuelShortfall;
     InvalidateLayoutAndVolatility();
+#if !UE_BUILD_SHIPPING
+    BHDefenseAMultiplayerTest::ObserveHUD(this, bOperationWaypointVisible,
+        bOperationWaypointActive, OperationStatusText);
+#endif
 }
 
 void UBHCombatStatusWidget::SetOperationArrivalDeadlineRisk(
@@ -1846,6 +1872,25 @@ int32 UBHCombatStatusWidget::NativePaint(
     const UBHUserSettingsSubsystem* UserSettings = GameInstance
         ? GameInstance->GetSubsystem<UBHUserSettingsSubsystem>()
         : nullptr;
+    const FMargin SafeArea = BHUIStyle::CalculateSafeAreaInsets(
+        IsValid(UserSettings) ? UserSettings->GetUISafeAreaScale() : 0.95f);
+    const FVector2D NativeSize = AllottedGeometry.GetLocalSize();
+    const FVector2D NativeSafeInset(NativeSize.X * SafeArea.Left, NativeSize.Y * SafeArea.Top);
+    float HealthLaneLeft = NativeSize.X * 0.72f;
+    const auto ReserveHealthLane = [&](const UWidget* HealthWidget)
+    {
+        if (IsValid(HealthWidget) && HealthWidget->IsVisible())
+        {
+            const FGeometry& HealthGeometry = HealthWidget->GetCachedGeometry();
+            const FVector2D LocalOrigin = AllottedGeometry.AbsoluteToLocal(HealthGeometry.GetAbsolutePosition());
+            if (HealthGeometry.GetLocalSize().X > 1.0f && LocalOrigin.X > NativeSize.X * 0.5f)
+            {
+                HealthLaneLeft = FMath::Min(HealthLaneLeft, static_cast<float>(LocalOrigin.X));
+            }
+        }
+    };
+    ReserveHealthLane(HealthBar);
+    ReserveHealthLane(HealthText);
     const auto GetBindingPrompt = [UserSettings](
         FName BindingID,
         const TCHAR* Fallback
@@ -1947,7 +1992,9 @@ int32 UBHCombatStatusWidget::NativePaint(
             OutDrawElements,
             MaxLayer + 1,
             OperationDirectionAngleRadians,
-            WaypointLabel
+            WaypointLabel,
+            NativeSafeInset,
+            HealthLaneLeft
         );
     }
 
@@ -3094,30 +3141,16 @@ int32 UBHCombatStatusWidget::NativePaint(
             );
         }
 
-        const FVector2D TextPosition(
-            28.0f,
-            FMath::Max(24.0f, WidgetSize.Y - 172.0f)
-        );
-        const FVector2D TextSize(
-            FMath::Max(280.0f, WidgetSize.X * 0.42f),
-            160.0f
-        );
-
-        FSlateDrawElement::MakeText(
-            OutDrawElements,
-            MaxLayer + 1,
-            AllottedGeometry.ToPaintGeometry(
-                TextSize,
-                FSlateLayoutTransform(TextPosition)
-            ),
-            InjuryStatus,
-            FCoreStyle::GetDefaultFontStyle(
-                TEXT("Bold"),
-                16
-            ),
-            ESlateDrawEffect::None,
-            InjuryColor
-        );
+        const FSlateFontInfo InjuryFont = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 16);
+        const float InjuryWidth = FMath::Max(1.0f, FMath::Min(680.0f,
+            (WidgetSize.X - 2.0f * NativeSafeInset.X) * 0.58f));
+        const FWrappedHUDText WrappedInjury = WrapHUDText(InjuryStatus, InjuryFont, InjuryWidth);
+        // Added wound/treatment lines grow upward; the final load line stays inside the safe bottom edge.
+        const FVector2D TextPosition(NativeSafeInset.X + 18.0f,
+            FMath::Max(NativeSafeInset.Y + 18.0f,
+                WidgetSize.Y - NativeSafeInset.Y - 18.0f - WrappedInjury.Height()));
+        DrawWrappedHUDText(AllottedGeometry, OutDrawElements, MaxLayer + 1,
+            WrappedInjury, TextPosition, InjuryFont, InjuryColor);
         ++MaxLayer;
     }
 

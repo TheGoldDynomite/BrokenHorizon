@@ -1,4 +1,5 @@
 #include "BHWarGameState.h"
+#include "BHDefenseAMultiplayerTest.h"
 
 #include "BHCharacter.h"
 #include "BHBattlefieldConditions.h"
@@ -4709,6 +4710,7 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
 void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
 {
     UWorld* World = GetWorld();
+    const bool bMultiplayer = BHDefenseAMultiplayerTest::IsHost();
     const auto FailTest = [this](const TCHAR* Reason)
     {
         UE_LOG(
@@ -4724,6 +4726,7 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
         GetWorldTimerManager().ClearTimer(
             DefenseAGarrisonPersistenceTestTimer
         );
+        if (BHDefenseAMultiplayerTest::IsEnabled()) { BHDefenseAMultiplayerTest::Fail(Reason); }
         FPlatformMisc::RequestExit(false);
     };
 
@@ -4734,13 +4737,25 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
     }
 
     ABHCharacter* Player = nullptr;
+    TArray<ABHCharacter*> Participants;
     for (TActorIterator<ABHCharacter> It(World); It; ++It)
     {
         if (It->HasAuthority() && It->IsPlayerControlled())
         {
-            Player = *It;
-            break;
+            APlayerController* Controller = Cast<APlayerController>(It->GetController());
+            UNetConnection* Connection = IsValid(Controller) ? Controller->GetNetConnection() : nullptr;
+            if (bMultiplayer && (!IsValid(Connection) || Connection->GetConnectionState() != USOCK_Open))
+            {
+                continue;
+            }
+            Participants.Add(*It);
+            if (!IsValid(Player)) { Player = *It; }
         }
+    }
+    if (bMultiplayer && Participants.Num() != 2)
+    {
+        if (BHTestDefenseAGarrisonPhase > 0) { FailTest(TEXT("two_participants_lost")); }
+        return;
     }
 
     if (!IsValid(Player))
@@ -4832,6 +4847,34 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
         return KilledCount;
     };
 
+    if (bMultiplayer && BHTestDefenseAGarrisonPhase > 0)
+    {
+        const FBHActiveOperationSnapshot Snapshot = GetActiveOperationSnapshot();
+        BHDefenseAMultiplayerTest::ObserveHost(Snapshot, Garrison.Num(),
+            CountLivingActiveAuthoredGarrison(), GatherRuntimeOperationHostiles().Num(), Participants.Num(), false);
+        if (BHTestDefenseAGarrisonPhase <= 6 && Snapshot.OperationState.bOperationActivated &&
+            !BHDefenseAMultiplayerTest::HasControl(TEXT("secure.ready")))
+        {
+            // Position the real actors counted by securing; production clocks continue normally.
+            const FVector Outside = FVector(Snapshot.OperationCenter) + FVector(1800.0f, 0.0f, 90.0f);
+            for (int32 Index = 0; Index < Participants.Num(); ++Index)
+            {
+                Participants[Index]->SetActorLocation(Outside + FVector(0.0f, Index * 200.0f, 0.0f),
+                    false, nullptr, ETeleportType::TeleportPhysics);
+                Participants[Index]->UpdateOverlaps();
+            }
+            for (TActorIterator<ABHEnemySoldier> It(World); It; ++It)
+            {
+                if (IsValid(*It) && !It->IsDead() && !It->IsIncapacitated() &&
+                    It->GetCombatFaction() == EBHCombatFaction::Friendly && Cast<ABHCharacter>(It->GetOwner()))
+                {
+                    It->SetActorLocation(Outside + FVector(0.0f, -300.0f, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+                    It->UpdateOverlaps();
+                }
+            }
+        }
+    }
+
     if (BHTestDefenseAGarrisonPhase == 0)
     {
         const TArray<FName> ExpectedGarrisonIDs = {
@@ -4873,6 +4916,14 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
                 FailTest(TEXT("garrison_not_dormant"));
                 return;
             }
+        }
+
+        if (bMultiplayer)
+        {
+            BHDefenseAMultiplayerTest::ObserveHost(GetActiveOperationSnapshot(), Garrison.Num(),
+                CountLivingActiveAuthoredGarrison(), 0, Participants.Num(), true);
+            // The harness acknowledges both clients' local viewport HUD readiness.
+            if (!BHDefenseAMultiplayerTest::HasControl(TEXT("start.ready"))) { return; }
         }
 
         UBHWarSubsystem* WarSubsystem =
@@ -4950,6 +5001,7 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
             return;
         }
 
+        if (bMultiplayer && !BHDefenseAMultiplayerTest::HasControl(TEXT("clear_wave1.ready"))) { return; }
         ABHEnemySoldier* Casualty = nullptr;
         for (ABHEnemySoldier* Enemy : Garrison)
         {
@@ -5004,6 +5056,14 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
             {
                 FailTest(TEXT("casualty_not_recorded"));
             }
+            return;
+        }
+
+        if (bMultiplayer)
+        {
+            // Standalone retains checkpoint/reload; this variation proves live replication/presentation.
+            BHTestDefenseAGarrisonPhase = 3;
+            BHTestDefenseAGarrisonWaitAttempts = 0;
             return;
         }
 
@@ -5075,15 +5135,21 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
             }
         }
 
+        // Live death retains the authored activation flag; reload restores a dormant casualty.
+        // The live variation must still account for exactly one casualty and every remaining actor.
+        const bool bInvalidLiveAccounting = bMultiplayer &&
+            (RestoredState.EnemyCasualties != 1 ||
+             LivingActiveGarrisonCount + RestoredState.EnemyCasualties != Garrison.Num());
         if (!IsValid(RestoredCasualty) ||
             !RestoredCasualty->IsDead() ||
-            RestoredCasualty->IsOperationGarrisonActive() ||
+            (!bMultiplayer && RestoredCasualty->IsOperationGarrisonActive()) ||
             LivingActiveGarrisonCount != RestoredState.LivingEnemyCount ||
             RestoredState.EnemyCasualties < 1 ||
             RestoredState.CurrentWave != 1 ||
-            RestoredState.OperationVariationIndex != 0)
+            RestoredState.OperationVariationIndex != 0 ||
+            bInvalidLiveAccounting)
         {
-            FailTest(TEXT("garrison_restore_state"));
+            FailTest(bMultiplayer ? TEXT("garrison_live_casualty_state") : TEXT("garrison_restore_state"));
             return;
         }
 
@@ -5174,6 +5240,7 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
                 return;
             }
 
+            if (bMultiplayer && !BHDefenseAMultiplayerTest::HasControl(TEXT("clear_wave2.ready"))) { return; }
             const int32 ClearedCount =
                 KillOperationHostiles(RuntimeHostiles);
             if (ClearedCount != RuntimeHostiles.Num())
@@ -5233,6 +5300,7 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
 
         if (State.bSecuringObjective)
         {
+            if (bMultiplayer && !BHDefenseAMultiplayerTest::HasControl(TEXT("secure.ready"))) { return; }
             if (!Player->SetActorLocation(
                     State.OperationCenter + FVector(0.0f, 0.0f, 50.0f),
                     false,
@@ -5244,6 +5312,15 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
                 return;
             }
             Player->UpdateOverlaps();
+            if (bMultiplayer)
+            {
+                for (ABHCharacter* Participant : Participants)
+                {
+                    Participant->SetActorLocation(State.OperationCenter + FVector(0.0f, 0.0f, 50.0f),
+                        false, nullptr, ETeleportType::TeleportPhysics);
+                    Participant->UpdateOverlaps();
+                }
+            }
             BHTestDefenseAGarrisonPhase = 7;
             BHTestDefenseAGarrisonWaitAttempts = 0;
             UE_LOG(
@@ -5280,6 +5357,8 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
                 return;
             }
 
+            if (bMultiplayer && !BHDefenseAMultiplayerTest::HasControl(
+                    FString::Printf(TEXT("clear_wave%d.ready"), State.CurrentWave))) { return; }
             const int32 ClearedCount =
                 KillOperationHostiles(RuntimeHostiles);
             if (ClearedCount != RuntimeHostiles.Num())
@@ -5315,9 +5394,15 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
     {
         const FBHActiveOperationSnapshot Snapshot =
             GetActiveOperationSnapshot();
+        int32 CompletedParticipants = 0;
+        for (ABHCharacter* Participant : Participants)
+        {
+            CompletedParticipants += Participant->IsMissionComplete() ? 1 : 0;
+        }
         if (Snapshot.OperationState.bHasSnapshot &&
             Snapshot.Phase == EBHActiveOperationPhase::DebriefSuccess &&
-            Player->IsMissionComplete())
+            Player->IsMissionComplete() &&
+            (!bMultiplayer || CompletedParticipants == Participants.Num()))
         {
             if (!Snapshot.OperationState.bSecuringObjective ||
                 Snapshot.OperationState.CurrentWave <
@@ -5344,7 +5429,14 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
             GetWorldTimerManager().ClearTimer(
                 DefenseAGarrisonPersistenceTestTimer
             );
-            FPlatformMisc::RequestExit(false);
+            if (bMultiplayer)
+            {
+                BHDefenseAMultiplayerTest::CompleteHost(Snapshot, Participants.Num(), CompletedParticipants);
+            }
+            else
+            {
+                FPlatformMisc::RequestExit(false);
+            }
             return;
         }
 
