@@ -5,6 +5,7 @@
 #include "BHAmmoHUDWidget.generated.h"
 
 class UTextBlock;
+class UBorder;
 
 UCLASS()
 class BROKENHORIZON_API UBHAmmoHUDWidget : public UUserWidget
@@ -36,6 +37,9 @@ protected:
 private:
     void ApplySafeAreaLayout();
     void RefreshAmmoText();
+
+    UPROPERTY(Transient)
+    TObjectPtr<UBorder> AmmoBackdrop;
 
     int32 CachedMagazineAmmo = 0;
     int32 CachedReserveAmmo = 0;

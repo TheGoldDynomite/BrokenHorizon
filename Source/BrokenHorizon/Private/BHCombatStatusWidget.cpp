@@ -128,10 +128,12 @@ struct FWrappedHUDText
     TArray<FString> Lines;
     float LineHeight = 0.0f;
     float Width = 0.0f;
+    float MeasuredWidth = 0.0f;
     float Height() const { return Lines.Num() * LineHeight; }
 };
 
-FWrappedHUDText WrapHUDText(const FString& Text, const FSlateFontInfo& Font, float MaxWidth)
+FWrappedHUDText WrapHUDText(const FString& Text, const FSlateFontInfo& Font, float MaxWidth,
+    float MeasurementScale = 1.0f)
 {
     FWrappedHUDText Result;
     const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
@@ -152,6 +154,14 @@ FWrappedHUDText WrapHUDText(const FString& Text, const FSlateFontInfo& Font, flo
             Remaining = Remaining.Mid(End).TrimStart();
         }
         Result.Lines.Add(Remaining);
+    }
+    // Measure the final lines at their painted font scale, then return to local coordinates.
+    // Font hinting can change their physical width even when wrapping remains unchanged.
+    const float SafeMeasurementScale = FMath::Max(0.01f, MeasurementScale);
+    for (const FString& Line : Result.Lines)
+    {
+        Result.MeasuredWidth = FMath::Max(Result.MeasuredWidth,
+            static_cast<float>(Measure->Measure(FStringView(Line), Font, SafeMeasurementScale).X) / SafeMeasurementScale);
     }
     return Result;
 }
@@ -3144,14 +3154,26 @@ int32 UBHCombatStatusWidget::NativePaint(
         const FSlateFontInfo InjuryFont = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 16);
         const float InjuryWidth = FMath::Max(1.0f, FMath::Min(680.0f,
             (WidgetSize.X - 2.0f * NativeSafeInset.X) * 0.58f));
-        const FWrappedHUDText WrappedInjury = WrapHUDText(InjuryStatus, InjuryFont, InjuryWidth);
+        const FWrappedHUDText WrappedInjury = WrapHUDText(InjuryStatus, InjuryFont, InjuryWidth,
+            AllottedGeometry.GetAccumulatedLayoutTransform().GetScale());
         // Added wound/treatment lines grow upward; the final load line stays inside the safe bottom edge.
         const FVector2D TextPosition(NativeSafeInset.X + 18.0f,
             FMath::Max(NativeSafeInset.Y + 18.0f,
                 WidgetSize.Y - NativeSafeInset.Y - 18.0f - WrappedInjury.Height()));
-        DrawWrappedHUDText(AllottedGeometry, OutDrawElements, MaxLayer + 1,
+        const FVector2D BackdropPadding(12.0f, 10.0f);
+        FLinearColor BackdropColor = BHUIStyle::Charcoal;
+        if (IsValid(UserSettings) && UserSettings->IsHighContrastHUDEnabled())
+        {
+            BackdropColor.A = 1.0f;
+        }
+        FSlateDrawElement::MakeBox(OutDrawElements, MaxLayer + 1,
+            AllottedGeometry.ToPaintGeometry(
+                FVector2D(WrappedInjury.MeasuredWidth, WrappedInjury.Height()) + BackdropPadding * 2.0f,
+                FSlateLayoutTransform(TextPosition - BackdropPadding)),
+            FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")), ESlateDrawEffect::None, BackdropColor);
+        DrawWrappedHUDText(AllottedGeometry, OutDrawElements, MaxLayer + 2,
             WrappedInjury, TextPosition, InjuryFont, InjuryColor);
-        ++MaxLayer;
+        MaxLayer += 2;
     }
 
     return MaxLayer;

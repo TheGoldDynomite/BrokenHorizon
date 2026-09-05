@@ -1,7 +1,11 @@
 #include "BHAmmoHUDWidget.h"
 
 #include "BHUIStyle.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Border.h"
+#include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/ContentWidget.h"
 #include "Components/TextBlock.h"
 #include "HAL/FileManager.h"
 #include "HighResScreenshot.h"
@@ -18,29 +22,51 @@ void UBHAmmoHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
     ApplySafeAreaLayout();
+    BHUIStyle::Apply(*this, EBHUIStyleContext::Gameplay);
 }
 
 void UBHAmmoHUDWidget::ApplySafeAreaLayout()
 {
-    if (!IsValid(AmmoText))
+    if (!IsValid(AmmoText) || !IsValid(WidgetTree)) { return; }
+    if (!IsValid(AmmoBackdrop))
     {
-        return;
+        UCanvasPanel* CanvasParent = Cast<UCanvasPanel>(AmmoText->GetParent());
+        UContentWidget* ContentParent = Cast<UContentWidget>(AmmoText->GetParent());
+        const bool bRootText = WidgetTree->RootWidget == AmmoText;
+        // The configured Blueprint uses a canvas. Preserve that parent and the bound text identity.
+        if (!IsValid(CanvasParent) && !IsValid(ContentParent) && !bRootText) { return; }
+        const UCanvasPanelSlot* OriginalSlot = Cast<UCanvasPanelSlot>(AmmoText->Slot);
+        const int32 OriginalZOrder = OriginalSlot ? OriginalSlot->GetZOrder() : 0;
+        AmmoBackdrop = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("NativeAmmoBackdrop"));
+        AmmoText->RemoveFromParent();
+        AmmoBackdrop->SetContent(AmmoText);
+        AmmoBackdrop->SetPadding(FMargin(14.0f, 10.0f));
+        if (IsValid(CanvasParent))
+        {
+            CanvasParent->AddChildToCanvas(AmmoBackdrop)->SetZOrder(OriginalZOrder);
+        }
+        else if (IsValid(ContentParent))
+        {
+            ContentParent->SetContent(AmmoBackdrop);
+        }
+        else
+        {
+            WidgetTree->RootWidget = AmmoBackdrop;
+        }
     }
-
-    if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AmmoText->Slot))
+    // The outer container now owns the anchor and HUD scale; don't retain old text transforms.
+    AmmoText->SetRenderTranslation(FVector2D::ZeroVector);
+    AmmoText->SetRenderScale(FVector2D(1.0f, 1.0f));
+    if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(AmmoBackdrop->Slot))
     {
         CanvasSlot->SetAnchors(FAnchors(1.0f, 1.0f));
         CanvasSlot->SetAlignment(FVector2D(1.0f, 1.0f));
-        CanvasSlot->SetPosition(
-            FVector2D(-AmmoHUDSafeInset, -AmmoHUDSafeInset)
-        );
+        CanvasSlot->SetPosition(FVector2D(-AmmoHUDSafeInset, -AmmoHUDSafeInset));
         CanvasSlot->SetAutoSize(true);
+        AmmoBackdrop->SetRenderTranslation(FVector2D::ZeroVector);
         return;
     }
-
-    AmmoText->SetRenderTranslation(
-        FVector2D(-AmmoHUDSafeInset, -AmmoHUDSafeInset)
-    );
+    AmmoBackdrop->SetRenderTranslation(FVector2D(-AmmoHUDSafeInset, -AmmoHUDSafeInset));
 }
 
 void UBHAmmoHUDWidget::SetAmmo(
@@ -48,6 +74,7 @@ void UBHAmmoHUDWidget::SetAmmo(
     int32 ReserveAmmo
 )
 {
+    ApplySafeAreaLayout();
     BHUIStyle::Apply(*this, EBHUIStyleContext::Gameplay);
 
     CachedMagazineAmmo = MagazineAmmo;
