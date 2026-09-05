@@ -2,6 +2,20 @@
 
 #include "BHGameShellSettings.h"
 #include "BHSaveSubsystem.h"
+#if !UE_BUILD_SHIPPING
+#include "BHWarGameState.h"
+#include "BHWarSubsystem.h"
+#include "Engine/NetConnection.h"
+#include "Engine/NetDriver.h"
+#include "HAL/FileManager.h"
+#include "HAL/PlatformProcess.h"
+#include "HAL/PlatformTime.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
+#include "String/LexFromString.h"
+#include "UObject/UObjectArray.h"
+#endif
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -26,10 +40,17 @@ void UBHSessionSubsystem::Initialize(
             this,
             &UBHSessionSubsystem::HandlePostLoadMap
         );
+#if !UE_BUILD_SHIPPING
+    StartSameProcessReconnectTest();
+#endif
 }
 
 void UBHSessionSubsystem::Deinitialize()
 {
+#if !UE_BUILD_SHIPPING
+    FTSTicker::GetCoreTicker().RemoveTicker(ReconnectTestTickerHandle);
+    ReconnectTestTickerHandle.Reset();
+#endif
     ClearSessionDelegates();
 
     if (PostLoadMapDelegateHandle.IsValid())
@@ -776,3 +797,186 @@ void UBHSessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
     );
 }
 
+
+#if !UE_BUILD_SHIPPING
+void UBHSessionSubsystem::StartSameProcessReconnectTest()
+{
+    const TCHAR* CommandLine = FCommandLine::Get();
+    if (!FParse::Param(CommandLine, TEXT("BHTestSameProcessReconnect")))
+    {
+        return;
+    }
+
+    FString PortText;
+    FString TimeoutText;
+    int32 Port = 0;
+    int32 TimeoutSeconds = 240;
+    FParse::Value(CommandLine, TEXT("BHTestReconnectRunId="), ReconnectTestRunID);
+    FParse::Value(CommandLine, TEXT("BHTestReconnectPort="), PortText);
+    FParse::Value(CommandLine, TEXT("BHTestReconnectTimeout="), TimeoutText);
+    const auto ParseDigits = [](const FString& Text, int32& Value)
+    {
+        if (Text.IsEmpty() || Text.Len() > 6)
+        {
+            return false;
+        }
+        for (TCHAR Character : Text)
+        {
+            if (Character < TEXT('0') || Character > TEXT('9'))
+            {
+                return false;
+            }
+        }
+        return LexTryParseString(Value, *Text);
+    };
+    bool bSafeRunID = !ReconnectTestRunID.IsEmpty() && ReconnectTestRunID.Len() <= 64;
+    for (TCHAR Character : ReconnectTestRunID)
+    {
+        bSafeRunID &= (Character >= TEXT('a') && Character <= TEXT('z')) ||
+            (Character >= TEXT('A') && Character <= TEXT('Z')) ||
+            (Character >= TEXT('0') && Character <= TEXT('9')) ||
+            Character == TEXT('_') || Character == TEXT('-');
+    }
+    if (!bSafeRunID || !ParseDigits(PortText, Port) || Port < 1024 || Port > 65535 ||
+        (!TimeoutText.IsEmpty() && !ParseDigits(TimeoutText, TimeoutSeconds)) ||
+        TimeoutSeconds < 30 || TimeoutSeconds > 600)
+    {
+        UE_LOG(LogTemp, Error, TEXT("BH_TEST_SAME_PROCESS_RECONNECT phase=failed result=failure reason=invalid_arguments"));
+        return;
+    }
+
+    ReconnectTestGameInstance = GetGameInstance();
+    ReconnectTestAddress = FString::Printf(TEXT("127.0.0.1:%d"), Port);
+    ReconnectTestControlDirectory = FPaths::Combine(
+        FPaths::ProjectSavedDir(), TEXT("Automation/SameProcessReconnect"), ReconnectTestRunID);
+    ReconnectTestDeadline = FPlatformTime::Seconds() + TimeoutSeconds;
+    ReconnectTestTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+        FTickerDelegate::CreateWeakLambda(this, [this](float DeltaTime)
+        {
+            return TickSameProcessReconnectTest(DeltaTime);
+        }),
+        0.1f
+    );
+}
+
+void UBHSessionSubsystem::LogSameProcessReconnectPhase(const TCHAR* Phase) const
+{
+    const auto ObjectIdentity = [](const UObject* Object)
+    {
+        if (!IsValid(Object))
+        {
+            return FString(TEXT("none"));
+        }
+        const FWeakObjectPtr Identity(Object);
+        const int32 ObjectIndex = static_cast<int32>(Identity.Get()->GetUniqueID());
+        return FString::Printf(TEXT("%d:%d"), ObjectIndex, GUObjectArray.GetSerialNumber(ObjectIndex));
+    };
+    UGameInstance* GameInstance = GetGameInstance();
+    UWorld* World = IsValid(GameInstance) ? GameInstance->GetWorld() : nullptr;
+    const UBHWarSubsystem* War = IsValid(GameInstance) ? GameInstance->GetSubsystem<UBHWarSubsystem>() : nullptr;
+    const UNetDriver* Driver = IsValid(World) ? World->GetNetDriver() : nullptr;
+    const UNetConnection* Connection = IsValid(Driver) ? Driver->ServerConnection.Get() : nullptr;
+    const ABHWarGameState* State = IsValid(World) ? World->GetGameState<ABHWarGameState>() : nullptr;
+    UE_LOG(LogTemp, Display, TEXT(
+        "BH_TEST_SAME_PROCESS_RECONNECT phase=%s result=observed run_id=%s pid=%u "
+        "game_instance=%s war_subsystem=%s connection=%s revision=%d turn=%d sectors=%d operation_id=%s"),
+        Phase, *ReconnectTestRunID, FPlatformProcess::GetCurrentProcessId(),
+        *ObjectIdentity(GameInstance), *ObjectIdentity(War), *ObjectIdentity(Connection),
+        IsValid(State) ? State->GetWarStateRevision() : 0,
+        IsValid(War) ? War->GetTurnNumber() : -1,
+        IsValid(War) ? War->GetSectorStates().Num() : 0,
+        IsValid(War) ? *War->GetCommittedOperationID().ToString() : TEXT("None"));
+}
+
+bool UBHSessionSubsystem::TickSameProcessReconnectTest(float DeltaTime)
+{
+    const auto Fail = [this](const TCHAR* Reason)
+    {
+        UE_LOG(LogTemp, Error, TEXT("BH_TEST_SAME_PROCESS_RECONNECT phase=failed result=failure run_id=%s reason=%s"),
+            *ReconnectTestRunID, Reason);
+        ReconnectTestTickerHandle.Reset();
+        return false; // Returning false removes this core ticker, including on timeout.
+    };
+    if (FPlatformTime::Seconds() >= ReconnectTestDeadline)
+    {
+        return Fail(TEXT("timeout"));
+    }
+
+    UGameInstance* GameInstance = GetGameInstance();
+    if (!IsValid(GameInstance) || ReconnectTestGameInstance != GameInstance)
+    {
+        return Fail(TEXT("game_instance_changed"));
+    }
+    UWorld* World = GameInstance->GetWorld();
+    APlayerController* Controller = GameInstance->GetFirstLocalPlayerController();
+    UBHWarSubsystem* War = GameInstance->GetSubsystem<UBHWarSubsystem>();
+    if (ReconnectTestPhase != EReconnectTestPhase::AwaitLeave &&
+        (!IsValid(War) || ReconnectTestWarSubsystem != War))
+    {
+        return Fail(TEXT("war_subsystem_changed"));
+    }
+    if (!IsValid(World) || !World->HasBegunPlay() || !IsValid(Controller) ||
+        !Controller->IsLocalController() || Controller->GetWorld() != World || !IsValid(War))
+    {
+        return true;
+    }
+    const UNetDriver* Driver = World->GetNetDriver();
+    UNetConnection* Connection = IsValid(Driver) ? Driver->ServerConnection.Get() : nullptr;
+    const ABHWarGameState* State = World->GetGameState<ABHWarGameState>();
+    const bool bConnected = World->GetNetMode() == NM_Client && IsValid(Connection) &&
+        Connection->GetConnectionState() == USOCK_Open && IsValid(State) &&
+        State->GetWarStateRevision() > 0 && !War->GetCommittedOperationID().IsNone();
+    const UBHGameShellSettings* Settings = GetDefault<UBHGameShellSettings>();
+    const bool bInMenu = IsValid(Settings) && !Settings->MainMenuMap.IsNull() &&
+        World->GetOutermost()->GetName() == Settings->MainMenuMap.ToSoftObjectPath().GetLongPackageName() &&
+        World->GetNetMode() == NM_Standalone && !IsValid(Driver);
+
+    switch (ReconnectTestPhase)
+    {
+    case EReconnectTestPhase::AwaitLeave:
+        if (bConnected && IFileManager::Get().FileExists(
+                *FPaths::Combine(ReconnectTestControlDirectory, TEXT("leave.ready"))))
+        {
+            ReconnectTestWarSubsystem = War;
+            ReconnectTestInitialConnection = Connection;
+            // The harness correlates this received revision with the real successful apply log.
+            LogSameProcessReconnectPhase(TEXT("before"));
+            ReconnectTestPhase = EReconnectTestPhase::AwaitMenu;
+            if (!LeaveSession())
+            {
+                return Fail(TEXT("leave_session_failed"));
+            }
+        }
+        break;
+    case EReconnectTestPhase::AwaitMenu:
+        if (bInMenu)
+        {
+            LogSameProcessReconnectPhase(TEXT("menu"));
+            ReconnectTestPhase = EReconnectTestPhase::AwaitReconnectSignal;
+        }
+        break;
+    case EReconnectTestPhase::AwaitReconnectSignal:
+        if (bInMenu && IFileManager::Get().FileExists(
+                *FPaths::Combine(ReconnectTestControlDirectory, TEXT("reconnect.ready"))))
+        {
+            LogSameProcessReconnectPhase(TEXT("travel_requested"));
+            ReconnectTestPhase = EReconnectTestPhase::AwaitReconnected;
+            Controller->ClientTravel(ReconnectTestAddress, ETravelType::TRAVEL_Absolute);
+        }
+        break;
+    case EReconnectTestPhase::AwaitReconnected:
+        if (bConnected)
+        {
+            if (ReconnectTestInitialConnection == Connection)
+            {
+                return Fail(TEXT("connection_not_replaced"));
+            }
+            LogSameProcessReconnectPhase(TEXT("reconnected"));
+            ReconnectTestTickerHandle.Reset();
+            return false;
+        }
+        break;
+    }
+    return true;
+}
+#endif

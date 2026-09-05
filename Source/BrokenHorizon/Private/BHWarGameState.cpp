@@ -5905,8 +5905,29 @@ void ABHWarGameState::PublishAuthoritativeSnapshot()
     }
 
     BoundWarSubsystem = WarSubsystem;
-    const int32 NextRevision =
+    int32 NextRevision =
         WarSubsystem->AllocateReplicatedSnapshotRevision();
+#if !UE_BUILD_SHIPPING
+    int32 RevisionFloor = 0;
+    if (WarStateSnapshot.Revision == 0 && FParse::Value(
+            FCommandLine::Get(), TEXT("BHTestSnapshotRevisionFloor="), RevisionFloor))
+    {
+        if (RevisionFloor < 1 || RevisionFloor > 65536)
+        {
+            UE_LOG(LogTemp, Error, TEXT("BH_TEST_SNAPSHOT_REVISION_FLOOR result=failure reason=invalid_floor"));
+        }
+        else
+        {
+            // Exercise the real allocator; no fabricated snapshot or campaign state.
+            while (NextRevision < RevisionFloor)
+            {
+                NextRevision = WarSubsystem->AllocateReplicatedSnapshotRevision();
+            }
+            UE_LOG(LogTemp, Display, TEXT("BH_TEST_SNAPSHOT_REVISION_FLOOR result=success floor=%d revision=%d"),
+                RevisionFloor, NextRevision);
+        }
+    }
+#endif
     WarStateSnapshot =
         WarSubsystem->CaptureReplicatedSnapshot(NextRevision);
     ForceNetUpdate();
