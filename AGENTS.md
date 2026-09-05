@@ -161,3 +161,17 @@ Report:
 - Unreal Editor handoff steps;
 - remaining risks or unverified behavior;
 - next single vertical slice.
+
+## Standing GitHub delivery - 2026-09-05
+
+The user explicitly authorizes automatic commit and push of every completed,
+validated game update or fix to the active development branch and its upstream.
+This standing permission supersedes earlier requirements to ask before each
+commit or push; do not request repeated approval for this authorized delivery.
+
+- Stage only the completed task's scoped changes and required dependencies;
+  preserve unrelated work in progress.
+- Write meaningful commits that describe the change, validation performed, and
+  any remaining manual Editor/PIE evidence.
+- Do not force push, merge into the default branch, publish releases, or include
+  generated packages, caches, saves, or credentials unless specifically authorized.
