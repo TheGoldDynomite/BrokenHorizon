@@ -5,6 +5,11 @@ Current slice: combat HUD readability against bright First Light surfaces.
 Status: **Verified** for the bounded combat HUD readability slice.
 Physical input and full-alpha gates remain separate from this slice.
 
+Development is paused for planning. [Alpha Roadmap](Alpha_Roadmap.md) owns the
+G5 alpha order and gates. First queued task after development resumes: Q1 First
+Light lighting, subject to resolution of its map-authoring approval; Q2 HUD scale
+layout is the independent next-ready task if that approval remains blocked.
+
 ## Release boundary and preceding checkpoints
 
 - Full alpha requires the complete campaign per
