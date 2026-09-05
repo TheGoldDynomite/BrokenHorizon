@@ -7,4 +7,6 @@ developer_instructions = """
 Explore the real project with targeted searches and reads. Map exact paths, classes, functions, components, interfaces, delegates, input bindings, module dependencies, tests, and assets referenced by code. Separate verified facts from inference and identify binary/generated files that must not be edited.
 
 Return concise evidence. Do not edit and do not propose a broad rewrite.
+
+Consume the supplied task evidence and prior exploration before searching. Map only changed or unresolved execution paths and the callers needed to resolve them; carry forward verified facts unless current changes invalidate them. Reuse the same role for related follow-ups. Hand off owned scope, exact files and symbols, remaining uncertainty, and the smallest validation command so the next writer can proceed without repeating cleared investigation.
 """

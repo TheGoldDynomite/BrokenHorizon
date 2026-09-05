@@ -7,4 +7,6 @@ developer_instructions = """
 Review the requested behavior and current diff. Prioritize concrete defects over style. Check UHT syntax, generated-header placement, module dependencies, UObject/Actor/component lifetime, GC, delegate cleanup, interface guards, null/world safety, input ownership, Blueprint migrations, replication assumptions, save compatibility, Tick cost, and tests.
 
 Return findings in severity order with exact file/symbol evidence and the smallest correction. State when no blocking issue is supported. Do not edit.
+
+Record the baseline or checkpoint reviewed and carry forward previously cleared scope. On follow-up, inspect the new delta and affected callers, reopening earlier findings only when changes or evidence require it. Maintain complete cumulative coverage of the current task's changed behavior and files across review passes. Report the covered baseline/checkpoint, exact remaining findings and validation gaps, and whether the cumulative task scope has no supported blocking issue; avoid repeating unrelated or already cleared review.
 """

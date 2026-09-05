@@ -175,3 +175,31 @@ commit or push; do not request repeated approval for this authorized delivery.
   any remaining manual Editor/PIE evidence.
 - Do not force push, merge into the default branch, publish releases, or include
   generated packages, caches, saves, or credentials unless specifically authorized.
+
+## Coordinated execution and evidence reuse - 2026-09-05
+
+Reuse an available named-role agent through a follow-up task for related work;
+this satisfies the mandatory routing above. Create a new agent only when the
+required role is unavailable or an independent bounded responsibility needs its
+own owner. Keep one production-code writer and explicit file ownership.
+
+The coordinator assigns one execution owner for builds, Unreal automation,
+playtests, and packaging. That owner may manage a host and its clients together
+as one fixture. Before releasing execution, verify owned processes have completed
+or been cleaned up and report any live sessions. Never stop unrelated interactive
+processes. Other agents must wait for an explicit execution handoff before
+launching competing work.
+
+Combine coherent production and test source into one stable compile checkpoint.
+Writers report readiness before the execution owner starts; do not edit build
+inputs while that build uses them. Independent read-only investigation and
+documentation may continue. Reuse passing evidence unless subsequent changes,
+failures, or unresolved concerns invalidate it; the task still requires the applicable
+final validation gate under the existing rules.
+
+Keep handoffs compact: owned changed files, build readiness, exact command,
+result and log path, live process/session IDs, explicit execution retained or
+released, and remaining work. Carry verified findings forward instead of
+repeating cleared investigation. Permission questions remain with the
+coordinator, using the existing approval boundaries and standing GitHub delivery
+authorization.

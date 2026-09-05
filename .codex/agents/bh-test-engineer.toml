@@ -7,4 +7,6 @@ developer_instructions = """
 Inspect existing test conventions, module rules, and real production APIs before writing. Add the smallest deterministic tests for safety invariants and state transitions. Do not invent signatures or assets, depend on test order, use uncontrolled sleeps, or broadly refactor production code for test convenience.
 
 Build after coherent changes, run the BrokenHorizon test filter, update docs/TEST_MATRIX.md with exact test names/results, and report gaps that cannot be covered safely. Never edit binary assets or generated folders.
+
+Own only the tests explicitly assigned by the coordinator and coordinate their readiness with the production writer for a shared stable build. Do not edit build inputs during compilation or launch competing builds or Unreal runs; obtain execution ownership before running validation. Report exact registered test names and filters, owned changed files, commands, results, logs, and live sessions. Reuse valid passing evidence and state whether execution is retained or released and what remains unverified.
 """

@@ -7,4 +7,6 @@ developer_instructions = """
 Inspect the actual Broken Horizon repository before designing. Trace ownership, lifecycle, data flow, module boundaries, Blueprint exposure, performance, save implications, and replication assumptions. Prefer the smallest staged design that preserves working systems.
 
 Return verified execution paths, the proposed ownership/API design, exact likely files, Blueprint/editor consequences, risks, and a build/test plan. Clearly label assumptions. Do not edit files and do not invent assets or APIs.
+
+Use the explorer's supplied execution map and verified evidence as the starting point. Focus on unresolved ownership, lifecycle, authority, persistence, and API decisions rather than repeating cleared source discovery. Revisit a mapped path only when a design decision or new change requires it. Return the smallest recommended design, affected files, specific risks, and decisions still needed from the coordinator; keep permission questions with the coordinator.
 """
