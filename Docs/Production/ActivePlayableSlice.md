@@ -165,10 +165,10 @@ User reports that the door and bleeding/reload fixes all work in their Editor
 playtest. Record this as user-reported acceptance of the two reported defects;
 it does not establish multiplayer or the complete Attack A loop.
 
-Going forward, source existing free or paid assets instead of making custom
+Going forward, source existing FREE assets only instead of making custom
 art assets by default. Present a short list of suitable assets, prices when
 verifiable, visual fit, formats, integration needs and storage impact before
-acquisition. Paid purchases require the user's explicit choice/authorization.
+acquisition. Paid replacements are deferred until the user requests them later.
 Check the applicable license and UE 5.8 import compatibility before integration.
 Keep changes scoped to the current playable slice and test in Editor without
 cooking or packaging. Existing gameplay code remains the integration owner.
@@ -185,3 +185,8 @@ Initial door candidates (research only; no download/purchase/import):
 
 Paid listing pages did not expose selectable current prices to the research
 reader; confirm exact license-tier price and download size before acquisition.
+
+User clarified the current asset budget is zero: use free assets now and replace
+them with paid assets later only if needed and explicitly authorized. Import
+only the assets required for the current slice to limit disk usage. Keep art
+references replaceable without rebuilding the working gameplay systems.
