@@ -59,6 +59,11 @@ public:
         AActor* DamageCauser
     );
 
+    // Ongoing injury damage still dispatches normal health/damage/death delegates.
+    float ApplyOngoingDamage(float DamageAmount, AActor* DamageCauser);
+    // Valid only during synchronous OnDamaged dispatch; nested calls restore the prior context.
+    bool IsDispatchingOngoingDamage() const { return bDispatchingOngoingDamage; }
+
     UFUNCTION(BlueprintCallable, Category = "Health")
     float Heal(float HealingAmount);
 
@@ -146,5 +151,7 @@ protected:
     bool bIsDead = false;
 
 private:
+    float ApplyDamageInternal(float DamageAmount, AActor* DamageCauser, bool bOngoingDamage);
+    bool bDispatchingOngoingDamage = false;
     bool HasMutationAuthority() const;
 };

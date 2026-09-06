@@ -4,6 +4,7 @@
 #include "BHWarSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "Net/UnrealNetwork.h"
+#include "Templates/UnrealTemplate.h"
 
 UBHHealthComponent::UBHHealthComponent()
 {
@@ -117,6 +118,20 @@ float UBHHealthComponent::ApplyDamage(
     AActor* DamageCauser
 )
 {
+    return ApplyDamageInternal(DamageAmount, DamageCauser, false);
+}
+
+float UBHHealthComponent::ApplyOngoingDamage(float DamageAmount, AActor* DamageCauser)
+{
+    return ApplyDamageInternal(DamageAmount, DamageCauser, true);
+}
+
+float UBHHealthComponent::ApplyDamageInternal(
+    float DamageAmount,
+    AActor* DamageCauser,
+    bool bOngoingDamage
+)
+{
     if (!HasMutationAuthority() ||
         bIsDead ||
         DamageAmount <= 0.0f)
@@ -137,7 +152,10 @@ float UBHHealthComponent::ApplyDamage(
         return 0.0f;
     }
 
-    OnDamaged.Broadcast(DamageApplied, DamageCauser);
+    {
+        TGuardValue<bool> DamageDispatchGuard(bDispatchingOngoingDamage, bOngoingDamage);
+        OnDamaged.Broadcast(DamageApplied, DamageCauser);
+    }
     OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 
     if (CurrentHealth <= 0.0f && !bIsDead)

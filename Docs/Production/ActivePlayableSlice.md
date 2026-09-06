@@ -110,3 +110,51 @@ cooking or packaging was needed. Editor commandlet execution is complete.
 Pending player check: reopen First Light in Editor, collect the keycard, unlock
 the security door and walk through; confirm the raised green block is gone.
 This fixes one reported obstruction; Attack A acceptance remains pending.
+
+## Door presentation and bleeding reload repair - 2026-09-06
+
+User confirmed the raised green block is gone. Their next PIE findings were a
+cube-shaped security door and bleeding repeatedly preventing reload completion.
+
+The door now uses the small authored SM_FirstLightSecurityDoor asset: an 8 cm
+steel leaf with panels, trim, a warning plate, hinges and lever handles on both
+faces. Hardware bounds are 18 x 200 x 200 cm. Its pivot moved to the leaf edge
+while retaining the opening footprint, keycard, persistence ID and opening
+settings. One simple box collider is saved with the mesh. The generator uses
+the same asset/hinge placement; the original prototype asset is unchanged.
+Authoring uses full UnrealEditor with -nullrhi; the script rejects unsupported
+apply environments before mutation. No cook or package was generated.
+
+Periodic injury damage now carries a scoped ongoing-damage context. Character
+and owning-client damage handling preserve reload for that damage, while direct
+hits still interrupt. Health loss, feedback, original damage causer and death
+remain active. Tests cover repeated bleed ticks completing a reload exactly
+once, direct-hit interruption, owner-notification policy, nested damage context,
+and lethal bleeding ending the reload.
+
+Validation evidence:
+- Editor C++ build and full Tools/Validate.ps1 -RequireTests -SkipReview passed.
+  Saved/Logs/Codex/AutomationReport-20260906-073712/index.json contains 136
+  successes, 9 successes with warnings, 0 failures/not-run/in-process (145 total).
+  Three new warnings concern transient test-world rifle teardown without a world
+  context; the other six warning cases predate this fix. No production failure
+  was reported. Focused BleedingReload tests also passed independently.
+- Saved/FirstLightSecurityDoor/20260906-144211-27c555bb/report.json verifies
+  backed-up apply, map save/reload, 125 actors and unchanged unrelated inventory.
+- Saved/FirstLightSecurityDoor/20260906-144301-d0740a07/report.json verifies the
+  saved mesh in a fresh process, including bounds, materials and one collider.
+  Saved/Logs/BH-SecurityDoor-SerializedInspect.log records route-contract PASS.
+- Saved/Reports/DoorPresentation-After.png was visually inspected in the rendered
+  Editor. The leaf, panels and hardware are visible; existing bright graybox
+  lighting remains. This does not prove physical interaction or navigation.
+- Saved/Logs/BH-DoorReload-FirstLightSmoke.log records First Light loaded for play
+  and exited normally with no logged errors. This is unattended startup only.
+- Scoped agents used: bh_code_explorer, bh_architect, bh_cpp_implementer,
+  bh_test_engineer, bh_build_debugger and bh_reviewer. Final review found no
+  supported blockers; coordinator owned engine execution.
+
+Minimum next PIE checks: inspect the new door, collect the keycard, unlock it
+and walk through. Fire some rounds, then reload while actively bleeding; the
+reload should finish while health continues to drain. Physical-input and
+listen-server host/client proof remain pending; local RPC implementation tests
+do not prove network delivery. Attack A acceptance remains in progress.

@@ -16851,7 +16851,8 @@ void ABHCharacter::HandlePlayerDamaged(
         return;
     }
 
-    const bool bReloadInterrupted = IsValid(WeaponComponent) &&
+    const bool bShouldInterruptReload = !HealthComponent->IsDispatchingOngoingDamage();
+    const bool bReloadInterrupted = bShouldInterruptReload && IsValid(WeaponComponent) &&
         WeaponComponent->InterruptReload(FName(TEXT("damage")));
     if (bReloadInterrupted && IsLocallyControlled())
     {
@@ -16883,7 +16884,8 @@ void ABHCharacter::HandlePlayerDamaged(
             DamageApplied,
             HealthPercentage,
             DamageSourceDirection,
-            DamageCauser
+            DamageCauser,
+            bShouldInterruptReload
         );
         return;
     }
@@ -17359,10 +17361,11 @@ void ABHCharacter::ClientNotifyCombatDamage_Implementation(
     float DamageApplied,
     float HealthPercentage,
     FVector DamageSourceDirection,
-    AActor* DamageCauser
+    AActor* DamageCauser,
+    bool bShouldInterruptReload
 )
 {
-    if (IsValid(WeaponComponent) &&
+    if (bShouldInterruptReload && IsValid(WeaponComponent) &&
         WeaponComponent->InterruptReload(FName(TEXT("damage"))))
     {
         DisplayStatusNotificationLocally(

@@ -98,7 +98,7 @@ void UBHInjuryComponent::TickComponent(
             !HealthComponent->IsDead())
         {
             BleedTickAccumulator -= SafeInterval;
-            HealthComponent->ApplyDamage(
+            HealthComponent->ApplyOngoingDamage(
                 CurrentBleedRate * SafeInterval,
                 LastDamageCauser.Get()
             );

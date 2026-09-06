@@ -113,7 +113,7 @@ def preflight(actors):
     door_record = actor_record(door)
     require(door_record["class"] == "/Game/BP_Door.BP_Door_C"
             and "BH_Auto_FirstLight" in door_record["tags"]
-            and near(door_record["location"], [4200, 0, 0])
+            and (near(door_record["location"], [4200, 0, 0]) or near(door_record["location"], [4200, -50, 0]))
             and near(door_record["rotation"], [0, 0, 0]) and near(door_record["scale"], [1, 1, 1])
             and str(door.get_editor_property("persistence_id")) == "FirstLightSecurityDoor",
             "Security door identity or transform changed")

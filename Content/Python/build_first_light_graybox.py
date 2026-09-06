@@ -192,7 +192,16 @@ def _place_gameplay():
     else:
         _warning("Red keycard material is unavailable; visual review remains pending.")
 
-    door = _spawn_actor(classes["door"], unreal.Vector(4200, 0, 0), "FL_LockedSecurityDoor", FOLDERS["gameplay"])
+    door = _spawn_actor(classes["door"], unreal.Vector(4200, -50, 0), "FL_LockedSecurityDoor", FOLDERS["gameplay"])
+    security_mesh = unreal.load_asset("/Game/BrokenHorizon/Environment/WorldKit/Meshes/SM_FirstLightSecurityDoor")
+    if security_mesh:
+        door_mesh = door.get_editor_property("door_mesh")
+        door_mesh.set_static_mesh(security_mesh)
+        door_mesh.set_editor_property("override_materials", [])
+        door_mesh.set_editor_property("relative_location", unreal.Vector(0, 100, 100))
+    else:
+        door.set_actor_location(unreal.Vector(4200, 0, 0), False, True)
+        _warning("Authored First Light security door mesh missing; run author_first_light_security_door.py --apply.")
     # UE's Python reflection removes the leading b from bool UPROPERTY names.
     _set(door, "locked", True)
     _set(door, "required_keycard", unreal.Name("RedKeycard"))

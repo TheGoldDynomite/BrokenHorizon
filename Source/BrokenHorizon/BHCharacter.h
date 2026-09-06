@@ -1041,7 +1041,8 @@ protected:
         float DamageApplied,
         float HealthPercentage,
         FVector DamageSourceDirection,
-        AActor* DamageCauser
+        AActor* DamageCauser,
+        bool bShouldInterruptReload
     );
 
     void DisplayHitConfirmationLocally(
