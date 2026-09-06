@@ -5184,7 +5184,8 @@ void ABHWarGameState::RunDefenseAGarrisonPersistenceTest()
             GetActiveOperationSnapshot();
         if (State.bHasSnapshot &&
             State.bOperationActivated &&
-            State.bWaitingForWave)
+            State.bWaitingForWave &&
+            Snapshot.Phase == EBHActiveOperationPhase::AwaitingWave)
         {
             if (State.CurrentWave != 1 ||
                 State.LivingEnemyCount != 0 ||

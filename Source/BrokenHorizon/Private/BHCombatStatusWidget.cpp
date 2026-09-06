@@ -3,6 +3,10 @@
 
 #include "BHUIStyle.h"
 #include "BHUserSettingsSubsystem.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/PanelWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "GameFramework/PlayerController.h"
@@ -15,6 +19,7 @@
 
 namespace
 {
+
 constexpr float DefaultSquadCommandMarkerY = 314.0f;
 constexpr float CasualtySquadCommandMarkerY = 338.0f;
 constexpr float SquadWaypointLaneSpacing = 50.0f;
@@ -133,20 +138,21 @@ struct FWrappedHUDText
 };
 
 FWrappedHUDText WrapHUDText(const FString& Text, const FSlateFontInfo& Font, float MaxWidth,
-    float MeasurementScale = 1.0f)
+    float MeasurementScale = 1.0f, float WrapScale = 1.0f)
 {
     FWrappedHUDText Result;
     const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
-    Result.LineHeight = Measure->GetMaxCharacterHeight(Font) + 2.0f;
+    const float SafeWrapScale = FMath::Max(0.01f, WrapScale);
+    Result.LineHeight = Measure->GetMaxCharacterHeight(Font, SafeWrapScale) / SafeWrapScale + 2.0f;
     Result.Width = FMath::Max(1.0f, MaxWidth);
     TArray<FString> Paragraphs;
     Text.ParseIntoArrayLines(Paragraphs, false);
     for (FString Remaining : Paragraphs)
     {
-        while (Measure->Measure(FStringView(Remaining), Font).X > Result.Width && Remaining.Len() > 1)
+        while (Measure->Measure(FStringView(Remaining), Font, SafeWrapScale).X / SafeWrapScale > Result.Width && Remaining.Len() > 1)
         {
             int32 End = FMath::Clamp(Measure->FindLastWholeCharacterIndexBeforeOffset(
-                FStringView(Remaining), Font, FMath::FloorToInt(Result.Width)) + 1, 1, Remaining.Len());
+                FStringView(Remaining), Font, FMath::FloorToInt(Result.Width * SafeWrapScale), SafeWrapScale) + 1, 1, Remaining.Len());
             int32 WordEnd = End;
             while (WordEnd > 0 && !FChar::IsWhitespace(Remaining[WordEnd - 1])) { --WordEnd; }
             if (WordEnd > 0) { End = WordEnd; }
@@ -548,7 +554,9 @@ int32 DrawTransportWaypoint(
     int32 LayerId,
     float DirectionAngleRadians,
     const FString& Label,
-    bool bImmobilized
+    bool bImmobilized,
+    const FSlateRect& SafeRect,
+    const FSlateRect& VitalsRect
 )
 {
     const FVector2D WidgetSize = Geometry.GetLocalSize();
@@ -610,31 +618,102 @@ int32 DrawTransportWaypoint(
         5.0f
     );
 
-    const float LabelWidth = 680.0f;
-    const FVector2D TextPosition(
-        FMath::Clamp(
-            MarkerX - (LabelWidth * 0.5f),
-            18.0f,
-            FMath::Max(18.0f, WidgetSize.X - LabelWidth - 18.0f)
-        ),
-        MarkerY + 16.0f
-    );
-
-    FSlateDrawElement::MakeText(
-        DrawElements,
-        LayerId + 2,
-        Geometry.ToPaintGeometry(
-            FVector2D(LabelWidth, 28.0f),
-            FSlateLayoutTransform(TextPosition)
-        ),
-        Label,
-        FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 15),
-        ESlateDrawEffect::None,
-        MarkerColor
-    );
+    const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 15);
+    const float FontScale = Geometry.GetAccumulatedLayoutTransform().GetScale();
+    const float LaneLeft = SafeRect.Left + 18.0f;
+    float LaneRight = FMath::Max(LaneLeft + 1.0f, SafeRect.Right - 18.0f);
+    float LabelWidth = FMath::Min(680.0f, LaneRight - LaneLeft);
+    const float LabelY = MarkerY + 16.0f;
+    FWrappedHUDText WrappedLabel = WrapHUDText(Label, Font, LabelWidth, FontScale, FontScale);
+    if (VitalsRect.Right > VitalsRect.Left && LabelY < VitalsRect.Bottom &&
+        LabelY + WrappedLabel.Height() > VitalsRect.Top)
+    {
+        LaneRight = FMath::Max(LaneLeft + 1.0f, FMath::Min(LaneRight, VitalsRect.Left - 12.0f));
+        LabelWidth = FMath::Min(680.0f, LaneRight - LaneLeft);
+        WrappedLabel = WrapHUDText(Label, Font, LabelWidth, FontScale, FontScale);
+    }
+    const FVector2D TextPosition(FMath::Clamp(MarkerX - LabelWidth * 0.5f,
+        LaneLeft, FMath::Max(LaneLeft, LaneRight - LabelWidth)), LabelY);
+    DrawWrappedHUDText(Geometry, DrawElements, LayerId + 2, WrappedLabel, TextPosition, Font, MarkerColor);
 
     return LayerId + 2;
 }
+}
+
+void UBHCombatStatusWidget::InitializeVitalsLayout()
+{
+    if (IsValid(VitalsGroup) || !IsValid(WidgetTree) || !IsValid(HealthBar) || !IsValid(StaminaBar)) { return; }
+    struct FChildLayout
+    {
+        UWidget* Widget;
+        FVector2D Position;
+        FVector2D Size;
+        bool bAutoSize;
+        int32 ZOrder;
+    };
+    TArray<FChildLayout> Children;
+    UCanvasPanel* SharedCanvas = nullptr;
+    FVector2D BoundsMin(TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
+    FVector2D BoundsMax(TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest());
+    // Validate the authored fixed-slot layout completely before moving any bound widget.
+    for (UWidget* Child : {static_cast<UWidget*>(HealthBar.Get()), static_cast<UWidget*>(StaminaBar.Get()),
+                          static_cast<UWidget*>(HealthText.Get()), static_cast<UWidget*>(StaminaText.Get())})
+    {
+        if (!IsValid(Child)) { continue; }
+        UCanvasPanel* Canvas = Cast<UCanvasPanel>(Child->GetParent());
+        const UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Child->Slot);
+        if (!IsValid(Canvas) || !IsValid(CanvasSlot) || (SharedCanvas && SharedCanvas != Canvas)) { return; }
+        const FAnchors Anchors = CanvasSlot->GetAnchors();
+        const FVector2D Size = CanvasSlot->GetSize();
+        if (!Anchors.Minimum.IsNearlyZero() || !Anchors.Maximum.IsNearlyZero() ||
+            !CanvasSlot->GetAlignment().IsNearlyZero() || Size.X <= 0.0f || Size.Y <= 0.0f) { return; }
+        SharedCanvas = Canvas;
+        const FVector2D Position = CanvasSlot->GetPosition();
+        BoundsMin.X = FMath::Min(BoundsMin.X, Position.X);
+        BoundsMin.Y = FMath::Min(BoundsMin.Y, Position.Y);
+        BoundsMax.X = FMath::Max(BoundsMax.X, Position.X + Size.X);
+        BoundsMax.Y = FMath::Max(BoundsMax.Y, Position.Y + Size.Y);
+        Children.Add({Child, Position, Size, CanvasSlot->GetAutoSize(), CanvasSlot->GetZOrder()});
+    }
+    if (!IsValid(SharedCanvas) || Children.IsEmpty()) { return; }
+    VitalsGroup = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("NativeVitalsGroup"));
+    UCanvasPanelSlot* GroupSlot = SharedCanvas->AddChildToCanvas(VitalsGroup);
+    GroupSlot->SetAnchors(FAnchors(1.0f, 0.0f));
+    GroupSlot->SetAlignment(FVector2D(1.0f, 0.0f));
+    GroupSlot->SetPosition(FVector2D(-34.0f, BoundsMin.Y));
+    GroupSlot->SetSize(BoundsMax - BoundsMin);
+    GroupSlot->SetAutoSize(false);
+    int32 GroupZOrder = Children[0].ZOrder;
+    for (const FChildLayout& Child : Children)
+    {
+        Child.Widget->RemoveFromParent();
+        Child.Widget->SetRenderTransform(FWidgetTransform());
+        Child.Widget->SetRenderTransformPivot(FVector2D::ZeroVector);
+        UCanvasPanelSlot* ChildSlot = VitalsGroup->AddChildToCanvas(Child.Widget);
+        ChildSlot->SetAnchors(FAnchors(0.0f, 0.0f));
+        ChildSlot->SetAlignment(FVector2D::ZeroVector);
+        ChildSlot->SetPosition(Child.Position - BoundsMin);
+        ChildSlot->SetSize(Child.Size);
+        ChildSlot->SetAutoSize(Child.bAutoSize);
+        ChildSlot->SetZOrder(Child.ZOrder);
+        GroupZOrder = FMath::Max(GroupZOrder, Child.ZOrder);
+    }
+    GroupSlot->SetZOrder(GroupZOrder);
+}
+
+void UBHCombatStatusWidget::NativeOnInitialized()
+{
+    // Install the group and safe-area root before Blueprint initialization can request Slate.
+    InitializeVitalsLayout();
+    BHUIStyle::Apply(*this, EBHUIStyleContext::Gameplay);
+    Super::NativeOnInitialized();
+}
+
+void UBHCombatStatusWidget::NativeConstruct()
+{
+    Super::NativeConstruct();
+    InitializeVitalsLayout();
+    BHUIStyle::Apply(*this, EBHUIStyleContext::Gameplay);
 }
 
 void UBHCombatStatusWidget::SetHealth(
@@ -642,6 +721,7 @@ void UBHCombatStatusWidget::SetHealth(
     float MaxHealth
 )
 {
+    InitializeVitalsLayout();
     BHUIStyle::Apply(*this, EBHUIStyleContext::Gameplay);
 
     const float SafeMaxHealth = FMath::Max(1.0f, MaxHealth);
@@ -677,6 +757,7 @@ void UBHCombatStatusWidget::SetStamina(
     float MaxStamina
 )
 {
+    InitializeVitalsLayout();
     BHUIStyle::Apply(*this, EBHUIStyleContext::Gameplay);
 
     const float SafeMaxStamina = FMath::Max(1.0f, MaxStamina);
@@ -2212,6 +2293,37 @@ int32 UBHCombatStatusWidget::NativePaint(
         );
     }
 
+    // These two native panels share the same safe right column below the rendered vitals.
+    FSlateRect StatusSafeRect(NativeSafeInset.X, NativeSafeInset.Y,
+        NativeSize.X - NativeSafeInset.X, NativeSize.Y - NativeSafeInset.Y);
+    const auto LocalRenderedBounds = [&AllottedGeometry](const UWidget* Widget, FSlateRect& OutRect)
+    {
+        if (!IsValid(Widget) || !Widget->IsVisible()) { return false; }
+        const FGeometry& Geometry = Widget->GetCachedGeometry();
+        if (Geometry.GetLocalSize().X <= 0.0f || Geometry.GetLocalSize().Y <= 0.0f) { return false; }
+        const FSlateRect AbsoluteRect = Geometry.GetRenderBoundingRect();
+        const FVector2D A = AllottedGeometry.AbsoluteToLocal(FVector2D(AbsoluteRect.Left, AbsoluteRect.Top));
+        const FVector2D B = AllottedGeometry.AbsoluteToLocal(FVector2D(AbsoluteRect.Right, AbsoluteRect.Bottom));
+        if (!FMath::IsFinite(A.X) || !FMath::IsFinite(A.Y) || !FMath::IsFinite(B.X) || !FMath::IsFinite(B.Y)) { return false; }
+        OutRect = FSlateRect(FMath::Min(A.X, B.X), FMath::Min(A.Y, B.Y), FMath::Max(A.X, B.X), FMath::Max(A.Y, B.Y));
+        return OutRect.Right > OutRect.Left && OutRect.Bottom > OutRect.Top;
+    };
+    FSlateRect ParentRect;
+    if (IsValid(VitalsGroup) && LocalRenderedBounds(VitalsGroup->GetParent(), ParentRect))
+    {
+        StatusSafeRect = FSlateRect(FMath::Clamp(ParentRect.Left, 0.0f, static_cast<float>(NativeSize.X)),
+            FMath::Clamp(ParentRect.Top, 0.0f, static_cast<float>(NativeSize.Y)),
+            FMath::Clamp(ParentRect.Right, 0.0f, static_cast<float>(NativeSize.X)),
+            FMath::Clamp(ParentRect.Bottom, 0.0f, static_cast<float>(NativeSize.Y)));
+    }
+    const float StatusColumnRight = StatusSafeRect.Right - 24.0f;
+    float StatusColumnTop = FMath::Max(StatusSafeRect.Top + 24.0f, bStrategicSituationVisible ? 132.0f : 24.0f);
+    FSlateRect VitalsRect(0.0f, 0.0f, 0.0f, 0.0f);
+    if (LocalRenderedBounds(VitalsGroup, VitalsRect))
+    {
+        StatusColumnTop = FMath::Max(StatusColumnTop, VitalsRect.Bottom + 12.0f);
+    }
+
     if (bTransportWaypointVisible)
     {
         const FString DistanceLabel =
@@ -2261,26 +2373,35 @@ int32 UBHCombatStatusWidget::NativePaint(
             MaxLayer + 1,
             TransportWaypointDirectionAngleRadians,
             WaypointLabel,
-            bTransportWaypointImmobilized
+            bTransportWaypointImmobilized,
+            StatusSafeRect,
+            VitalsRect
         );
     }
 
+    const FSlateFontInfo FieldFont = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 14);
+    const float FieldFontScale = AllottedGeometry.GetAccumulatedLayoutTransform().GetScale();
+    const FString FieldLabel = bFieldSquadStatusVisible ? BuildFieldSquadStatusLabel(
+        LivingFieldSquadOperatives, MaximumFieldSquadOperatives, bFieldSquadHolding,
+        bFieldSquadEmbarked, FieldSquadMembersNeedingService, FieldSquadMembersRequiringEvacuation,
+        FieldSquadAverageReadiness, FieldSquadLowestReadiness, FieldSquadContextStatusLine, SquadOrderPrompt) : FString();
+    const FWrappedHUDText WrappedField = WrapHUDText(FieldLabel, FieldFont, 364.0f, FieldFontScale, FieldFontScale);
+    const float FieldPanelHeight = FMath::Max(FieldSquadContextStatusLine.IsEmpty() ? 84.0f : 104.0f,
+        WrappedField.Height() + 18.0f);
+
+
     if (bFieldSquadStatusVisible)
     {
-        const FVector2D WidgetSize =
-            AllottedGeometry.GetLocalSize();
-        const bool bContextStatusVisible =
-            !FieldSquadContextStatusLine.IsEmpty();
         const FVector2D PanelSize(
             400.0f,
-            bContextStatusVisible ? 104.0f : 84.0f
+            FieldPanelHeight
         );
         const FVector2D PanelPosition(
             FMath::Max(
-                18.0f,
-                WidgetSize.X - PanelSize.X - 24.0f
+                StatusSafeRect.Left + 18.0f,
+                StatusColumnRight - PanelSize.X
             ),
-            bStrategicSituationVisible ? 168.0f : 24.0f
+            StatusColumnTop + (bStrategicSituationVisible ? 142.0f : 0.0f)
         );
         const FLinearColor FireteamColor =
             FieldSquadMembersNeedingService > 0
@@ -2294,20 +2415,6 @@ int32 UBHCombatStatusWidget::NativePaint(
                 : bFieldSquadHolding
                     ? FLinearColor(1.0f, 0.66f, 0.14f, 0.98f)
                     : FLinearColor(0.18f, 0.80f, 0.92f, 0.98f);
-        const FString FireteamLabel =
-            BuildFieldSquadStatusLabel(
-                LivingFieldSquadOperatives,
-                MaximumFieldSquadOperatives,
-                bFieldSquadHolding,
-                bFieldSquadEmbarked,
-                FieldSquadMembersNeedingService,
-                FieldSquadMembersRequiringEvacuation,
-                FieldSquadAverageReadiness,
-                FieldSquadLowestReadiness,
-                FieldSquadContextStatusLine,
-                SquadOrderPrompt
-            );
-
         FSlateDrawElement::MakeBox(
             OutDrawElements,
             MaxLayer + 1,
@@ -2333,37 +2440,20 @@ int32 UBHCombatStatusWidget::NativePaint(
             FireteamColor,
             2.0f
         );
-        FSlateDrawElement::MakeText(
-            OutDrawElements,
-            MaxLayer + 3,
-            AllottedGeometry.ToPaintGeometry(
-                FVector2D(
-                    364.0f,
-                    bContextStatusVisible ? 82.0f : 62.0f
-                ),
-                FSlateLayoutTransform(
-                    PanelPosition + FVector2D(18.0f, 9.0f)
-                )
-            ),
-            FireteamLabel,
-            FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 14),
-            ESlateDrawEffect::None,
-            FLinearColor(0.94f, 0.97f, 1.0f, 0.98f)
-        );
+        DrawWrappedHUDText(AllottedGeometry, OutDrawElements, MaxLayer + 3, WrappedField,
+            PanelPosition + FVector2D(18.0f, 9.0f), FieldFont, FLinearColor(0.94f, 0.97f, 1.0f, 0.98f));
         MaxLayer += 3;
     }
 
     if (bStrategicSituationVisible)
     {
-        const FVector2D WidgetSize =
-            AllottedGeometry.GetLocalSize();
         const FVector2D PanelSize(440.0f, 130.0f);
         const FVector2D PanelPosition(
             FMath::Max(
-                18.0f,
-                WidgetSize.X - PanelSize.X - 24.0f
+                StatusSafeRect.Left + 18.0f,
+                StatusColumnRight - PanelSize.X
             ),
-            132.0f
+            StatusColumnTop
         );
         const FLinearColor FactionColor =
             StrategicSectorOwner == EBHWarFaction::Friendly

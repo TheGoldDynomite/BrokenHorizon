@@ -1,8 +1,10 @@
 # Alpha roadmap
 
 Updated: 2026-09-05. Target: **G5 Alpha**, a complete playable limited-region
-resistance campaign (M6). **Development is paused.** This planning document does
-not resume gameplay work, launch validation, or authorize blocked asset authoring.
+resistance campaign (M6). **A1 development has explicitly resumed.** Q2 health/stamina
+150% HUD layout is Verified for its bounded scope. Next independent A1 work is
+packaged First Light listen/dedicated functional coverage exploration. A0/A1/G2 remain open;
+resumption does not authorize the blocked lighting map edit.
 
 ## Document ownership and gate names
 
@@ -23,13 +25,13 @@ A0-A6 below are work packages toward G5, not replacements for canonical gates.
 
 - Delivered checkpoints: `4a77387` combat HUD readability, `7de8bf3` Defense A,
   and `9b4cd86` same-process reconnect. Reuse their working systems and scoped proof.
-- Latest recorded suite: 127 tests, comprising 125 successes and two expected-warning
+- Preceding roadmap baseline suite: 127 tests, comprising 125 successes and two expected-warning
   successes, with zero failed/not-run/in-process:
   `Saved/Logs/Codex/AutomationReport-20260905-103902/index.json`.
-- The current Readability Development package passed the four-objective First Light
+- The preceding Readability Development package passed the four-objective First Light
   route and an inspected packaged 720p HUD capture. Details and limits are in
   [Alpha Progress](Alpha_Progress.md).
-- These are recorded results, not tests rerun for planning. They do not prove the
+- These are prior-checkpoint results, not new validation of the resumed A1 slice. They do not prove the
   complete campaign, all earlier canonical gates, packaged multiplayer, or physical play.
 - Defense A lifecycle/Continue already passes its fixture. Remaining facility art
   and manual tactical quality should reuse that proof rather than rebuild the runtime.
@@ -89,13 +91,13 @@ Do not publish a date or completion percentage until measured throughput support
 
 ## Ordered milestones
 
-All milestone statuses below are open planning states. Existing scoped proof may
+Milestone gates remain open; A1 has an active bounded source slice. Existing scoped proof may
 satisfy individual checks; writing the roadmap does not complete a gate.
 
 | ID | Dependency and status | Concrete deliverable | Exit proof |
 | --- | --- | --- | --- |
 | A0 Scope and support lock | First; open | Named alpha content manifest, supported player/topology/settings matrix, four required families, save/recovery expectations, and explicit deferred 1.0 items. | Every included row has an owner, integration dependency, and player-facing acceptance check; working scope accepted before content multiplication. |
-| A1 First Light quality and G2 acceptance | A0; open | Accepted world/combat/UI template with readable lighting, actual controls, coherent weapon/arms/enemy/animation/audio/VFX, measured performance targets, and multiplayer vertical slice. | Two-player natural First Light play plus visual/input review; listen AND dedicated functional paths with packaged clients hosting/joining as appropriate, reconnecting, and completing an operation; first-quality hardware/preset/frame-time/memory record. |
+| A1 First Light quality and G2 acceptance | Q2 verified; functional coverage exploration next, gate open and A0 scope lock required | Accepted world/combat/UI template with readable lighting, actual controls, coherent weapon/arms/enemy/animation/audio/VFX, measured performance targets, and multiplayer vertical slice. | Two-player natural First Light play plus visual/input review; listen AND dedicated functional paths with packaged clients hosting/joining as appropriate, reconnecting, and completing an operation; first-quality hardware/preset/frame-time/memory record. |
 | A2 Connected prototype and four families | A0 plus A1/G2 acceptance; open | Connected three-sector prototype with Attack, Defense, Raid, and Resupply proving the full preparation-to-next-operation loop. | Natural operation routes, traversal, casualty handling, extraction/debrief, logistics, saves, and world-state consequences; reuse existing Defense A fixture evidence. |
 | A3 Included regional content and logistics | A2; open | Playable alpha manifest across the included region, authored facilities/routes and required content, functioning movement of personnel/supplies/transport. | Every included inventory row reachable and accepted; corridor delivery/casualty recovery, transport persistence, and no supply dead ends. |
 | A4 Complete campaign progression | A3; open | World-state-driven progression from fresh campaign to victory and a meaningful defeat/recovery path. | Recorded complete campaign run, deliberate setbacks, persistence checks, measured first-campaign duration, and no debug intervention. |
@@ -109,22 +111,34 @@ A3 closes regional coverage rather than postponing all art/content until the end
 Do not require a full repository audit or repeat all previously green tests before
 starting the next bounded task; rerun proof when changed dependencies warrant it.
 
-## Immediate task queue after development resumes
+## Active A1 task queue
 
 No item below starts from this document alone. Priority and readiness are separate:
-Q1 lighting is high priority but approval-blocked; Q2 is the next independent ready
-code slice once development resumes. Unlocked scope budgets do not block contained
+Q1 lighting is high priority but approval-blocked; Q2 is verified. Unlocked scope budgets do not block contained
 existing-map/HUD repairs. A0 scope lock and G2 acceptance precede multiplying
 content; the following bounded tasks provide the nearest player-facing proof.
 
 | ID | Scope and dependency | Done when |
 | --- | --- | --- |
-| Q1 First Light lighting | Review the prepared narrow repair for black sky/overbright world. Map remains unchanged; automatic approval review denied the prior map-save launch and work stopped. Author only after development resumes and applicable approval is resolved. | Approved in-Editor authoring preserves gameplay actors/IDs; before/after rendered comparison accepts sky, surfaces, enemies, and HUD at the recorded settings. |
-| Q2 HUD scale edge | Probe the authored health/stamina slot/pivot path causing right-edge overflow at 150% HUD scale; fix only the owning layout. Independent of Q1 approval. | Actual bars remain within the safe area at supported scales/resolutions; existing medical/ammo readability remains intact. |
-| Q3 Actual First Light controls | Two-player play using Enter/M Continue, scrolling, firing/reloading, keycard/door interaction, combat, and extraction. Use working runtime systems. | Both players complete the natural route and actual input/debrief flow; record failures and minimum remaining manual steps, not delegate-only proof. |
+| Q1 First Light lighting | Review the prepared narrow repair for black sky/overbright world. Map remains unchanged; automatic approval review rejected the normal escalated map-save launch again after A1 resumed, before any process started. Explicit map-edit approval has been requested; the script remains unexecuted. Author only once applicable approval is resolved. | Approved in-Editor authoring preserves gameplay actors/IDs; before/after rendered comparison accepts sky, surfaces, enemies, and HUD at the recorded settings. |
+| Q2 HUD scale edge | Verified bounded delivery: final source/rendered/package evidence confirms four actual vitals bindings grouped, 150% edge overflow fixed, 80% safe bounds initialized before Slate, and strategic/field/transport text clear of vitals. Long field context wraps with its background. Independent of Q1 approval. | Actual bars remain within the safe area at supported scales/resolutions; existing medical/ammo readability remains intact. |
+| Q3 Actual First Light controls | Open: Computer Use failed before game input on initialization, retry, and a clean-reset third attempt. Two-player play using Enter/M Continue, scrolling, firing/reloading, keycard/door interaction, combat, and extraction. Use working runtime systems. | Both players complete the natural route and actual input/debrief flow; record failures and minimum remaining manual steps, not delegate-only proof. |
 | Q4 Natural Attack A | FirstLightAttackA has five guards and eight cover points. The strategic North Pass and physical marker are distinct concepts; inspect the actual deployment route. | Players deploy, navigate, fight naturally, secure, and debrief with correct world-state consequence; the older deterministic completion hook does not count as natural combat proof. |
 | Q5 Logistics corridor | Western FOB -> Eastern Depot, including FirstLightWaterRoute01 and FirstLightWatercraft01; use existing transport/logistics paths. | Boarding, crossing, delivery, casualty recovery, and subsequent save/reload work through actual play without supply/progression dead ends. |
 | Q6 Natural Raid A | Depot patrol, sabotage, and exfiltration through the authored route. | Natural patrol/combat or avoidance, sabotage result, extraction/debrief, and campaign persistence are demonstrated with readable facility/interaction cues. |
+
+Computer Use initialization, retry, and clean-reset third attempt all failed before
+any game input: `windows sandbox failed: helper_unknown_error: apply deny-read ACLs`.
+No custom input workaround was used. Actual controls and human-feel acceptance
+remain open; automated source, rendered, and packaged validation can proceed.
+Q2 is Verified: final build/127-test suite/review, seven normal HUD frames, First
+Light/Defense A regression, all ten fresh Defense A images, and the fresh Vitals
+package with four-objective route and inspected 720p HUD150 pass; see
+[Alpha Progress](Alpha_Progress.md). Delivery branch: `codex/first-light-acceptance`;
+commit history records the validated update.
+Next independent A1 work is exploration of packaged First Light listen/dedicated
+functional coverage; neither path is accepted by this HUD evidence. Actual controls,
+performance, packaged multiplayer, and A0/A1/G2 acceptance remain open.
 
 The [operation matrix](Broken_Horizon_1.0_OperationMatrix.md) still has all eight
 A/B rows in progress for authored/manual criteria. Do not schedule already
@@ -134,7 +148,7 @@ repeat implementation of its accepted lifecycle.
 
 ## Working cadence and task card
 
-When active development resumes, select the next unpassed gate and one playable
+During active development, select the next unpassed gate and one playable
 slice. Assign read-only exploration and architecture review when needed, one
 production writer, and one execution owner. Build a coherent change, collect
 scoped proof, then run the applicable final automated gate and scoped review.
@@ -142,8 +156,7 @@ Record exact evidence and remaining manual limits in [Alpha Progress](Alpha_Prog
 Commit and push each completed scoped update under standing user permission;
 preserve unrelated WIP. No recurring automation or build is started by this plan.
 
-If asset approval blocks a task, choose an independent ready task after development
-resumes. Do not assume elapsed time or planning approval grants asset authorization.
+If asset approval blocks a task, choose an independent ready task. Do not assume elapsed time or planning approval grants asset authorization.
 Review this plan after each gate and weekly while actively working; adjust sequence
 using evidence without silently changing the accepted alpha manifest.
 

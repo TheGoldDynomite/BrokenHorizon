@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "BHCombatStatusWidget.generated.h"
 
+class UCanvasPanel;
 class UProgressBar;
 class UTextBlock;
 class AActor;
@@ -322,6 +323,9 @@ public:
     );
 
 protected:
+    virtual void NativeOnInitialized() override;
+    virtual void NativeConstruct() override;
+
     virtual void NativeTick(
         const FGeometry& MyGeometry,
         float InDeltaTime
@@ -404,6 +408,11 @@ protected:
     float LowHealthThreshold = 0.25f;
 
 private:
+    void InitializeVitalsLayout();
+
+    UPROPERTY(Transient)
+    TObjectPtr<UCanvasPanel> VitalsGroup;
+
     struct FGrenadeThreatState
     {
         TWeakObjectPtr<AActor> SourceActor;

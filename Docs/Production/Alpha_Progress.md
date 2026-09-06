@@ -1,19 +1,100 @@
 # Alpha progress
 
 Updated: 2026-09-05. Repository evidence overrides this compact continuation record.
-Current slice: combat HUD readability against bright First Light surfaces.
-Status: **Verified** for the bounded combat HUD readability slice.
+Completed slice: A1/Q2 health/stamina layout at 150% HUD scale.
+Status: **Verified** for bounded Q2 HUD layout.
+Delivery branch: `codex/first-light-acceptance`; commit history records the validated update.
 Physical input and full-alpha gates remain separate from this slice.
 
-Development is paused for planning. [Alpha Roadmap](Alpha_Roadmap.md) owns the
-G5 alpha order and gates. First queued task after development resumes: Q1 First
-Light lighting, subject to resolution of its map-authoring approval; Q2 HUD scale
-layout is the independent next-ready task if that approval remains blocked.
+A1 development has explicitly resumed. [Alpha Roadmap](Alpha_Roadmap.md) owns the
+G5 alpha order and gates; Q2 is complete. Next independent A1 work is exploration
+of packaged First Light listen/dedicated functional coverage. A0/A1/G2 remain
+open. The earlier 127-test suite and Readability package below are prior-checkpoint proof,
+not fresh validation of this layout work.
+
+Q1 lighting remains approval-blocked: automatic approval review rejected the normal
+escalated map-save launch after resumption, before any process started. Explicit
+map-edit approval has been requested; the map is unchanged and script unexecuted.
+Computer Use initialization, retry, and clean-reset third attempt all failed before
+game input with `windows sandbox failed: helper_unknown_error: apply deny-read ACLs`.
+No custom input workaround was used. Actual controls/human feel remain open;
+automated source, rendered, and packaged checks can proceed. Current Q2 proof and remaining gates are below.
+
+## Verified Q2 delivery and evidence
+
+- Opt-in live probes demonstrate that the actual four vitals bindings remain grouped
+  and the 150% right-edge overflow is fixed. Safe-area settings initialize before
+  Slate construction; actual 80% bounds were checked.
+- Strategic and field status stack below vitals. Long field context wraps and grows
+  its background height; the transport label avoids the vitals block.
+- Evidence chain under `Saved/Reports` (each prefix has `-Summary.json`):
+  `BH-Q2-LiveVitals-20260905-112720`,
+  `BH-Q2-GroupedVitals-20260905-113551`,
+  `BH-Q2-LifecycleVitals-20260905-114140`,
+  `BH-Q2-Column-20260905-115018`, and
+  `BH-Q2-TextFollowup-20260905-115915`.
+- The coordinator inspected the full 720p text-followup frame and native 4K
+  column/transport crops; no blocking text occlusion was observed in those views.
+  The test engineer independently checked widget identity/value/geometry earlier.
+- Final scoped review cleared HUD diagnostic removal and the Defense A fixture
+  readiness correction in `BHWarGameState.cpp`: phase 4 waits for
+  `Snapshot.Phase == AwaitingWave`. The fixture edit is two insertions/one deletion.
+- Failed Defense A runs `120841-e48a280b` and `121017-31770f76` are preserved.
+  The exact corrected rendered run passed with ten PNG assertions, both owner
+  Continue acknowledgements, two checkpoint confirmations, and no cleanup errors:
+  `Saved/Logs/Codex/BH-A1-Vitals-DefenseA-20260905-192648-7e37cdce-Summary.json`.
+  The coordinator inspected all ten fresh full frames. Native ammo crops of ClientA
+  wave 2/securing and ClientB securing confirmed complete STABLE text with right
+  padding; apparent clipping in the full-frame display was not present in those
+  native pixels. Vitals, state, medical, and debrief are clear for this bounded scope.
+- Final `Tools/Validate.ps1 -RequireTests -SkipReview` passed. Project Doctor:
+  zero errors/warnings; Editor build:
+  `Saved/Logs/Codex/BuildEditor-20260905-192833.log`.
+  Automation: 125 successes plus two expected-warning successes, zero
+  failed/not-run/in-process (127 total):
+  `Saved/Logs/Codex/AutomationReport-20260905-192834/index.json`.
+- All seven normal HUD frames passed and were inspected by the coordinator:
+  `Saved/Reports/BH-A1-FinalHUD-20260905-120509-Summary.json`.
+  This evidence remains valid after the fixture-only readiness adjustment.
+- Canonical First Light and navigation/grenade regression passed under log prefix
+  `BH-A1-Vitals-FirstLight-20260905-1208`, with zero of twelve navigation fallbacks.
+- Fresh Vitals Development package passed (exit 0, 84.05 seconds):
+  `Saved/Logs/Codex/PackageDevelopment-20260905-192943.log`;
+  archive `Builds/Alpha-Development-20260905-Vitals/Windows`.
+- Packaged First Light passed all four objectives:
+  `Saved/Reports/BH-A1-Packaged-Vitals-20260905-193217-FirstLight-Summary.json`.
+  This NullRHI run proves the packaged route only.
+- Packaged HUD at 1280x720, 150% scale, and 100% safe area passed native fixture
+  and decoded-PNG assertions:
+  `Saved/Reports/BH-A1-Packaged-Vitals-20260905-193217-HUD150-Summary.json`
+  and its matching PNG. The coordinator inspected the actual frame and accepted
+  bars, strategic, medical, and ammo layout. This is the actual First Light scene
+  with synthetic HUD data, not packaged multiplayer or physical-input proof.
+- Packaged runs reported no cleanup errors; all owned processes ended.
+- Consolidated final visual review records seven normal HUD frames, ten fresh
+  multiplayer frames, the packaged 150% HUD frame, native ammo-crop confirmation,
+  and evidence limits:
+  `Saved/Reports/BH-A1-Vitals-20260905-FinalVisualReview.json`.
+  Independent review cleared the apparent ammo concern; no further fix or rerun
+  was required.
+
+| Final Q2 gate | Current evidence boundary |
+| --- | --- |
+| Stable source build and full automation | Passed: Doctor 0/0, build 192833, 127 tests at 192834. |
+| Normal HUD matrix | Seven normal frames passed and visually inspected. |
+| First Light and Defense A regression | Passed; all ten fresh Defense A frames and selected native ammo crops inspected. |
+| Fresh package and packaged acceptance | Vitals package, four-objective route, and inspected 720p HUD150 capture passed. |
+| Final scoped review | Passed, including diagnostic removal and fixture readiness delta. |
+
+Q2 is Verified within this bounded HUD scope. A0/A1/G2 remain open for actual controls, packaged
+listen/dedicated functional proof, performance acceptance, and the remaining
+quality/content gates; a HUD correction cannot close those requirements.
 
 ## Release boundary and preceding checkpoints
 
-- Full alpha requires the complete campaign per
-  [ModuleImplementationPlan.md](ModuleImplementationPlan.md), G4-G7.
+- The alpha target is canonical G5 Alpha / M6: a complete playable limited-region
+  resistance campaign, ordered by [Alpha Roadmap](Alpha_Roadmap.md);
+  [ModuleImplementationPlan.md](ModuleImplementationPlan.md) retains the detailed backlog.
   G1 Networked FirstLight is an earlier milestone; no release date is implied.
 - Foundation `167893e` and same-process reconnect `9b4cd86` were pushed to
   `origin/codex/first-light-acceptance` before this slice.
@@ -25,7 +106,7 @@ layout is the independent next-ready task if that approval remains blocked.
 - The foundation/reconnect checkpoint passed 125 automation tests and packaged standalone
   First Light. Its package predates the current UI changes; current status is below.
 
-## Current delivered behavior and evidence
+## Prior checkpoint: delivered HUD behavior and evidence
 
 - Medical/load text now has a padded, measured dark Charcoal backdrop. The latest
   correction measures width with active Slate scale so it spans the text at 4K;
@@ -77,14 +158,14 @@ layout is the independent next-ready task if that approval remains blocked.
   automatic approval review denied the map-save launch. Specific user approval is
   pending; the script has not been executed or committed and
   `Content/BrokenHorizon/Maps/L_FirstLight_Graybox.umap` is unchanged.
-- The sky remains black and the world overbright. Separately, authored health/stamina
-  bars extend past the right edge at 150% HUD scale; investigate their slot/pivot
-  ownership as a subsequent bounded correction.
+- At this prior checkpoint, authored health/stamina bars extended past the right
+  edge at 150% HUD scale. The verified Q2 correction above resolves that recorded
+  defect. Black sky/overbright world remains the separate Q1 lighting issue.
 
 ## Preceding checkpoint: Defense A (`7de8bf3`)
 
 The following behavior and evidence describe the preceding committed checkpoint,
-not validation of the current HUD readability changes.
+not validation of the later HUD readability or active A1/Q2 layout changes.
 
 - Real two-client Defense A deployment runs authored first-wave activation,
   natural inter-wave delay, runtime second-wave spawning, physical securing,
@@ -144,14 +225,22 @@ not validation of the current HUD readability changes.
 
 | Gate | Evidence boundary and remaining work |
 | --- | --- |
-| Code/unit | Current HUD build, scoped review, and final 127-test suite pass. Preceding Defense A passed 127 tests. |
+| Code/unit | Prior HUD checkpoint build/review/127-test suite pass. Q2 final source build/review/127-test suite and bounded package acceptance pass. |
 | Live network | Two-client tactical lifecycle/Continue passes under controlled fixture damage/positioning and natural director clocks. Remote networking, campaign crash/save recovery, and soak remain. |
-| Rendered/player | Current targeted medical rerenders and wounded runtime rerun pass; selected fresh multiplayer images inspected. Prior Defense A inspected ten 1280x720 frames. Actual Enter/M Continue, scrolling, combat feel, localization, and broader safe-area coverage remain. |
-| Presentation/performance | HUD contrast correction built and targeted static visuals inspected. Black sky/overbright world and 150% health/stamina edge overflow remain. Lighting map-save launch was denied by automatic approval review. Earlier local two-client VRAM warnings do not constitute performance acceptance. |
+| Rendered/player | Prior targeted medical rerenders and wounded runtime rerun pass; selected fresh multiplayer images inspected. Prior Defense A inspected ten 1280x720 frames. Actual Enter/M Continue, scrolling, combat feel, localization, and broader safe-area coverage remain. |
+| Presentation/performance | HUD contrast correction built and targeted static visuals inspected. Black sky/overbright world remains; Q2 150% vitals correction is verified for the recorded cases. Lighting map-save launch was denied by automatic approval review. Earlier local two-client VRAM warnings do not constitute performance acceptance. |
 | Campaign/content | Complete campaign and authored-content gates remain; this tactical acceptance slice is not full alpha. |
-| Package | Fresh Readability package, packaged four-objective First Light route, and visually inspected 720p HUD pass. Packaged multiplayer and physical play remain open. |
+| Package | Current Vitals package, four-objective First Light route, and inspected 720p HUD150 pass. Packaged multiplayer and physical play remain open. |
 
-## Current task files
+## Current Q2 delivery files
+
+- `Source/BrokenHorizon/Private/BHCombatStatusWidget.cpp`
+- `Source/BrokenHorizon/Public/BHCombatStatusWidget.h`
+- `Source/BrokenHorizon/Private/BHWarGameState.cpp`
+- `Docs/Production/Alpha_Progress.md`
+- `Docs/Production/Alpha_Roadmap.md`
+
+## Prior HUD checkpoint files
 
 - `Source/BrokenHorizon/Private/BHCombatStatusWidget.cpp`
 - `Source/BrokenHorizon/Private/BHAmmoHUDWidget.cpp`
