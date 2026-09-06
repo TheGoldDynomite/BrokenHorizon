@@ -1,8 +1,9 @@
 # Alpha progress
 
 Updated: 2026-09-05. Repository evidence overrides this compact continuation record.
-Completed slice: bounded A1 First Light topology coverage.
-Status: **Verified** for the recorded First Light topology matrix.
+Completed slice: A1 package-aware performance runner.
+Status: **Verified** for bounded performance measurement; all three runs failed at least one provisional budget.
+Topology commit: `1df892b9e9c2b85929ae29cb586fdf3191790e96`; pushed and remote SHA verified.
 Prior Q2 commit: `58d2380f524dff9812e204d42222d2d0d97f11b9`; pushed to
 `origin/codex/first-light-acceptance` and remote SHA verified.
 Physical input and full-alpha gates remain separate from this slice.
@@ -11,7 +12,7 @@ A1 development has explicitly resumed. [Alpha Roadmap](Alpha_Roadmap.md) owns th
 G5 alpha order and gates; Q2 and the bounded topology matrix are verified.
 The validated topology delivery is tracked by active development-branch history. A0/A1/G2 remain
 open. The earlier 127-test suite and Readability package below are prior-checkpoint proof,
-not validation of the current topology changes.
+separate from the current performance-runner proof.
 
 Q1 lighting remains approval-blocked: automatic approval review rejected the normal
 escalated map-save launch after resumption, before any process started. Explicit
@@ -25,6 +26,71 @@ Draft scope artifact: [Alpha Manifest](Alpha_Manifest.md) combines content candi
 and proposed support coverage. Draft commit `4470616664ee517c117c0d7d5c6671ac80ab8715`
 was pushed and its remote SHA verified. The working-scope question is unanswered;
 A0 and all candidate decisions remain unaccepted.
+
+## Verified performance runner and measured budget failures
+
+- Script scope is `Scripts/Test-BrokenHorizonPerformance.ps1`; frozen SHA256:
+  `F1961CA66E8E46EB27B8544C7250329512003C9EDB876ACA5E204F36AA1D97BC`.
+- Actual-AST/real-CSV parser checks passed 45/45, including negative cases:
+  `Saved/Automation/PerformanceBaseline/20260905-210053-c62984e1/Summary.json`.
+- Same local hardware: i9-14900K / RTX5060Ti, driver 616.64, Windows 11/D3D12.
+  Observed settings were stable and identical across all three runs: 1920x1080,
+  all quality groups 3, screen percentage 100%, VSync 0, MaxFPS 0. Requested viewport
+  and caps matched; quality groups 3 were observed defaults, not explicitly requested.
+  First Light traversal used eight steps/two loops. Runs use unique UserDirs and
+  owned CSVs; boot capture/180-frame prefix does not establish cache warmth.
+
+| Run | Capture / sample boundary | Frame p95 / p99 | GPU p95 / p99 | Other observations | Budget result |
+| --- | --- | --- | --- | --- | --- |
+| Editor compatibility | Valid; 1800 numeric frames, 180-frame prefix; diagnostic rows 175/1795 (one eligible excluded); 1619 measured, other exclusions 0 | 9.063 / 9.718 ms | 7.610 / 7.904 ms | Render-thread p95 9.044 ms; peak RAM 3226.3 MB; peak VRAM 3051.6 MB (42.8% runtime budget); no >33 ms frame hitches | Failed three unchanged provisional budgets; overall false, exit 1 |
+| Packaged first | Valid; 1800 numeric, 180-prefix, one eligible diagnostic exclusion, 1619 measured | 8.503 / 9.127 ms | 7.766 / 8.176 ms | Render-thread p95 8.481 ms; peak RAM 1699.5 MB; VRAM 3084.1 MB (43.3% runtime budget) | Failed primitives p95 1,009,635 > 1,000,000; overall false, script exit 1 |
+| Packaged repeat, same configuration | Valid; 1800 numeric, 180-prefix, one eligible diagnostic exclusion, 1619 measured | 8.530 / 9.192 ms | 7.760 / 8.133 ms | Render-thread p95 8.527 ms; peak RAM 1642.6 MB; VRAM 3097.3 MB (43.5% runtime budget) | Failed primitives p95 1,001,301 > 1,000,000; overall false, script exit 1 |
+
+Editor report (independently read by coordinator):
+`Saved/Automation/Performance/20260905-210216-f3bc8f88/BH-A1-Perf-Editor-20260905-2057-Summary.json`.
+Capture validity and budget acceptance are separate: primitives p95 1,065,869 exceeds
+1,000,000; pending-stream p95 0.062 exceeds 0; pending-stream frames 6.92% exceeds 5%.
+Final texture percentage was 100; owned-runtime cleanup completed.
+
+Packaged reports (both independently audited by coordinator):
+`Saved/Automation/Performance/20260905-210331-688f86b3/BH-A1-Perf-Packaged-First-20260905-2103-Summary.json`
+and
+`Saved/Automation/Performance/20260905-210431-11e9298a/BH-A1-Perf-Packaged-Repeat-20260905-2104-Summary.json`.
+Both use the FirstLightTopology Windows archive and actual executable SHA256
+`CCF9E88A5ED65F7373BAB7D5551F6FFF592560CAB670261AF268F017F5589F45`.
+Both have pending-stream p95 0 and pending-frame percentage 4.32% (pass), final
+texture percentage 100, no >33 ms frame hitches, and completed owned cleanup.
+Their script exit 1 is solely a primitives-budget failure. Native process exit -1
+from an owned cleanup stop is distinct from that script result.
+
+Earlier failures are preserved: a prelaunch queryFrames PowerShell-precedence error
+(no game launched), and a real footer-parse failure under
+`Saved/Automation/Performance/20260905-205554-f0f6817d`. Both were corrected,
+tested, and reviewed. Offline recovery of the old CSV is not a full-run pass.
+
+The runner is Verified for bounded measurement; all three overall budget failures
+remain recorded. Frozen-hash final review and 45 parser cases, including real CSV,
+are clear. Final `Tools/Validate.ps1 -RequireTests -SkipReview` passed (exit 0):
+Doctor zero errors/warnings; up-to-date Editor build in 0.96 seconds:
+`Saved/Logs/Codex/BuildEditor-20260905-210539.log`.
+Automation passed 125 successes plus two warning-successes (127 total), zero
+failed/not-run/in-process:
+`Saved/Logs/Codex/AutomationReport-20260905-210540/index.json`.
+The coordinator independently read all three performance JSONs and final build/test
+evidence. Script SHA256 remained unchanged; all sessions terminated, no owned
+engine/build processes remain, and execution was released.
+
+No C++/asset or new-package change was made in this slice. No overall performance
+acceptance, FPS promise, or comparison with incompatible August runs is claimed.
+A1/S07 performance acceptance, A0 scope, Q1 map approval, and actual controls remain open.
+
+Exact measurements used these commands from the repository root:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Scripts\Test-BrokenHorizonPerformance.ps1 -Rendered -RenderOffscreen -Traversal -CaptureFrames 1800 -WarmupFrames 180 -LogPrefix BH-A1-Perf-Editor-20260905-2057
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Scripts\Test-BrokenHorizonPerformance.ps1 -Rendered -RenderOffscreen -Traversal -CaptureFrames 1800 -WarmupFrames 180 -LogPrefix BH-A1-Perf-Packaged-First-20260905-2103 -Runtime Packaged -PackageRoot Builds/Alpha-Development-20260905-FirstLightTopology/Windows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Scripts\Test-BrokenHorizonPerformance.ps1 -Rendered -RenderOffscreen -Traversal -CaptureFrames 1800 -WarmupFrames 180 -LogPrefix BH-A1-Perf-Packaged-Repeat-20260905-2104 -Runtime Packaged -PackageRoot Builds/Alpha-Development-20260905-FirstLightTopology/Windows
+```
 
 ## Verified A1 First Light topology coverage
 
@@ -279,7 +345,14 @@ not validation of the later HUD readability or active A1/Q2 layout changes.
 | Campaign/content | Complete campaign and authored-content gates remain; this tactical acceptance slice is not full alpha. |
 | Package | Current FirstLightTopology package passes standalone and bounded two-player loopback configurations: fully packaged listen and hybrid Editor dedicated with packaged clients. Wider promised configurations, remote/menu/physical acceptance remain open; Q2 rendered proof is separate. |
 
-## Current topology delivery files
+## Current performance delivery files
+
+- `Scripts/Test-BrokenHorizonPerformance.ps1`
+- `Docs/Production/Alpha_Progress.md`
+- `Docs/Production/Alpha_Roadmap.md`
+- `Docs/Production/Alpha_Manifest.md`
+
+## Prior topology delivery files
 
 - `Scripts/Test-BrokenHorizonFirstLightMultiplayer.ps1`
 - `Source/BrokenHorizon/Private/BHWarGameState.cpp`

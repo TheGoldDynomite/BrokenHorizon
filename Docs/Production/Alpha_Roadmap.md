@@ -3,7 +3,9 @@
 Updated: 2026-09-05. Target: **G5 Alpha**, a complete playable limited-region
 resistance campaign (M6). **A1 development has explicitly resumed.** Q2 health/stamina
 150% HUD layout is Verified for its bounded scope. Bounded First Light topology coverage is now Verified. A0/A1/G2 remain open;
-resumption does not authorize the blocked lighting map edit.
+resumption does not authorize the blocked lighting map edit. The package-aware
+performance runner is Verified for bounded measurement: three valid captures,
+all three runs failed at least one provisional budget. Full A1/S07 acceptance remains open.
 
 ## Document ownership and gate names
 
@@ -150,6 +152,16 @@ transfer and weapon-role modes were not rerun. Q2 visual evidence remains separa
 The manifest support rows remain candidates; unanswered A0 scope, full A1/G2,
 performance/content, actual controls, and Q1 explicit map approval remain open.
 The recorded six-sector graph does not accept physical traversal or regional scope.
+
+The topology update was delivered as `1df892b9e9c2b85929ae29cb586fdf3191790e96`
+(pushed and remote SHA verified). The completed bounded measurement slice covers Editor compatibility
+and packaged first/repeat runs on the same local hardware/configuration: First Light
+eight-step, two-loop traversal, 1080p D3D12, unique UserDirs, owned CSVs, and observed
+effective settings. All captures are valid: Editor fails primitives and two streaming
+budgets; each packaged run fails primitives only. Final review and 45 parser cases
+pass; final Validate also passed with 127 tests and an up-to-date build. Exact reports/commands are in Alpha Progress. Provisional budgets are
+not accepted promises; boot capture/180-frame prefix does not establish cache warmth,
+and differing August reports cannot support an old-versus-new improvement claim.
 
 The [operation matrix](Broken_Horizon_1.0_OperationMatrix.md) still has all eight
 A/B rows in progress for authored/manual criteria. Do not schedule already

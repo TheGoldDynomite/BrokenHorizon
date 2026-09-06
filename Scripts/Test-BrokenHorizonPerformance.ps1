@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [string]$EngineRoot,
-    [string]$LogPrefix = "BHPerformance",
+    [ValidatePattern("^[A-Za-z0-9_-]{1,80}$")][string]$LogPrefix = "BHPerformance",
+    [ValidateSet("Editor", "Packaged")][string]$Runtime = "Editor",
+    [string]$PackageRoot,
+    [switch]$RenderOffscreen,
     [int]$CaptureFrames = 600,
     [int]$WarmupFrames = 180,
     [double]$FrameP95BudgetMs = 8.0,
@@ -72,25 +75,105 @@ $map = if ($WorldMap) {
 }
 $logDirectory = Join-Path $projectRoot "Saved\Logs"
 $reportDirectory = Join-Path $projectRoot "Saved\Reports"
-$runtimeLog = Join-Path $logDirectory "$LogPrefix.log"
-$profileReport = Join-Path $reportDirectory "$LogPrefix-Profile.csv"
-$summaryReport = Join-Path $reportDirectory "$LogPrefix-Summary.json"
-$captureUserDir = Join-Path $projectRoot "Saved\PerformanceUser\$LogPrefix"
-$csvRoot = if ($Rendered) {
-    Join-Path $env:LOCALAPPDATA "UnrealEngine\5.8\Saved\Profiling\CSV"
-} else {
-    Join-Path $captureUserDir "Saved\Profiling\CSV"
+$runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+$runDirectory = Join-Path $projectRoot "Saved\Automation\Performance\$runId"
+$captureUserDir = Join-Path $runDirectory 'User'
+$runtimeLog = Join-Path $runDirectory "$LogPrefix.log"
+$profileReport = Join-Path $runDirectory "$LogPrefix-Profile.csv"
+$summaryReport = Join-Path $runDirectory "$LogPrefix-Summary.json"
+$compatibilitySummary = Join-Path $reportDirectory "$LogPrefix-Summary.json"
+$resolvedPackageRoot = $null
+if ($Runtime -eq 'Packaged') {
+    if ([string]::IsNullOrWhiteSpace($PackageRoot)) { throw '-Runtime Packaged requires an explicit -PackageRoot Windows archive directory.' }
+    $resolvedPackageRoot = if ([IO.Path]::IsPathRooted($PackageRoot)) { [IO.Path]::GetFullPath($PackageRoot) } else {
+        [IO.Path]::GetFullPath((Join-Path $projectRoot $PackageRoot))
+    }
+}
+$executable = if ($Runtime -eq 'Editor') { $editor } else { Join-Path $resolvedPackageRoot 'BrokenHorizon\Binaries\Win64\BrokenHorizon.exe' }
+if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "Runtime executable not found: $executable" }
+if ($RenderOffscreen -and -not $Rendered) { throw '-RenderOffscreen requires -Rendered.' }
+if ($LowerTier -and -not $Rendered) { throw '-LowerTier requires -Rendered.' }
+if ($WarmupFrames -lt 0 -or $CaptureFrames -lt 8) { throw 'WarmupFrames must be nonnegative and CaptureFrames at least8.' }
+New-Item -ItemType Directory -Path $captureUserDir -Force | Out-Null
+New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null
+
+function Resolve-PerformanceCsv {
+    param([string]$LogContent, [string]$ExecutableDirectory, [string]$OwnedDirectory, [DateTime]$CaptureStart)
+    $markers = [regex]::Matches($LogContent, 'LogCsvProfiler:\s+Display: Capture Ended\. Writing CSV to file :[ \t]*(?<path>[^\r\n]+)')
+    if ($markers.Count -ne 1) { throw "Expected exactly one finalized CSV path marker; observed $($markers.Count)." }
+    $rawPath = $markers[0].Groups['path'].Value.Trim().Trim('"')
+    $csvPath = if ([IO.Path]::IsPathRooted($rawPath)) { [IO.Path]::GetFullPath($rawPath) } else {
+        [IO.Path]::GetFullPath((Join-Path $ExecutableDirectory $rawPath))
+    }
+    $ownedPrefix = [IO.Path]::GetFullPath($OwnedDirectory).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $csvPath.StartsWith($ownedPrefix, [StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetExtension($csvPath) -ne '.csv') {
+        throw "CSV marker resolves outside this run's owned CSV evidence: $csvPath"
+    }
+    $file = Get-Item -LiteralPath $csvPath -ErrorAction Stop
+    if ($file.PSIsContainer -or $file.Length -le 0 -or $file.LastWriteTimeUtc -lt $CaptureStart -or $file.CreationTimeUtc -lt $CaptureStart) {
+        throw "CSV marker points to missing, empty or stale capture evidence: $csvPath"
+    }
+    return $file
+}
+function Get-NativePerformanceMetadata {
+    param([string]$RawFooter)
+    # UE5.8 FCsvStreamWriter::Finalize deliberately writes commandline last.
+    # That raw, quoted tail can contain unescaped quotes/commas. Keep the original
+    # CSV untouched and parse only the preceding structured metadata as strict CSV.
+    if (-not $RawFooter.StartsWith('[HasHeaderRowAtEnd],1,')) { throw 'Invalid native CSV metadata footer.' }
+    $tailMarker = ',[commandline],'
+    $tailIndex = $RawFooter.IndexOf($tailMarker, [StringComparison]::Ordinal)
+    if ($tailIndex -lt 0) { throw 'Native CSV footer lacks the final commandline field.' }
+    $tail = $RawFooter.Substring($tailIndex + $tailMarker.Length)
+    if ($tail.Length -lt 2 -or -not $tail.StartsWith('"') -or -not $tail.EndsWith('"')) { throw 'Native CSV commandline tail is incomplete.' }
+    $reader = [IO.StringReader]::new($RawFooter.Substring(0, $tailIndex))
+    $metadataParser = [Microsoft.VisualBasic.FileIO.TextFieldParser]::new($reader)
+    try {
+        $metadataParser.TextFieldType = [Microsoft.VisualBasic.FileIO.FieldType]::Delimited
+        $metadataParser.SetDelimiters(','); $metadataParser.HasFieldsEnclosedInQuotes = $true
+        $fields = $metadataParser.ReadFields()
+        if ($fields.Count % 2 -ne 0) { throw 'Native CSV metadata must contain complete key/value pairs.' }
+        $allowed = @('platform', 'config', 'buildversion', 'engineversion', 'cpu', 'os', 'systemresolution.resx', 'systemresolution.resy',
+            'rhiname', 'verbatimrhiname', 'gpu', 'gpudriver', 'deviceprofile', 'vsyncenabled', 'targetframerate', 'bh_run_id', 'bh_runtime', 'captureduration')
+        $seen = @{}; $metadata = [ordered]@{}
+        for ($i = 0; $i -lt $fields.Count; $i += 2) {
+            if ($fields[$i] -notmatch '^\[[A-Za-z0-9_.]+\]$') { throw 'Malformed native CSV metadata key.' }
+            $key = $fields[$i].Trim('[', ']')
+            if ($seen.ContainsKey($key)) { throw "Duplicate native CSV metadata key: $key" }
+            $seen[$key] = $true
+            if ($key -in $allowed) { $metadata[$key] = $fields[$i + 1] }
+        }
+        return $metadata
+    } finally { $metadataParser.Close(); $reader.Dispose() }
+}
+function Get-ObservedPerformanceSettings {
+    param([string]$LogContent, [string[]]$Names)
+    $observed = [ordered]@{}
+    foreach ($name in $Names) {
+        $pattern = '(?m)^[^\r\n]*?(?<![A-Za-z0-9_.])' + [regex]::Escape($name) + '\s*=\s*"(?<value>[^"\r\n]+)"\s+LastSetBy:\s*(?<source>[^\s\r\n]+)'
+        $records = [regex]::Matches($LogContent, $pattern)
+        if ($records.Count -lt 2) { throw "Missing early/final effective setting observations for $name." }
+        $early = $records[$records.Count - 2]; $final = $records[$records.Count - 1]
+        $observed[$name] = [ordered]@{
+            earlyValue = $early.Groups['value'].Value; earlyLastSetBy = $early.Groups['source'].Value
+            value = $final.Groups['value'].Value; lastSetBy = $final.Groups['source'].Value
+            stable = $early.Groups['value'].Value -ceq $final.Groups['value'].Value
+        }
+    }
+    return $observed
+}
+function Stop-OwnedPerformanceProcess {
+    if ($null -eq $process -or $completion.cleanedUp) { return }
+    $process.Refresh()
+    if (-not $process.HasExited) {
+        $completion.termination = 'OwnedProcessStopped'
+        Stop-Process -Id $process.Id -ErrorAction Stop
+        if (-not $process.WaitForExit(10000)) { throw "Owned performance process $($process.Id) failed to exit." }
+    } else { $completion.termination = 'NaturalExit' }
+    $completion.exitCode = $process.ExitCode
+    $completion.cleanedUp = $true
 }
 
-New-Item -ItemType Directory -Force -Path $logDirectory, $reportDirectory | Out-Null
-if (-not $Rendered) {
-    New-Item -ItemType Directory -Force -Path $csvRoot | Out-Null
-}
-Remove-Item -LiteralPath $runtimeLog, $profileReport, $summaryReport -Force -ErrorAction SilentlyContinue
-
-if (-not (Test-Path -LiteralPath $editor)) {
-    throw "Unreal Editor was not found: $editor"
-}
 if ($CaptureFrames -le $WarmupFrames) {
     throw "CaptureFrames must be greater than WarmupFrames."
 }
@@ -106,21 +189,25 @@ if ($Rendered -and
 }
 
 $captureStart = [DateTime]::UtcNow
+$process = $null
+$summary = $null
+$completion = [ordered]@{ csvFinalized = $false; termination = 'NotStarted'; cleanedUp = $false; exitCode = $null }
+$settingsNames = @('sg.ResolutionQuality', 'sg.ViewDistanceQuality', 'sg.AntiAliasingQuality', 'sg.ShadowQuality',
+    'sg.GlobalIlluminationQuality', 'sg.ReflectionQuality', 'sg.PostProcessQuality', 'sg.TextureQuality',
+    'sg.EffectsQuality', 'sg.FoliageQuality', 'sg.ShadingQuality', 'r.ScreenPercentage', 'r.VSync', 't.MaxFPS')
+$queryFrames = @([Math]::Max(1, $WarmupFrames - 4), ($CaptureFrames - 4))
+$csvCommands = @($queryFrames | ForEach-Object { $frame = $_; $settingsNames | ForEach-Object { "${frame}:$_" } }) -join ','
+$requestedSettings = [ordered]@{ 't.MaxFPS' = '0' }
+$executableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $executable).Hash
 $captureSeconds = [Math]::Ceiling($CaptureFrames / 60.0) + 5
-$arguments = @(
-    $uproject,
-    $map,
-    "-game",
-    "-unattended",
-    "-nosound",
-    "-NoSplash",
-    "-DDC-ForceMemoryCache",
-    "-benchmark",
-    "-fps=60",
-    "-ExecCmds=t.MaxFPS 0",
-    "-seconds=$captureSeconds",
-    "-csvCaptureFrames=$CaptureFrames",
-    "-abslog=$runtimeLog"
+$arguments = @()
+if ($Runtime -eq 'Editor') { $arguments += $uproject }
+$arguments += @(
+    $map, '-game', '-unattended', '-nosound', '-NoSplash', '-DisablePython', '-DDC-ForceMemoryCache',
+    '-benchmark', '-fps=60', '-ExecCmds=t.MaxFPS 0', "-seconds=$captureSeconds",
+    "-csvCaptureFrames=$CaptureFrames", '-csvCompression=0', "-csvExecCmds=$csvCommands",
+    "-csvMetadata=bh_run_id=$runId,bh_runtime=$Runtime", "-UserDir=$captureUserDir",
+    "-BHTestSaveSlotSuffix=Performance_$($runId -replace '-', '_')", "-abslog=$runtimeLog"
 )
 if ($Rendered) {
     $arguments += @(
@@ -130,9 +217,10 @@ if ($Rendered) {
         "-ForceRes",
         "-NoVSync"
     )
+    $requestedSettings['r.VSync'] = '0'
+    if ($RenderOffscreen) { $arguments += '-RenderOffscreen' }
     if ($LowerTier) {
-        # Representative lower-tier profile: reduce scalability and internal
-        # resolution while retaining the D3D12/rendered evidence path.
+        # These are requests. Effective values must be observed after project settings apply.
         $arguments += @(
             "-ScalabilityQuality=1",
             "-sg.ResolutionQuality=75",
@@ -147,61 +235,45 @@ if ($Rendered) {
             "-r.ScreenPercentage=75"
         )
     }
-} else {
-    $arguments += "-nullrhi"
-    $arguments += "-userdir=$captureUserDir"
-}
+        foreach ($name in $settingsNames | Where-Object { $_ -like 'sg.*' -and $_ -notin @('sg.ResolutionQuality', 'sg.FoliageQuality', 'sg.ShadingQuality') }) {
+            if ($LowerTier) { $requestedSettings[$name] = '1' }
+        }
+        if ($LowerTier) { $requestedSettings['sg.ResolutionQuality'] = '75'; $requestedSettings['r.ScreenPercentage'] = '75' }
+} else { $arguments += '-nullrhi' }
 if ($WorldTraversal) {
     $arguments += "-BHTestRenderedWorldTraversal"
 } elseif ($Traversal) {
     $arguments += "-BHTestRenderedTraversal"
 }
 
-Write-Host "[Performance] Capturing $CaptureFrames frames on $map ($WarmupFrames warmup; rendered=$Rendered; worldTraversal=$WorldTraversal)"
-# Keep profiler, config, and save writes inside the project so the gate is
-# deterministic in restricted CI/agent environments. The benchmark command
-# can finish its CSV capture without exiting the game process, so wait for the
-# authoritative capture marker and then close only this owned process.
-$process = Start-Process -FilePath $editor -ArgumentList $arguments -PassThru
+try {
+Write-Host "[Performance] Capturing $CaptureFrames boot frames on $map (discard prefix=$WarmupFrames; runtime=$Runtime; rendered=$Rendered; offscreen=$RenderOffscreen)"
+$quotedArguments = foreach ($argument in $arguments) {
+    if ($argument -match '["\r\n]' -or $argument.EndsWith('\')) { throw "Unsupported launch argument: $argument" }
+    '"' + $argument + '"'
+}
+$process = Start-Process -FilePath $executable -ArgumentList $quotedArguments -WindowStyle Hidden -PassThru
+$completion.processId = $process.Id
+$completion.termination = 'Running'
 $startupAllowanceSeconds = if ($Rendered) { 900 } else { 180 }
 $captureDeadline = [DateTime]::UtcNow.AddSeconds($captureSeconds + $startupAllowanceSeconds)
 while ([DateTime]::UtcNow -lt $captureDeadline) {
     if (Test-Path -LiteralPath $runtimeLog) {
         $liveLog = Get-Content -Raw -LiteralPath $runtimeLog
-        if ($liveLog -match "LogCsvProfiler: Display: Capture Ended") {
-            break
-        }
+        if ($liveLog -match 'LogCsvProfiler:\s+Display: Capture Ended\. Writing CSV to file :') { break }
+        if ($liveLog -match 'Fatal error:|Assertion failed:|Unhandled Exception:') { throw "Capture failed: $runtimeLog" }
     }
-    if ($process.HasExited) {
-        break
-    }
+    $process.Refresh()
+    if ($process.HasExited) { break }
     Start-Sleep -Seconds 1
 }
-if (-not (Test-Path -LiteralPath $runtimeLog)) {
-    throw "Performance capture did not produce its runtime log: $runtimeLog"
-}
+if (-not (Test-Path -LiteralPath $runtimeLog)) { throw "Capture did not produce its own log: $runtimeLog" }
 $logContent = Get-Content -Raw -LiteralPath $runtimeLog
-if ($logContent -notmatch "LogCsvProfiler: Display: Capture Ended") {
-    if (-not $process.HasExited) {
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        $process.WaitForExit(5000) | Out-Null
-    }
-    throw "Performance capture did not reach the CSV completion marker. See $runtimeLog"
-}
-if (-not $process.HasExited) {
-    Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
-    if (-not $process.WaitForExit(5000)) {
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        $process.WaitForExit(5000) | Out-Null
-    }
-}
-# Once Capture Ended has been observed, the process is intentionally stopped
-# to avoid the benchmark's normal game/editor teardown hang. Its exit code is
-# therefore not a reliable failure signal; the runtime log and CSV checks below
-# are the authoritative result.
-if (-not (Test-Path -LiteralPath $runtimeLog)) {
-    throw "Performance capture did not produce its runtime log: $runtimeLog"
-}
+$sourceProfile = Resolve-PerformanceCsv -LogContent $logContent -ExecutableDirectory (Split-Path -Parent $executable) -OwnedDirectory $runDirectory -CaptureStart $captureStart
+$completion.csvFinalized = $true
+$completion.sourceCsv = $sourceProfile.FullName
+Stop-OwnedPerformanceProcess
+$logContent = Get-Content -Raw -LiteralPath $runtimeLog
 $failurePatterns = @("Fatal error:", "Assertion failed:", "Unhandled Exception:", "Failed to load package", "CreateExport: Failed to load")
 if ($WorldTraversal) {
     $failurePatterns += "Navmesh bounds are too large!"
@@ -239,14 +311,8 @@ else {
     $navigationStepCount = 0
 }
 
-$sourceProfile = Get-ChildItem -LiteralPath $csvRoot -Filter "*.csv" -File -ErrorAction Stop |
-    Where-Object { $_.LastWriteTimeUtc -ge $captureStart.AddSeconds(-2) } |
-    Sort-Object LastWriteTimeUtc -Descending |
-    Select-Object -First 1
-if (-not $sourceProfile) {
-    throw "Unreal did not produce a CSV profile under $csvRoot"
-}
-Copy-Item -LiteralPath $sourceProfile.FullName -Destination $profileReport -Force
+Copy-Item -LiteralPath $sourceProfile.FullName -Destination $profileReport
+$observedSettings = Get-ObservedPerformanceSettings -LogContent $logContent -Names $settingsNames
 
 Add-Type -AssemblyName Microsoft.VisualBasic
 $parser = New-Object Microsoft.VisualBasic.FileIO.TextFieldParser($profileReport)
@@ -286,9 +352,19 @@ foreach ($column in $requiredColumns) {
     $columnIndices[$column] = $index
 }
 
+$csvMetadata = [ordered]@{}
+$diagnosticRows = [System.Collections.Generic.List[int]]::new()
+$excludedDiagnosticSamples = 0
+$eventsIndex = [Array]::IndexOf($headers, "EVENTS")
+if ($eventsIndex -lt 0) { throw "CSV lacks EVENTS required to exclude settings diagnostics." }
 $samples = New-Object System.Collections.Generic.List[object]
 $rowIndex = 0
 while (-not $parser.EndOfData) {
+    if ($parser.PeekChars(32).StartsWith('[HasHeaderRowAtEnd],')) {
+        $csvMetadata = Get-NativePerformanceMetadata -RawFooter $parser.ReadLine()
+        if (-not $parser.EndOfData) { throw 'Native metadata footer must be the final CSV record.' }
+        break
+    }
     $fields = $parser.ReadFields()
     if ($fields.Count -lt $headers.Count) {
         continue
@@ -348,8 +424,11 @@ while (-not $parser.EndOfData) {
     if (-not $numericRow) {
         continue
     }
-    if ($rowIndex -ge $WarmupFrames -and
-        (-not $WorldTraversal -or $worldTraversalMeasure -ge 0.5)) {
+    $isDiagnostic = $fields[$eventsIndex] -match 'CsvExecCommand :'
+    if ($isDiagnostic) { $diagnosticRows.Add($rowIndex) }
+    $eligibleSample = $rowIndex -ge $WarmupFrames -and (-not $WorldTraversal -or $worldTraversalMeasure -ge 0.5)
+    if ($eligibleSample -and $isDiagnostic) { ++$excludedDiagnosticSamples }
+    if ($eligibleSample -and -not $isDiagnostic) {
         $samples.Add([pscustomobject]@{
             FrameTime = $frameTime
             GameThreadTime = $gameThreadTime
@@ -383,14 +462,16 @@ while (-not $parser.EndOfData) {
     $rowIndex++
 }
 $parser.Close()
+if ($csvMetadata['bh_run_id'] -cne $runId -or $csvMetadata['bh_runtime'] -cne $Runtime) { throw 'CSV metadata does not identify this run/runtime.' }
+if ($diagnosticRows.Count -ne 2) { throw "Expected two excluded settings-query rows; observed $($diagnosticRows.Count)." }
 
 $minimumSamples = if ($WorldTraversal) {
     # The custom CSV stat is emitted on each 0.1 s fixture movement tick.
     # Nineteen sampled movement frames across each of eight sectors are the
     # complete marked acceptance set; loading/recovery dwell frames stay out.
-    152
+    152 - $excludedDiagnosticSamples
 } else {
-    $CaptureFrames - $WarmupFrames
+    $CaptureFrames - $WarmupFrames - $excludedDiagnosticSamples
 }
 if ($samples.Count -lt $minimumSamples) {
     throw "Performance profile contained $($samples.Count) measured frames; expected at least $minimumSamples. See $profileReport"
@@ -679,79 +760,81 @@ if ($Rendered) {
     }
 }
 $passed = @($checks.Values | Where-Object { -not $_ }).Count -eq 0
-$gpuNameMatch = [regex]::Match(
-    $logContent,
-    "LogRHI:\s+Name:\s+(?<name>[^\r\n]+)"
-)
-$gpuDriverMatch = [regex]::Match(
-    $logContent,
-    "LogRHI:\s+Driver Version:\s+(?<driver>[^\s]+)"
-)
-    $summary = [ordered]@{
-    schemaVersion = 1
-    generatedAtUtc = [DateTime]::UtcNow.ToString("o")
-    mode = if ($WorldTraversal) {
-        "EditorD3D12Offscreen1080pWorldTraversal"
-    } elseif ($Traversal) {
-        "EditorD3D12Offscreen1080pTraversal"
-    } elseif ($Rendered -and $LowerTier) {
-        "EditorD3D12LowerTier1080p"
-    } elseif ($Rendered) {
-        "EditorD3D12Offscreen1080p"
-    } else {
-        "EditorNullRHI"
-    }
-    captureFrames = $CaptureFrames
-    warmupFrames = $WarmupFrames
-    rendererProof = [bool]$Rendered
-    lowerTierProof = [bool]$LowerTier
-    traversalProof = [bool]$Traversal
-    worldMapProof = [bool]$WorldMap
-    worldTraversalProof = [bool]$WorldTraversal
-    navigationProof = [bool]($WorldTraversal -and $navigationStepCount -eq 8)
-    map = $map
-    traversalSteps = if ($Traversal) { $traversalStepCount } else { 0 }
-    navigationSteps = $navigationStepCount
-    networkProof = $false
-    budgets = $budgets
-    metrics = $metrics
-    checks = $checks
-    passed = $passed
-    hardware = if ($Rendered) {
-        [ordered]@{
-            resolution = "1920x1080"
-            rhi = "D3D12"
-            gpu = if ($gpuNameMatch.Success) {
-                $gpuNameMatch.Groups["name"].Value.Trim()
-            } else {
-                "Unknown"
-            }
-            driver = if ($gpuDriverMatch.Success) {
-                $gpuDriverMatch.Groups["driver"].Value.Trim()
-            } else {
-                "Unknown"
-            }
-        }
-    } else {
-        $null
-    }
-    limitations = if ($Rendered) {
-        @(
-            "Offscreen editor D3D12 capture validates this machine and content path, not every target hardware tier or a packaged build.",
-            "Standalone capture does not validate multiplayer bandwidth, replication saturation, travel, reconnect, or soak stability.",
-            "PSO counters cover the measured warm-cache editor window; cold-cache and packaged pipeline-cache stutter remain separate release gates.",
-            "Automated counters do not replace manual review for visible mip transitions, traversal hitches, or image quality."
-        )
-    } else {
-        @(
-            "NullRHI does not validate GPU frame time, draw calls, lighting, material cost, texture quality, or streaming presentation.",
-            "Standalone capture does not validate multiplayer bandwidth, replication saturation, travel, reconnect, or soak stability."
-        )
-    }
-    runtimeLog = $runtimeLog
-    profileCsv = $profileReport
+$budgetPassed = $passed
+$settingsStable = @($observedSettings.Values | Where-Object { -not $_.stable }).Count -eq 0
+$requestedSettingsMatched = $true
+foreach ($name in $requestedSettings.Keys) {
+    [double]$actual = 0; [double]$requested = 0
+    $validNumbers = [double]::TryParse($observedSettings[$name].value, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$actual) -and
+        [double]::TryParse($requestedSettings[$name], [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$requested)
+    if (-not $validNumbers -or $actual -ne $requested) { $requestedSettingsMatched = $false }
 }
-$summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $summaryReport -Encoding UTF8
+$lowerTierVerified = $LowerTier -and $requestedSettingsMatched -and $settingsStable
+$rhi = if ($csvMetadata.Contains('rhiname')) { $csvMetadata['rhiname'] } else { 'Unknown' }
+$resolution = if ($csvMetadata.Contains('systemresolution.resx') -and $csvMetadata.Contains('systemresolution.resy')) {
+    "$($csvMetadata['systemresolution.resx'])x$($csvMetadata['systemresolution.resy'])"
+} else { 'Unknown' }
+$presentationMode = if (-not $Rendered) { 'NullRHI' } elseif ($RenderOffscreen) { 'Offscreen' } else { 'OnscreenRequested' }
+$passed = $budgetPassed -and $settingsStable -and $requestedSettingsMatched
+$summary = [ordered]@{
+    schemaVersion = 2
+    generatedAtUtc = [DateTime]::UtcNow.ToString('o')
+    runId = $runId; runtime = $Runtime; mode = "$Runtime-$presentationMode-$rhi"
+    captureFrames = $CaptureFrames; warmupFrames = $WarmupFrames
+    rendererProof = [bool]($Rendered -and $metrics.gpuP50Ms -gt 0 -and $rhi -ne 'Unknown')
+    lowerTierProof = [bool]$lowerTierVerified; traversalProof = [bool]$Traversal
+    worldMapProof = [bool]$WorldMap; worldTraversalProof = [bool]$WorldTraversal
+    navigationProof = [bool]($WorldTraversal -and $navigationStepCount -eq 8)
+    map = $map; traversalSteps = if ($Traversal) { $traversalStepCount } else { 0 }; navigationSteps = $navigationStepCount
+    networkProof = $false; budgets = $budgets; metrics = $metrics; checks = $checks; passed = $passed
+    captureValid = $settingsStable; budgetStatus = 'provisionalComparison'; budgetPassed = $budgetPassed
+    settings = [ordered]@{
+        requested = $requestedSettings; observed = $observedSettings; requestedMatched = $requestedSettingsMatched
+        stableAcrossQueries = $settingsStable; lowerTierRequested = [bool]$LowerTier; queryFrames = $queryFrames
+        source = 'Two csvExecCmds console queries with effective value and LastSetBy; exact CSV event rows excluded'
+    }
+    hardware = [ordered]@{
+        resolution = $resolution; rhi = $rhi
+        gpu = if ($csvMetadata.Contains('gpu')) { $csvMetadata['gpu'] } else { 'Unknown' }
+        driver = if ($csvMetadata.Contains('gpudriver')) { $csvMetadata['gpudriver'] } else { 'Unknown' }
+        cpu = if ($csvMetadata.Contains('cpu')) { $csvMetadata['cpu'] } else { 'Unknown' }
+        os = if ($csvMetadata.Contains('os')) { $csvMetadata['os'] } else { 'Unknown' }
+        source = 'Finalized CSV runtime metadata; resolution is observed engine system resolution'
+        physicalDisplayPresentationVerified = $false
+    }
+    identity = [ordered]@{
+        executable = $executable; executableSha256 = $executableHash
+        executableLastWriteUtc = (Get-Item -LiteralPath $executable).LastWriteTimeUtc.ToString('o')
+        packageRoot = if ($Runtime -eq 'Packaged') { $resolvedPackageRoot } else { $null }
+        editorProject = if ($Runtime -eq 'Editor') { $uproject } else { $null }
+        csvMetadata = $csvMetadata
+    }
+    frameAccounting = [ordered]@{
+        requested = $CaptureFrames; parsedNumericRows = $rowIndex; startupPrefixDiscarded = [Math]::Min($rowIndex, $WarmupFrames)
+        diagnosticRowIndices = @($diagnosticRows); diagnosticEligibleRowsExcluded = $excludedDiagnosticSamples
+        measured = $samples.Count; otherUnmeasuredRows = $rowIndex - [Math]::Min($rowIndex, $WarmupFrames) - $excludedDiagnosticSamples - $samples.Count
+    }
+    measurementProtocol = [ordered]@{
+        captureStart = 'Engine boot via csvCaptureFrames'; simulation = 'benchmark fixed1/60second timestep'
+        timing = 'CSV elapsed execution timing; t.MaxFPS0 requested; actual effective cap recorded in settings'
+        prefix = 'Startup prefix discard, not proof of warmed caches'; cacheState = 'Uncontrolled; no cache deletion or prewarming'
+        traversal = if ($Traversal) { 'Scripted movement through canonical8steps/2loops; not interactive play' } else { 'Static startup location' }
+        renderedRequested = [bool]$Rendered; renderOffscreenRequested = [bool]$RenderOffscreen
+    }
+    completion = $completion
+    arguments = $arguments; runDirectory = $runDirectory; userDirectory = $captureUserDir
+    sourceProfileCsv = $sourceProfile.FullName; profileSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $profileReport).Hash
+    runtimeLog = $runtimeLog; profileCsv = $profileReport
+    limitations = @(
+        'Budgets are provisional comparisons on this machine, not a calibrated minimum-spec or release performance certification.',
+        'Boot capture and discarded startup frames do not prove warm caches; first/repeat processes may reuse system and driver caches.',
+        'Fixed simulation timestep and scripted traversal do not establish interactive feel, image quality or presentation pacing.',
+        'Standalone profiling does not prove multiplayer bandwidth, travel, reconnect or soak stability.',
+        $(if ($Rendered) { 'GPU metrics and runtime resolution do not replace rendered image inspection.' } else { 'NullRHI provides no GPU or rendered presentation proof.' })
+    )
+}
+$summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $summaryReport -Encoding UTF8
+Copy-Item -LiteralPath $summaryReport -Destination $compatibilitySummary -Force
 
 Write-Host ("[Performance] Frame p95={0}ms p99={1}ms hitches={2}; memory={3}MB; actors={4}; ticks={5}" -f `
     $metrics.frameP95Ms, $metrics.frameP99Ms, $metrics.frameHitchesOver33Ms, `
@@ -770,7 +853,36 @@ if ($Rendered) {
 Write-Host "[Performance] Evidence: $summaryReport"
 if (-not $passed) {
     $failedChecks = @($checks.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object { $_.Key })
-    throw "Performance budget failed: $($failedChecks -join ', '). See $summaryReport"
+    throw "Performance comparison failed (stable settings=$settingsStable; requested settings matched=$requestedSettingsMatched): $($failedChecks -join ', '). Measurements retained: $summaryReport"
 }
 
 Write-Host "BH_PERFORMANCE_ALL_CHECKS_PASSED"
+
+}
+catch {
+    $captureError = $_
+    if ($null -eq $summary) {
+        $summary = [ordered]@{
+            schemaVersion = 2; runId = $runId; runtime = $Runtime; map = $map; passed = $false; captureValid = $false
+            budgetStatus = 'notEvaluated'; failure = $captureError.Exception.Message; completion = $completion
+            rendererProof = $false; lowerTierProof = $false; networkProof = $false; traversalProof = $false
+            metrics = $null; budgets = $null; checks = $null
+            runtimeLog = $runtimeLog; profileCsv = $profileReport; runDirectory = $runDirectory; userDirectory = $captureUserDir
+            executable = $executable; executableSha256 = $executableHash; arguments = $arguments
+        }
+    }
+    throw
+}
+finally {
+    try { Stop-OwnedPerformanceProcess }
+    catch {
+        if ($null -ne $summary) { $summary.passed = $false; $summary.cleanupFailure = $_.Exception.Message }
+        throw
+    }
+    finally {
+        if ($null -ne $summary) {
+            $summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $summaryReport -Encoding UTF8
+            Copy-Item -LiteralPath $summaryReport -Destination $compatibilitySummary -Force
+        }
+    }
+}
