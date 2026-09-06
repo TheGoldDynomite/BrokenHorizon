@@ -2,6 +2,7 @@
 
 #include "BHMainMenuWidget.h"
 #include "BHSessionSubsystem.h"
+#include "BHSaveSubsystem.h"
 #include "BHReplicationTestGameInstance.h"
 #include "Engine/Engine.h"
 #include "Engine/NetConnection.h"
@@ -161,6 +162,21 @@ struct FBHSessionSubsystemTestAccess
         Session.TrackPendingTravel(Origin, NM_ListenServer, Package);
         Session.SetSessionState(EBHSessionState::Traveling, FText::GetEmpty());
     }
+    static void ArmContinue(UBHSessionSubsystem& Session, UWorld* Origin, FGuid ID)
+    {
+        Arm(Session, Origin);
+        Session.PendingContinueRequestID = ID;
+        Session.bPendingContinueCampaign = true;
+        // The saved-map request has already started: map arrival must still wait for Applied.
+        Session.bLoadContinueAfterListenTravel = false;
+        // Keep consumer-only unit tests from requesting an actual menu map change.
+        // Real menu dispatch and retained widget text are covered by the isolated runtime fixture.
+        Session.bContinueFailureMenuTravelPending = true;
+    }
+    static void ContinueResult(UBHSessionSubsystem& Session, FGuid ID, EBHLoadProgressResult Result, UWorld* World)
+    { Session.HandleContinueLoadComplete(ID, Result, TEXT("scoped_test_result"), World); }
+    static bool HasContinueID(const UBHSessionSubsystem& Session, FGuid ID)
+    { return Session.PendingContinueRequestID == ID; }
     static bool BeginContinue(UBHSessionSubsystem& Session, UWorld* World, const FString& Package)
     {
         Session.PendingAction = UBHSessionSubsystem::EPendingAction::Host;
@@ -469,6 +485,47 @@ bool FBHSessionStaleOnlineCallbacksTest::RunTest(const FString& Parameters)
     (void)Parameters;
     FBHScopedSessionWorld Fixture;
     FBHSessionSubsystemTestAccess::CheckRejectedOnlineCallbacks(*Fixture.Session, Fixture.World(), *this);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FBHSessionContinueCompletionTest,
+    "BrokenHorizon.Multiplayer.Session.ContinueCompletion",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter
+)
+bool FBHSessionContinueCompletionTest::RunTest(const FString& Parameters)
+{
+    (void)Parameters;
+    FBHScopedSessionWorld Owned;
+    FBHScopedSessionWorld Foreign;
+    const FGuid FailedID = FGuid::NewGuid();
+    FBHSessionSubsystemTestAccess::ArmContinue(*Owned.Session, Owned.World(), FailedID);
+    UWorld* Destination = Owned.ReplaceWorld();
+    FBHSessionSubsystemTestAccess::Complete(*Owned.Session, Destination);
+    TestEqual(TEXT("Continue map arrival alone remains Traveling"), Owned.Session->GetSessionState(), EBHSessionState::Traveling);
+    FBHSessionSubsystemTestAccess::ContinueResult(*Owned.Session, FGuid::NewGuid(), EBHLoadProgressResult::Applied, Destination);
+    TestTrue(TEXT("Foreign completion ID cannot consume active Continue"), FBHSessionSubsystemTestAccess::HasContinueID(*Owned.Session, FailedID));
+    TestEqual(TEXT("Foreign result cannot report connected"), Owned.Session->GetSessionState(), EBHSessionState::Traveling);
+    AddExpectedError(TEXT("BH_SESSION_ERROR"), EAutomationExpectedErrorFlags::Contains, 1);
+    FBHSessionSubsystemTestAccess::ContinueResult(*Owned.Session, FailedID, EBHLoadProgressResult::Applied, Foreign.World());
+    TestEqual(TEXT("Applied from a foreign world fails closed"), Owned.Session->GetSessionState(), EBHSessionState::Error);
+    TestFalse(TEXT("Failed Continue is no longer pending"), Owned.Session->IsSessionActionPending());
+    const FText FailureMessage = Owned.Session->GetSessionStatusMessage();
+    TestFalse(TEXT("Failure retains a message for the newly constructed menu"), FailureMessage.IsEmpty());
+    FBHSessionSubsystemTestAccess::Complete(*Owned.Session, Destination);
+    TestEqual(TEXT("Stale map arrival cannot erase retained failure text"), Owned.Session->GetSessionStatusMessage().ToString(), FailureMessage.ToString());
+    const FGuid RetryID = FGuid::NewGuid();
+    FBHSessionSubsystemTestAccess::ArmContinue(*Owned.Session, Destination, RetryID);
+    UWorld* RetryDestination = Owned.ReplaceWorld();
+    FBHSessionSubsystemTestAccess::Complete(*Owned.Session, RetryDestination);
+    TestEqual(TEXT("Retry still waits for application after travel"), Owned.Session->GetSessionState(), EBHSessionState::Traveling);
+    // Exercise the actual Session consumer contract. Real Save application/result
+    // generation is independently covered by Persistence.Load.ApplyFailureAndRecovery.
+    FBHSessionSubsystemTestAccess::ContinueResult(*Owned.Session, RetryID, EBHLoadProgressResult::Applied, RetryDestination);
+    TestEqual(TEXT("Matching Applied in the current listen world connects"), Owned.Session->GetSessionState(), EBHSessionState::InSession);
+    TestFalse(TEXT("Applied Continue retires its request identity"), FBHSessionSubsystemTestAccess::HasContinueID(*Owned.Session, RetryID));
+    FBHSessionSubsystemTestAccess::ContinueResult(*Owned.Session, FailedID, EBHLoadProgressResult::Failed, RetryDestination);
+    TestEqual(TEXT("Stale failure cannot overwrite successful retry"), Owned.Session->GetSessionState(), EBHSessionState::InSession);
     return true;
 }
 #endif

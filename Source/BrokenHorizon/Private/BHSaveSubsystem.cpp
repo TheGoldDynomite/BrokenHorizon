@@ -1,4 +1,4 @@
-﻿#include "BHSaveSubsystem.h"
+#include "BHSaveSubsystem.h"
 
 #include "BHCharacter.h"
 #include "BHAmbientWarDirector.h"
@@ -28,6 +28,8 @@
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "Misc/Parse.h"
+#include "HAL/PlatformTime.h"
+#include "Misc/ScopeExit.h"
 #include "Subsystems/SubsystemCollection.h"
 #include "Templates/UnrealTemplate.h"
 #include "TimerManager.h"
@@ -569,10 +571,20 @@ void UBHSaveSubsystem::Initialize(
             this,
             &UBHSaveSubsystem::HandlePostLoadMap
         );
+#if !UE_BUILD_SHIPPING
+    StartContinueRecoveryTest();
+#endif
 }
 
 void UBHSaveSubsystem::Deinitialize()
 {
+    bLoadSubsystemDeinitializing = true;
+    CancelLoadProgress(ActiveLoadRequestID);
+    ClearLoadTimers();
+#if !UE_BUILD_SHIPPING
+    FTSTicker::GetCoreTicker().RemoveTicker(ContinueRecoveryTicker);
+    ContinueRecoveryTicker.Reset();
+#endif
     if (UBHWarSubsystem* WarSubsystem =
         GetGameInstance()
             ? GetGameInstance()->GetSubsystem<UBHWarSubsystem>()
@@ -606,6 +618,7 @@ void UBHSaveSubsystem::Deinitialize()
 
 bool UBHSaveSubsystem::SaveProgress()
 {
+    if (bCheckpointWritesProtected) { return false; }
     UWorld* World = GetGameInstance()
         ? GetGameInstance()->GetWorld()
         : nullptr;
@@ -628,6 +641,7 @@ bool UBHSaveSubsystem::SaveProgressForCharacter(
     ABHCharacter* Character
 )
 {
+    if (bCheckpointWritesProtected) { return false; }
     UWorld* World = GetGameInstance()
         ? GetGameInstance()->GetWorld()
         : nullptr;
@@ -1189,6 +1203,7 @@ bool UBHSaveSubsystem::SaveProgressForCharacter(
 
 bool UBHSaveSubsystem::SavePlayerResources()
 {
+    if (bCheckpointWritesProtected) { return false; }
     UWorld* World = GetGameInstance()
         ? GetGameInstance()->GetWorld()
         : nullptr;
@@ -1256,68 +1271,141 @@ bool UBHSaveSubsystem::SavePlayerResources()
 
 bool UBHSaveSubsystem::LoadProgress()
 {
-    UWorld* World = GetGameInstance()
-        ? GetGameInstance()->GetWorld()
-        : nullptr;
+    const FGuid RequestID = FGuid::NewGuid();
+    return PrepareLoadProgress(RequestID, FBHLoadProgressCompletion()) && StartPreparedLoad(RequestID);
+}
 
-    if (IsClientCampaignWorld(World))
-    {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("BH_CAMPAIGN_LOAD_REJECTED_CLIENT")
-        );
-        return false;
-    }
+bool UBHSaveSubsystem::IsOwnedLoadWorld(const UWorld* World) const
+{
+    const UGameInstance* GI = GetGameInstance();
+    return IsValid(GI) && LoadGameInstance == GI && IsValid(World) &&
+        GI->GetWorld() == World && World->GetGameInstance() == GI &&
+        World->IsGameWorld() && World->GetNetMode() != NM_Client;
+}
 
-#if !UE_BUILD_SHIPPING
-    if (FParse::Param(
-            FCommandLine::Get(),
-            TEXT("BHTestRestoreCrashRecovery")))
-    {
-        bCrashRecoveryLoadStarted = true;
-    }
-#endif
-
-    if (!HasSaveGame())
-    {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("No checkpoint save exists in slot %s."),
-            *GetActiveSaveSlotName()
-        );
-        return false;
-    }
-
+bool UBHSaveSubsystem::PrepareLoadProgress(const FGuid& RequestID, FBHLoadProgressCompletion Completion)
+{
+    // Reject before reading a slot or disturbing another request/casualty intent.
+    if (bLoadSubsystemDeinitializing || bExecutingLoadMutation || !RequestID.IsValid() || ActiveLoadRequestID.IsValid() ||
+        (Completion.IsBound() && !Completion.GetUObject())) { return false; }
+    UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
+    if (!IsValid(World) || IsClientCampaignWorld(World)) { return false; }
     bool bUsedBackup = false;
-    UBHSaveGame* SaveData =
-        LoadBestSaveGame(&bUsedBackup);
+    UBHSaveGame* SaveData = LoadBestSaveGame(&bUsedBackup);
+    return BeginPreparedLoad(RequestID, SaveData, bUsedBackup, MoveTemp(Completion));
+}
 
-    if (!IsValid(SaveData))
-    {
-        UE_LOG(
-            LogTemp,
-            Error,
-            TEXT("No compatible primary or backup checkpoint exists.")
-        );
-        return false;
-    }
-
-    if (!IsValid(World))
-    {
-        return false;
-    }
-
-    const FName LevelToLoad =
-        SaveData->SavedLevelName.IsNone()
-        ? FName(*UGameplayStatics::GetCurrentLevelName(World, true))
-        : SaveData->SavedLevelName;
-
+bool UBHSaveSubsystem::BeginPreparedLoad(const FGuid& RequestID, UBHSaveGame* SaveData, bool bUsedBackup, FBHLoadProgressCompletion Completion)
+{
+    UGameInstance* GI = GetGameInstance();
+    UWorld* World = IsValid(GI) ? GI->GetWorld() : nullptr;
+    if (bLoadSubsystemDeinitializing || bExecutingLoadMutation || !RequestID.IsValid() || ActiveLoadRequestID.IsValid() || !IsValid(SaveData) ||
+        !IsValid(World) || IsClientCampaignWorld(World) ||
+        SaveData->SchemaVersion < BHSave::MinimumCompatibleSchemaVersion || SaveData->SchemaVersion > BHSave::CurrentSchemaVersion ||
+        (Completion.IsBound() && !Completion.GetUObject())) { return false; }
+    ActiveLoadRequestID = RequestID;
+    LoadCompletion = MoveTemp(Completion);
+    LoadGameInstance = GI;
+    LoadOriginWorld = World;
+    LoadDestinationLevel = SaveData->SavedLevelName.IsNone()
+        ? FName(*UGameplayStatics::GetCurrentLevelName(World, true)) : SaveData->SavedLevelName;
     PendingSaveData = SaveData;
     PendingLoadedSchemaVersion = SaveData->SchemaVersion;
     bPendingLoadedFromBackup = bUsedBackup;
+    PendingSaveApplyAttempts = 0;
+    PendingPlayerDeathAttritionSectorID = NAME_None;
+    LoadPhase = ELoadProgressPhase::Prepared;
+    bCheckpointWritesProtected = true;
+    ClearPendingWarAutosave(World);
+    LoadDeadlineSeconds = FPlatformTime::Seconds() + 120.0;
+    LoadDeadlineTicker = FTSTicker::GetCoreTicker().AddTicker(
+        FTickerDelegate::CreateUObject(this, &UBHSaveSubsystem::TickLoadDeadline), 0.25f);
+#if !UE_BUILD_SHIPPING
+    if (FParse::Param(FCommandLine::Get(), TEXT("BHTestRestoreCrashRecovery"))) { bCrashRecoveryLoadStarted = true; }
+#endif
+    UE_LOG(LogTemp, Display, TEXT("BH_CHECKPOINT_LOAD_PREPARED request=%s level=%s"), *RequestID.ToString(), *LoadDestinationLevel.ToString());
+    return true;
+}
 
+void UBHSaveSubsystem::ClearLoadTimers()
+{
+    if (UWorld* World = LoadApplyWorld.Get()) { World->GetTimerManager().ClearTimer(LoadApplyTimer); }
+    LoadApplyTimer.Invalidate();
+    FTSTicker::GetCoreTicker().RemoveTicker(LoadDeadlineTicker);
+    LoadDeadlineTicker.Reset();
+}
+
+void UBHSaveSubsystem::FinishLoadProgress(FGuid RequestID, EBHLoadProgressResult Result, FName Reason, UWorld* AppliedWorld)
+{
+    if (!RequestID.IsValid() || ActiveLoadRequestID != RequestID) { return; }
+    FBHLoadProgressCompletion Completion = MoveTemp(LoadCompletion);
+    ClearLoadTimers();
+    ActiveLoadRequestID.Invalidate();
+    LoadPhase = ELoadProgressPhase::None;
+    PendingSaveData = nullptr;
+    PendingLoadedSchemaVersion = 0;
+    bPendingLoadedFromBackup = false;
+    PendingSaveApplyAttempts = 0;
+    PendingPlayerDeathAttritionSectorID = NAME_None;
+    LoadApplyWorld.Reset(); LoadOriginWorld.Reset(); LoadGameInstance.Reset();
+    LoadDestinationLevel = NAME_None;
+    if (Result == EBHLoadProgressResult::Applied) { bCheckpointWritesProtected = false; }
+    UE_LOG(LogTemp, Display, TEXT("BH_CHECKPOINT_LOAD_FINISHED request=%s result=%d reason=%s world=%s"),
+        *RequestID.ToString(), static_cast<int32>(Result), *Reason.ToString(), *GetNameSafe(AppliedWorld));
+#if !UE_BUILD_SHIPPING
+    if (bContinueRecoveryValid)
+    {
+        if (Result == EBHLoadProgressResult::Failed && Reason == TEXT("apply_validation_failed"))
+        {
+            bContinueRecoveryApplyFailed = true;
+            if (!CheckContinueRecoveryWrites(TEXT("failed_writes"))) { LogContinueRecoveryTest(TEXT("failure"), TEXT("reason=failed_write_protection")); }
+            LogContinueRecoveryTest(TEXT("load_failed"), TEXT("reason=apply_validation_failed"));
+        }
+        if (Result == EBHLoadProgressResult::Applied)
+        { bContinueRecoveryApplied = true; LogContinueRecoveryTest(TEXT("load_applied"), TEXT("reason=applied")); }
+    }
+#endif
+    Completion.ExecuteIfBound(RequestID, Result, Reason, AppliedWorld);
+}
+
+bool UBHSaveSubsystem::CancelLoadProgress(const FGuid& RequestID)
+{
+    if (!RequestID.IsValid() || ActiveLoadRequestID != RequestID) { return false; }
+    if (bExecutingLoadMutation)
+    {
+        bCancelLoadAfterMutation = true;
+        bCheckpointWritesProtected = true;
+        return true;
+    }
+    FinishLoadProgress(RequestID, EBHLoadProgressResult::Cancelled, TEXT("cancelled"), nullptr);
+    return true;
+}
+
+bool UBHSaveSubsystem::TickLoadDeadline(float DeltaTime)
+{
+    if (!ActiveLoadRequestID.IsValid()) { return false; }
+    if (bExecutingLoadMutation) { return true; }
+    if (LoadGameInstance != GetGameInstance() || FPlatformTime::Seconds() >= LoadDeadlineSeconds)
+    {
+        FinishLoadProgress(ActiveLoadRequestID, EBHLoadProgressResult::TimedOut, TEXT("request_timeout"), nullptr);
+        return false;
+    }
+    return true;
+}
+
+bool UBHSaveSubsystem::StartPreparedLoad(const FGuid& RequestID)
+{
+    if (bExecutingLoadMutation || bLoadSubsystemDeinitializing || !RequestID.IsValid() ||
+        ActiveLoadRequestID != RequestID || LoadPhase != ELoadProgressPhase::Prepared) { return false; }
+    UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
+    if (!IsOwnedLoadWorld(World) || !IsValid(PendingSaveData))
+    {
+        FinishLoadProgress(RequestID, EBHLoadProgressResult::Failed, TEXT("invalid_start_world"), nullptr);
+        return false;
+    }
+    LoadOriginWorld = World;
+    LoadPhase = ELoadProgressPhase::AwaitDestination;
+    const FName LevelToLoad = LoadDestinationLevel;
     if (World->GetNetMode() == NM_ListenServer ||
         World->GetNetMode() == NM_DedicatedServer)
     {
@@ -1343,7 +1431,7 @@ bool UBHSaveSubsystem::LoadProgress()
         }
     }
 
-    if (bUsedBackup)
+    if (bPendingLoadedFromBackup)
     {
         UE_LOG(
             LogTemp,
@@ -1380,9 +1468,7 @@ bool UBHSaveSubsystem::LoadProgress()
 
         if (!World->ServerTravel(TravelURL, true))
         {
-            PendingSaveData = nullptr;
-            PendingLoadedSchemaVersion = 0;
-            bPendingLoadedFromBackup = false;
+            FinishLoadProgress(RequestID, EBHLoadProgressResult::Failed, TEXT("travel_rejected"), World);
             UE_LOG(
                 LogTemp,
                 Error,
@@ -1425,15 +1511,10 @@ bool UBHSaveSubsystem::ReloadCheckpointAfterPlayerDeath(
         return false;
     }
 
+    const FGuid RequestID = FGuid::NewGuid();
+    if (!PrepareLoadProgress(RequestID, FBHLoadProgressCompletion())) { return false; }
     PendingPlayerDeathAttritionSectorID = CasualtySectorID;
-
-    if (LoadProgress())
-    {
-        return true;
-    }
-
-    PendingPlayerDeathAttritionSectorID = NAME_None;
-    return false;
+    return StartPreparedLoad(RequestID);
 }
 
 bool UBHSaveSubsystem::DeployNextOperation()
@@ -1592,6 +1673,17 @@ bool UBHSaveSubsystem::HasValidSaveGame() const
 
 bool UBHSaveSubsystem::DeleteSaveGame()
 {
+    if (bExecutingLoadMutation) { return false; }
+    bExecutingLoadMutation = true;
+    ON_SCOPE_EXIT
+    {
+        bExecutingLoadMutation = false;
+        if (bCancelLoadAfterMutation)
+        {
+            bCancelLoadAfterMutation = false;
+            FinishLoadProgress(ActiveLoadRequestID, EBHLoadProgressResult::Cancelled, TEXT("checkpoint_deleted"), nullptr);
+        }
+    };
     UWorld* World = GetGameInstance()
         ? GetGameInstance()->GetWorld()
         : nullptr;
@@ -1637,6 +1729,8 @@ bool UBHSaveSubsystem::DeleteSaveGame()
         return false;
     }
 
+    CancelLoadProgress(ActiveLoadRequestID);
+    bCheckpointWritesProtected = false;
     ClearPendingWarAutosave(World);
 
     PendingSaveData = nullptr;
@@ -1672,6 +1766,7 @@ bool UBHSaveSubsystem::DeleteSaveGame()
 
 void UBHSaveSubsystem::RecordDefeatedEnemy(ABHEnemySoldier* Enemy)
 {
+    if (bCheckpointWritesProtected) { return; }
     if (!IsValid(Enemy) ||
         !Enemy->HasAuthority() ||
         Enemy->GetCombatFaction() != EBHCombatFaction::Hostile ||
@@ -1699,6 +1794,7 @@ void UBHSaveSubsystem::RecordDefeatedEnemy(ABHEnemySoldier* Enemy)
     FName PersistenceID
 )
 {
+    if (bCheckpointWritesProtected) { return false; }
     UWorld* World = GetGameInstance()
         ? GetGameInstance()->GetWorld()
         : nullptr;
@@ -1919,6 +2015,7 @@ bool UBHSaveSubsystem::SavePrimaryWithBackup(
     UBHSaveGame* SaveData
 ) const
 {
+    if (bCheckpointWritesProtected) { return false; }
     if (!IsCompatibleCampaignSave(SaveData))
     {
         return false;
@@ -3113,94 +3210,68 @@ bool UBHSaveSubsystem::ApplyPendingSurrenderState(
 
 void UBHSaveSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
 {
-    if (IsValid(LoadedWorld) && LoadedWorld->IsGameWorld())
-    {
-        ScheduleFieldAutosave(LoadedWorld);
-    }
-
-    if (!IsValid(PendingSaveData) ||
-        !IsValid(LoadedWorld) ||
-        !LoadedWorld->IsGameWorld())
-    {
-        return;
-    }
-
+    UGameInstance* GI = GetGameInstance();
+    if (!IsValid(GI) || !IsValid(LoadedWorld) || GI->GetWorld() != LoadedWorld ||
+        LoadedWorld->GetGameInstance() != GI || !LoadedWorld->IsGameWorld()) { return; }
+    ScheduleFieldAutosave(LoadedWorld);
+    if (LoadPhase != ELoadProgressPhase::AwaitDestination || !ActiveLoadRequestID.IsValid() ||
+        !IsOwnedLoadWorld(LoadedWorld) || LoadOriginWorld == LoadedWorld ||
+        FName(*UGameplayStatics::GetCurrentLevelName(LoadedWorld, true)) != LoadDestinationLevel) { return; }
+#if !UE_BUILD_SHIPPING
+    InstallContinueRecoveryFault(LoadedWorld);
+#endif
+    LoadApplyWorld = LoadedWorld;
+    LoadPhase = ELoadProgressPhase::Applying;
     PendingSaveApplyAttempts = 0;
-
-    FTimerDelegate ApplyDelegate;
-    ApplyDelegate.BindUObject(
-        this,
-        &UBHSaveSubsystem::ApplyPendingSave,
-        LoadedWorld
-    );
-    LoadedWorld->GetTimerManager().SetTimerForNextTick(
-        ApplyDelegate
-    );
+    LoadApplyTimer = LoadedWorld->GetTimerManager().SetTimerForNextTick(
+        FTimerDelegate::CreateUObject(this, &UBHSaveSubsystem::ApplyPendingSave, ActiveLoadRequestID, TWeakObjectPtr<UWorld>(LoadedWorld)));
 }
 
-void UBHSaveSubsystem::ApplyPendingSave(UWorld* LoadedWorld)
+void UBHSaveSubsystem::ApplyPendingSave(FGuid RequestID, TWeakObjectPtr<UWorld> ExpectedWorld)
 {
-    if (!IsValid(PendingSaveData) ||
-        !IsValid(LoadedWorld) ||
-        !LoadedWorld->IsGameWorld())
-    {
-        return;
-    }
-
+    UWorld* LoadedWorld = ExpectedWorld.Get();
+    if (ActiveLoadRequestID != RequestID || !RequestID.IsValid() || LoadPhase != ELoadProgressPhase::Applying ||
+        LoadApplyWorld != ExpectedWorld || !IsOwnedLoadWorld(LoadedWorld) || !IsValid(PendingSaveData)) { return; }
     if (!IsValid(FindPlayerCharacter(LoadedWorld)))
     {
-        constexpr int32 MaximumApplyAttempts = 40;
-        constexpr float ApplyRetryDelaySeconds = 0.25f;
-        ++PendingSaveApplyAttempts;
-
-        if (PendingSaveApplyAttempts > MaximumApplyAttempts)
+        if (++PendingSaveApplyAttempts > 40)
         {
-            UE_LOG(
-                LogTemp,
-                Error,
-                TEXT(
-                    "BH_CHECKPOINT_APPLY_TIMEOUT attempts=%d world=%s"
-                ),
-                PendingSaveApplyAttempts,
-                *GetNameSafe(LoadedWorld)
-            );
-            PendingSaveData = nullptr;
-            PendingLoadedSchemaVersion = 0;
-            bPendingLoadedFromBackup = false;
-            PendingPlayerDeathAttritionSectorID = NAME_None;
-            PendingSaveApplyAttempts = 0;
+            FinishLoadProgress(RequestID, EBHLoadProgressResult::TimedOut, TEXT("player_timeout"), LoadedWorld);
             return;
         }
-
-        if (PendingSaveApplyAttempts == 1)
-        {
-            UE_LOG(
-                LogTemp,
-                Display,
-                TEXT(
-                    "BH_CHECKPOINT_APPLY_WAITING_FOR_PLAYER world=%s"
-                ),
-                *GetNameSafe(LoadedWorld)
-            );
-        }
-
-        FTimerDelegate RetryDelegate;
-        RetryDelegate.BindUObject(
-            this,
-            &UBHSaveSubsystem::ApplyPendingSave,
-            LoadedWorld
-        );
-        FTimerHandle RetryTimer;
-        LoadedWorld->GetTimerManager().SetTimer(
-            RetryTimer,
-            RetryDelegate,
-            ApplyRetryDelaySeconds,
-            false
-        );
+        LoadedWorld->GetTimerManager().SetTimer(LoadApplyTimer,
+            FTimerDelegate::CreateUObject(this, &UBHSaveSubsystem::ApplyPendingSave, RequestID, ExpectedWorld), 0.25f, false);
         return;
     }
-
-    UBHSaveGame* SaveData = PendingSaveData;
+#if !UE_BUILD_SHIPPING
+    if (bContinueRecoveryValid && ContinueRecoveryPhase == 2 && !CheckContinueRecoveryWrites(TEXT("pending_writes")))
+    { LogContinueRecoveryTest(TEXT("failure"), TEXT("reason=pending_write_protection")); }
+#endif
+    // Restoration broadcasts gameplay delegates; pin the payload and serialize
+    // cancellation/reset around those synchronous callbacks.
+    TStrongObjectPtr<UBHSaveGame> PinnedSaveData(PendingSaveData.Get());
+    UBHSaveGame* SaveData = PinnedSaveData.Get();
+    bExecutingLoadMutation = true;
+    bool bApplied = false;
+    FName FailureReason = TEXT("apply_validation_failed");
+    ON_SCOPE_EXIT
+    {
+        const bool bContextValid = ActiveLoadRequestID == RequestID && LoadPhase == ELoadProgressPhase::Applying && IsOwnedLoadWorld(LoadedWorld);
+        if (bApplied && !bContextValid) { bApplied = false; FailureReason = TEXT("apply_context_changed"); }
+        bExecutingLoadMutation = false;
+        const bool bCancelled = bCancelLoadAfterMutation;
+        if (bCancelled || !bApplied) { bCheckpointWritesProtected = true; }
+        bCancelLoadAfterMutation = false;
+        FinishLoadProgress(RequestID, bCancelled ? EBHLoadProgressResult::Cancelled :
+            (bApplied ? EBHLoadProgressResult::Applied : EBHLoadProgressResult::Failed),
+            bCancelled ? FName(TEXT("cancelled")) : (bApplied ? FName(TEXT("applied")) : FailureReason), LoadedWorld);
+    };
+#if !UE_BUILD_SHIPPING
+    if (bContinueRecoveryValid && ContinueRecoveryPhase == 2 && !CheckContinueRecoveryReset())
+    { LogContinueRecoveryTest(TEXT("failure"), TEXT("reason=apply_reset_protection")); }
+    if (bContinueRecoveryValid && (ContinueRecoveryPhase == 2 || ContinueRecoveryPhase == 4) && !PrepareContinueRecoveryNegativeControl())
+    { LogContinueRecoveryTest(TEXT("failure"), TEXT("reason=negative_control")); }
+#endif
     PendingSaveData = nullptr;
     PendingSaveApplyAttempts = 0;
     const int32 LoadedSchemaVersion = PendingLoadedSchemaVersion;
@@ -3221,6 +3292,17 @@ void UBHSaveSubsystem::ApplyPendingSave(UWorld* LoadedWorld)
         return;
     }
 
+    if (ActiveLoadRequestID != RequestID || LoadPhase != ELoadProgressPhase::Applying ||
+        !IsOwnedLoadWorld(LoadedWorld) || bCancelLoadAfterMutation)
+    {
+        FailureReason = TEXT("apply_context_changed");
+        return;
+    }
+    // Actual application is complete. Preserve existing healing/attrition, then
+    // notify only after synchronous housekeeping and the mutation guard unwind.
+    bApplied = true;
+    bCheckpointWritesProtected = false;
+
     if (!PlayerDeathAttritionSectorID.IsNone())
     {
         FTimerHandle RapidRedeployTimer;
@@ -3228,10 +3310,12 @@ void UBHSaveSubsystem::ApplyPendingSave(UWorld* LoadedWorld)
             RapidRedeployTimer,
             FTimerDelegate::CreateWeakLambda(
                 this,
-                [this, LoadedWorld]()
+                [this, ExpectedWorld]()
                 {
+                    UWorld* RedeployWorld = ExpectedWorld.Get();
+                    if (!IsValid(RedeployWorld) || !GetGameInstance() || GetGameInstance()->GetWorld() != RedeployWorld || bCheckpointWritesProtected) { return; }
                     if (ABHCharacter* RedeployedCharacter =
-                            FindPlayerCharacter(LoadedWorld))
+                            FindPlayerCharacter(RedeployWorld))
                     {
                         RedeployedCharacter->ApplyRapidOperationRedeployment();
                     }

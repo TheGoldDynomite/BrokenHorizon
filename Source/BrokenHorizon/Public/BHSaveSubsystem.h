@@ -4,6 +4,8 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "TimerManager.h"
+#include "Containers/Ticker.h"
+#include "UObject/StrongObjectPtr.h"
 #include "BHSaveSubsystem.generated.h"
 
 class ABHCharacter;
@@ -11,6 +13,9 @@ class ABHEnemySoldier;
 class UBHSaveGame;
 class UWorld;
 class FSubsystemCollectionBase;
+
+enum class EBHLoadProgressResult : uint8 { Applied, Failed, TimedOut, Cancelled };
+DECLARE_DELEGATE_FourParams(FBHLoadProgressCompletion, FGuid, EBHLoadProgressResult, FName, UWorld*);
 
 struct FBHPendingSurrenderEnemyState
 {
@@ -54,6 +59,11 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Save")
     bool LoadProgress();
+
+    // Acceptance is separate from restoration. A bound completion must be UObject-owned.
+    bool PrepareLoadProgress(const FGuid& RequestID, FBHLoadProgressCompletion Completion);
+    bool StartPreparedLoad(const FGuid& RequestID);
+    bool CancelLoadProgress(const FGuid& RequestID);
 
     bool ReloadCheckpointAfterPlayerDeath(
         FName CasualtySectorID
@@ -118,7 +128,31 @@ private:
 
     void HandlePostLoadMap(UWorld* LoadedWorld);
 
-    void ApplyPendingSave(UWorld* LoadedWorld);
+    enum class ELoadProgressPhase : uint8 { None, Prepared, AwaitDestination, Applying };
+    bool BeginPreparedLoad(const FGuid& RequestID, UBHSaveGame* SaveData, bool bUsedBackup, FBHLoadProgressCompletion Completion);
+    void FinishLoadProgress(FGuid RequestID, EBHLoadProgressResult Result, FName Reason, UWorld* AppliedWorld);
+    void ApplyPendingSave(FGuid RequestID, TWeakObjectPtr<UWorld> ExpectedWorld);
+    bool IsOwnedLoadWorld(const UWorld* World) const;
+    bool TickLoadDeadline(float DeltaTime);
+    void ClearLoadTimers();
+#if WITH_DEV_AUTOMATION_TESTS
+    friend struct FBHSaveSubsystemTestAccess;
+#endif
+    FGuid ActiveLoadRequestID;
+    FBHLoadProgressCompletion LoadCompletion;
+    ELoadProgressPhase LoadPhase = ELoadProgressPhase::None;
+    TWeakObjectPtr<UGameInstance> LoadGameInstance;
+    TWeakObjectPtr<UWorld> LoadOriginWorld;
+    TWeakObjectPtr<UWorld> LoadApplyWorld;
+    FName LoadDestinationLevel;
+    FTimerHandle LoadApplyTimer;
+    FTSTicker::FDelegateHandle LoadDeadlineTicker;
+    double LoadDeadlineSeconds = 0.0;
+    bool bCheckpointWritesProtected = false;
+    bool bExecutingLoadMutation = false;
+    bool bLoadSubsystemDeinitializing = false;
+    bool bCancelLoadAfterMutation = false;
+
 
     UFUNCTION()
     void HandleWarStateChanged(
@@ -132,6 +166,28 @@ private:
     void ScheduleFieldAutosave(UWorld* World);
     void PerformFieldAutosave();
     bool ShouldDeferCrashRecoveryAutosave() const;
+
+#if !UE_BUILD_SHIPPING
+    void StartContinueRecoveryTest();
+    bool TickContinueRecoveryTest(float DeltaTime);
+    void InstallContinueRecoveryFault(UWorld* World);
+    void LogContinueRecoveryTest(const TCHAR* Phase, const FString& Detail = FString()) const;
+    bool CheckContinueRecoveryWrites(const TCHAR* Stage);
+    bool CheckContinueRecoveryReset();
+    bool PrepareContinueRecoveryNegativeControl();
+    FString ContinueRecoveryRunID;
+    FString ContinueRecoveryDirectory;
+    FString ContinueRecoveryPrimaryHash;
+    FString ContinueRecoveryBackupHash;
+    FTSTicker::FDelegateHandle ContinueRecoveryTicker;
+    double ContinueRecoveryDeadline = 0.0;
+    int32 ContinueRecoveryPhase = 0;
+    bool bContinueRecoveryValid = false;
+    bool bContinueRecoveryFaultInstalled = false;
+    bool bContinueRecoveryApplyFailed = false;
+    bool bContinueRecoveryApplied = false;
+    TStrongObjectPtr<UBHSaveGame> ContinueRecoveryExpected;
+#endif
 
     UPROPERTY(Transient)
     TObjectPtr<UBHSaveGame> PendingSaveData;

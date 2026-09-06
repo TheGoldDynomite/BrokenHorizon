@@ -53,6 +53,7 @@ void UBHSessionSubsystem::Initialize(
 
 void UBHSessionSubsystem::Deinitialize()
 {
+    CancelPendingContinue();
 #if !UE_BUILD_SHIPPING
     FTSTicker::GetCoreTicker().RemoveTicker(SessionRecoveryTickerHandle);
     SessionRecoveryTickerHandle.Reset();
@@ -184,6 +185,18 @@ bool UBHSessionSubsystem::HostCampaign(
         return false;
     }
 
+    if (bContinueCampaign)
+    {
+        UBHSaveSubsystem* Save = GetGameInstance() ? GetGameInstance()->GetSubsystem<UBHSaveSubsystem>() : nullptr;
+        const FGuid RequestID = FGuid::NewGuid();
+        if (!IsValid(Save) || !Save->PrepareLoadProgress(RequestID,
+            FBHLoadProgressCompletion::CreateUObject(this, &UBHSessionSubsystem::HandleContinueLoadComplete)))
+        {
+            FailSessionAction(NSLOCTEXT("BrokenHorizon", "ContinuePrepareFailed", "Checkpoint could not be prepared. Please try again."));
+            return false;
+        }
+        PendingContinueRequestID = RequestID;
+    }
     PendingAction = EPendingAction::Host;
     bPendingContinueCampaign = bContinueCampaign;
     bPendingLANMatch = bLANMatch;
@@ -365,6 +378,12 @@ bool UBHSessionSubsystem::LeaveSession()
 EBHSessionState UBHSessionSubsystem::GetSessionState() const
 {
     return SessionState;
+}
+
+FText UBHSessionSubsystem::GetSessionStatusMessage() const
+{
+    return SessionStatusMessage.IsEmpty()
+        ? NSLOCTEXT("BrokenHorizon", "SessionReadyHelp", "Host a campaign or join a LAN campaign.") : SessionStatusMessage;
 }
 
 bool UBHSessionSubsystem::IsSessionActionPending() const
@@ -578,6 +597,7 @@ bool UBHSessionSubsystem::OpenMainMenu()
         return false;
     }
 
+    CancelPendingContinue();
     ClearPendingTravel();
     bPendingContinueCampaign = false;
     bLoadContinueAfterListenTravel = false;
@@ -599,11 +619,14 @@ void UBHSessionSubsystem::SetSessionState(
 )
 {
     SessionState = NewState;
+    SessionStatusMessage = Message;
     OnSessionStateChanged.Broadcast(NewState, Message);
 }
 
 void UBHSessionSubsystem::FailSessionAction(const FText& Message)
 {
+    const bool bFailedContinue = PendingContinueRequestID.IsValid();
+    CancelPendingContinue();
     ClearSessionDelegates();
     SessionSearch.Reset();
     PendingAction = EPendingAction::None;
@@ -617,6 +640,7 @@ void UBHSessionSubsystem::FailSessionAction(const FText& Message)
         TEXT("BH_SESSION_ERROR %s"),
         *Message.ToString()
     );
+    if (bFailedContinue) { ReturnToMenuAfterContinueFailure(); }
 }
 void UBHSessionSubsystem::ClearSessionDelegates()
 {
@@ -957,74 +981,78 @@ void UBHSessionSubsystem::HandleDestroySessionComplete(
     }
 }
 
-void UBHSessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
+void UBHSessionSubsystem::CancelPendingContinue()
 {
-    if (SessionState != EBHSessionState::Traveling ||
-        !IsCurrentSessionWorld(LoadedWorld) ||
-        PendingTravelMode == NM_Standalone ||
-        LoadedWorld->GetNetMode() != PendingTravelMode ||
-        PendingTravelOrigin.Get() == LoadedWorld ||
-        (!PendingTravelPackage.IsEmpty() &&
-            UWorld::RemovePIEPrefix(LoadedWorld->GetOutermost()->GetName()) != PendingTravelPackage))
+    const FGuid RequestID = PendingContinueRequestID;
+    PendingContinueRequestID.Invalidate();
+    if (RequestID.IsValid())
     {
-        return;
+        if (UBHSaveSubsystem* Save = GetGameInstance() ? GetGameInstance()->GetSubsystem<UBHSaveSubsystem>() : nullptr)
+        { Save->CancelLoadProgress(RequestID); }
     }
+}
 
-    if (bLoadContinueAfterListenTravel)
+void UBHSessionSubsystem::ReturnToMenuAfterContinueFailure()
+{
+    // Error listeners may synchronously begin a newer action. Its travel wins.
+    if (SessionState != EBHSessionState::Error || IsSessionActionPending() || PendingContinueRequestID.IsValid()) { return; }
+    UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
+    const UBHGameShellSettings* Settings = GetDefault<UBHGameShellSettings>();
+    if (!IsCurrentSessionWorld(World) || World->bIsTearingDown || !IsValid(Settings) || Settings->MainMenuMap.IsNull()) { return; }
+    const FString Package = Settings->MainMenuMap.ToSoftObjectPath().GetLongPackageName();
+    if (Package.IsEmpty() || bContinueFailureMenuTravelPending ||
+        UWorld::RemovePIEPrefix(World->GetOutermost()->GetName()) == Package) { return; }
+    bContinueFailureMenuTravelPending = true;
+    // Keep Error and its message through the new menu's construction.
+    UGameplayStatics::OpenLevel(this, FName(*Package));
+}
+
+void UBHSessionSubsystem::HandleContinueLoadComplete(FGuid RequestID, EBHLoadProgressResult Result, FName Reason, UWorld* AppliedWorld)
+{
+    if (!RequestID.IsValid() || PendingContinueRequestID != RequestID) { return; }
+    PendingContinueRequestID.Invalidate();
+    if (Result == EBHLoadProgressResult::Applied && SessionState == EBHSessionState::Traveling &&
+        IsCurrentSessionWorld(AppliedWorld) && AppliedWorld->GetNetMode() == NM_ListenServer)
     {
-        // The existing Continue request may perform another travel to the saved map.
-        // Its deferred save-application semantics remain owned by the save subsystem.
-        PendingTravelOrigin.Reset();
-        PendingTravelPackage.Reset();
-        bLoadContinueAfterListenTravel = false;
-        UGameInstance* GameInstance = GetGameInstance();
-        UBHSaveSubsystem* SaveSubsystem = IsValid(GameInstance)
-            ? GameInstance->GetSubsystem<UBHSaveSubsystem>()
-            : nullptr;
-
-        const bool bCanLoadSavedCampaign =
-            LoadedWorld->GetNetMode() == NM_ListenServer &&
-            IsValid(SaveSubsystem) &&
-            SaveSubsystem->HasValidSaveGame();
-
-        if (bCanLoadSavedCampaign &&
-            SaveSubsystem->LoadProgress())
-        {
-            return;
-        }
-
-        if (bCanLoadSavedCampaign)
-        {
-            UE_LOG(
-                LogTemp,
-                Warning,
-                TEXT("BH_SESSION_CONTINUE_LOAD_FAILED")
-            );
-        }
-
         ClearPendingTravel();
         bPendingContinueCampaign = false;
-        SetSessionState(
-            EBHSessionState::InSession,
-            NSLOCTEXT(
-                "BrokenHorizon",
-                "SessionConnected",
-                "Connected to shared campaign."
-            )
-        );
+        bLoadContinueAfterListenTravel = false;
+        SetSessionState(EBHSessionState::InSession, NSLOCTEXT("BrokenHorizon", "ContinueRestored", "Campaign checkpoint restored."));
+        UE_LOG(LogTemp, Display, TEXT("BH_SESSION_CONTINUE_APPLIED request=%s world=%s"), *RequestID.ToString(), *GetNameSafe(AppliedWorld));
         return;
     }
+    UE_LOG(LogTemp, Warning, TEXT("BH_SESSION_CONTINUE_FAILED request=%s result=%d reason=%s"), *RequestID.ToString(), static_cast<int32>(Result), *Reason.ToString());
+    FailSessionAction(NSLOCTEXT("BrokenHorizon", "ContinueRestoreFailed", "Checkpoint restoration failed. Your checkpoint is protected. Please try again."));
+    ReturnToMenuAfterContinueFailure();
+}
 
+void UBHSessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
+{
+    if (IsCurrentSessionWorld(LoadedWorld)) { bContinueFailureMenuTravelPending = false; }
+    if (SessionState != EBHSessionState::Traveling || !IsCurrentSessionWorld(LoadedWorld) ||
+        PendingTravelMode == NM_Standalone || LoadedWorld->GetNetMode() != PendingTravelMode ||
+        PendingTravelOrigin.Get() == LoadedWorld ||
+        (!PendingTravelPackage.IsEmpty() && UWorld::RemovePIEPrefix(LoadedWorld->GetOutermost()->GetName()) != PendingTravelPackage)) { return; }
+    if (PendingContinueRequestID.IsValid())
+    {
+        if (bLoadContinueAfterListenTravel)
+        {
+            bLoadContinueAfterListenTravel = false;
+            PendingTravelOrigin.Reset();
+            PendingTravelPackage.Reset();
+            UBHSaveSubsystem* Save = GetGameInstance()->GetSubsystem<UBHSaveSubsystem>();
+            if (!IsValid(Save) || !Save->StartPreparedLoad(PendingContinueRequestID))
+            {
+                // Rejection can synchronously complete and report the failure already.
+                if (PendingContinueRequestID.IsValid())
+                { FailSessionAction(NSLOCTEXT("BrokenHorizon", "ContinueStartFailed", "Checkpoint restoration could not start. Please try again.")); }
+            }
+        }
+        return; // Map readiness is not proof that checkpoint data was applied.
+    }
     ClearPendingTravel();
     bPendingContinueCampaign = false;
-    SetSessionState(
-        EBHSessionState::InSession,
-        NSLOCTEXT(
-            "BrokenHorizon",
-            "SessionConnected",
-            "Connected to shared campaign."
-        )
-    );
+    SetSessionState(EBHSessionState::InSession, NSLOCTEXT("BrokenHorizon", "SessionConnected", "Connected to campaign."));
 }
 
 

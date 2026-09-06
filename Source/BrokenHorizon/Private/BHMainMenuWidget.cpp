@@ -269,11 +269,7 @@ void UBHMainMenuWidget::NativeConstruct()
         );
         HandleSessionStateChanged(
             SessionSubsystem->GetSessionState(),
-            NSLOCTEXT(
-                "BrokenHorizon",
-                "SessionReadyHelp",
-                "Host a campaign or join a LAN campaign."
-            )
+            SessionSubsystem->GetSessionStatusMessage()
         );
     }
 

@@ -113,6 +113,7 @@ A3 closes regional coverage rather than postponing all art/content until the end
 Do not require a full repository audit or repeat all previously green tests before
 starting the next bounded task; rerun proof when changed dependencies warrant it.
 
+Recovery delivery `71dd1ac875eac6015a47d4aa59cf03a598982180` is pushed and remote-SHA verified.
 The bounded A1 session-recovery slice is Verified with Editor and packaged evidence: rejected travel,
 no-match Join, actual button events, real host loss, and same-client direct Join
 retry without hidden Leave. Build, six targeted tests (two expected-warning
@@ -124,9 +125,27 @@ open intermittent reload-reliability finding with no supported cause or hardware
 attribution. Final Validate passed with 132 tests (128 successes/four warning-successes)
 and an up-to-date build; final review found no supported blocker in the unchanged
 four files. The crash cannot be declared unrelated or resolved; its reliability
-finding and full A1/G2 remain open. Continue accepted-versus-applied completion is
-the next independent source task; save restoration, physical input, rendered
-appearance and internet acceptance remain separate, with no save API change in this delivery.
+finding and full A1/G2 remain open. Bounded Continue restoration is now Verified:
+the Blueprint boolean acceptance signature is preserved, native completion waits for
+actual save apply, and checkpoint protection begins before initial host travel and
+persists through failure. Successful apply or explicit successful New Game reset
+releases protection; failures retain their reason on the actionable menu. Five
+Persistence.Load and seven Session tests, 74 parser checks, Editor and fresh packaged
+13-phase Continue fixtures, packaged session-recovery regression, focused Editor
+host/transport/travel regression, cumulative review, and final 138-test Validate pass.
+Per-run primary/backup checkpoint bytes stayed unchanged through failure and retry.
+See [Alpha Progress](Alpha_Progress.md) for exact reports and scope. This proves a
+pre-apply failure path, not partial rollback; NullRHI/bound button events do not prove
+physical controls, rendered appearance, natural pickup/removal, or internet operation.
+Physically activating ordinary Continue on a real checkpoint and inspecting restored
+HUD/state/presentation remains the quick manual gate. No user-induced fault is required.
+Next focus is Q5 read-only inventory of actual boat/route, authored cargo, existing
+WesternFOB/EasternDepot stations, and geometry. The current helper spawns a receiving
+station if absent and teleports before transfer, so its integration result does not
+prove the authored corridor or destination supply delta. No production defect or Q5
+pass/failure was established. Extend the read-only staging inventory without saving,
+spawning, teleporting, map repair, or invoking `add_first_light_water_route.py`.
+Inventory precedes a strict acceptance-mode decision; natural controls remain separate.
 Performance checkpoint `ae20a5238db84418836419dff2aa06a3776be118` is pushed and
 remote-SHA verified; its three valid captures still fail provisional budgets.
 Installed UE 5.8 lacks Server distribution support; packaged dedicated delivery

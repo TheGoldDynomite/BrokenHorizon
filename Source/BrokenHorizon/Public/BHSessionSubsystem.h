@@ -12,6 +12,7 @@ class UEngine;
 class UNetDriver;
 class UNetConnection;
 class UBHWarSubsystem;
+enum class EBHLoadProgressResult : uint8;
 
 UENUM(BlueprintType)
 enum class EBHSessionState : uint8
@@ -74,6 +75,7 @@ public:
         Category = "Broken Horizon|Multiplayer"
     )
     EBHSessionState GetSessionState() const;
+    FText GetSessionStatusMessage() const;
 
     UFUNCTION(
         BlueprintPure,
@@ -129,6 +131,12 @@ private:
         bool bWasSuccessful
     );
     void HandlePostLoadMap(UWorld* LoadedWorld);
+    void HandleContinueLoadComplete(FGuid RequestID, EBHLoadProgressResult Result, FName Reason, UWorld* AppliedWorld);
+    void CancelPendingContinue();
+    void ReturnToMenuAfterContinueFailure();
+    FGuid PendingContinueRequestID;
+    FText SessionStatusMessage;
+    bool bContinueFailureMenuTravelPending = false;
 
 #if !UE_BUILD_SHIPPING
     void StartSessionRecoveryTest();

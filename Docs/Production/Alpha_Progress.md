@@ -1,8 +1,11 @@
 # Alpha progress
 
 Updated: 2026-09-05. Repository evidence overrides this compact continuation record.
-Completed slice: bounded A1 session-menu failure recovery.
-Status: **Verified** for bounded session recovery; intermittent reload reliability remains open.
+Completed slice: bounded A1 Continue restoration and checkpoint protection.
+Previous completed slice: bounded A1 session-menu failure recovery.
+Status: **Verified** within automated Continue recovery scope; full A1/G2/alpha acceptance remains open.
+Recovery commit: `71dd1ac875eac6015a47d4aa59cf03a598982180`; pushed and remote SHA verified.
+Intermittent First Light reload reliability remains open.
 Performance commit: `ae20a5238db84418836419dff2aa06a3776be118`; pushed and remote SHA verified.
 Topology commit: `1df892b9e9c2b85929ae29cb586fdf3191790e96`; pushed and remote SHA verified.
 Prior Q2 commit: `58d2380f524dff9812e204d42222d2d0d97f11b9`; pushed to
@@ -27,6 +30,88 @@ Draft scope artifact: [Alpha Manifest](Alpha_Manifest.md) combines content candi
 and proposed support coverage. Draft commit `4470616664ee517c117c0d7d5c6671ac80ab8715`
 was pushed and its remote SHA verified. The working-scope question is unanswered;
 A0 and all candidate decisions remain unaccepted.
+
+## Verified bounded A1 Continue restoration
+
+- `LoadProgress` retains its Blueprint boolean request-acceptance signature. Native
+  request identity and completion distinguish acceptance from actual `ApplySaveData`.
+  Continue prepares and protects the checkpoint before initial host travel; session
+  success waits for Applied. Failure returns an actionable menu with its retained reason.
+- The save owner rejects all writes while pending or failed. Actual successful apply
+  or a successful explicit New Game reset releases protection. Cancellation, deinit,
+  and reentrant protection were reviewed. This is not a partial-apply rollback guarantee.
+- Editor build passed in 4.76 seconds:
+  `Saved/Logs/Codex/BuildEditor-20260905-230025.log`.
+  Persistence.Load passed five tests (four successes/one warning-success):
+  `Saved/Logs/Codex/AutomationReport-20260905-230039/index.json`.
+  Session passed seven (four successes/three warning-successes):
+  `Saved/Logs/Codex/AutomationReport-20260905-230110/index.json`.
+  Parser checks passed 74/74:
+  `Saved/Automation/ContinueRecoveryParser/20260905-224441-7689ba1c/Summary.json`.
+- Editor and packaged Continue fixtures each passed 13 ordered phases:
+  `Saved/Automation/ContinueRecovery/20260905-230152-57442eef/BH-A1-ContinueRecovery-Editor-20260905-2301-Summary.json` and
+  `Saved/Automation/ContinueRecovery/20260905-230730-6537aef7/BH-A1-ContinueRecovery-Packaged-20260905-2307-Summary.json`.
+  An intentional duplicate runtime door ID triggered real pre-apply validation
+  failure. Actual bound Continue events exercised failure-menu recovery and retry
+  in the same process. Health 73, ammo 17/91, Red keycard, UnlockSecurityDoor objective,
+  turn 37, supply 63, and consumed-item tracking were restored after negative controls
+  of turn 9, supply 11, and zero consumed tracking.
+- Full, character, resource, item, and central save writes were blocked while pending
+  and failed; Delete during actual mutation was rejected. Primary and backup bytes
+  stayed identical before, through failure, and after recovery within each run.
+  Coordinator independently checked the actual packaged files. Editor slot SHA256:
+  `94644B4D5BBE3658E8B8A6306ABA3218078C9A20D390074C0D268A32576D5B35`;
+  packaged slot SHA256:
+  `CE430F81422A950F113EDF9F6076D5AE5249CF8CEA3C83E79EEF6457E1F847D8`.
+  These are per-run preservation checks, not cross-runtime byte identity.
+- Fresh package passed (exit 0; UAT 103.87 seconds, wrapper 104.88 seconds):
+  `Saved/Logs/Codex/PackageDevelopment-20260905-230532.log`;
+  archive `Builds/Alpha-Development-20260905-ContinueRecovery/Windows`.
+  Executable SHA256:
+  `4C4FD0C09A8E8D8996495FB5C13B73D76D0982F81A2F66EAD834DF38C1BBF4E6`.
+- Packaged SessionRecovery regression passed real same-machine LAN host loss,
+  actionable menu with the actual specific reason retained, and same-PID/GameInstance
+  direct Join retry with a new connection:
+  `Saved/Automation/SessionRecovery/20260905-230755-660138a0/BH-A1-SessionRecovery-Continue-20260905-2307-Summary.json`.
+  Focused Editor HostRecovery, TransportPersistence, and ServerTravel passed:
+  `Saved/Logs/BH-A1-Continue-HostRecovery-20260905-2309-20260905-230939-Summary.json`.
+  Only required scenario flags count as proof; optional default-true fields do not.
+- Final `Tools/Validate.ps1 -RequireTests -SkipReview` passed. Project Doctor had
+  zero errors/warnings; up-to-date build took 0.87 seconds:
+  `Saved/Logs/Codex/BuildEditor-20260905-231112.log`.
+  Full automation passed 138 tests (132 successes/six warning-successes), zero
+  failed/not-run/in-process:
+  `Saved/Logs/Codex/AutomationReport-20260905-231113/index.json`.
+  Warnings include scoped failure guards and one reviewed nonblocking rifle-fixture
+  cleanup-order warning. Cumulative scoped review is clear; ten source/runner inputs
+  remained unchanged through final validation. All native processes stopped;
+  execution ownership was released. Delivery is tracked by scoped development-branch
+  history; this evidence record does not assert a new commit or push before delivery.
+- **Proof limits:** NullRHI and actual bound `UButton` events prove the automated route,
+  not physical input or pixels. Consumed tracking is not physical pickup/removal;
+  the pre-apply fault is not partial rollback; same-machine LAN is not internet proof.
+  Minimum manual check: physically activate ordinary Continue on a real checkpoint
+  and inspect restored HUD/state/presentation. Automated failure/retry is already
+  proven; error presentation can be reviewed in a controlled fixture when available,
+  without requiring user asset corruption. Broader natural two-player play remains open.
+  A0 draft scope, Q1 denied map-save approval, dedicated-engine and performance gates,
+  and the earlier unexplained First Light reload crash remain open. This update does
+  not establish that the earlier crash is unrelated or resolved.
+
+## Next focus: Q5 authored corridor inventory
+
+A bounded read-only pass found no production defect. The existing watercraft-delivery
+helper creates an Eastern Depot receiving station if absent and teleports the boat
+before transfer; it proves transfer integration, not authored corridor presence,
+reachability, crossing, or destination supply delta. This is not a Q5 pass or failure.
+`Content/Python/inspect_first_light_staging.py` is an existing read-only map-load and
+actor-log probe, but omits receiving stations, cargo, and water extents. No complete
+current corridor inventory was found. Next inspect the actual named boat/route,
+authored cargo, existing WesternFOB/EasternDepot stations, and geometry without
+saving, spawning, teleporting, or creating a synthetic station. Do not execute the
+map-mutating `add_first_light_water_route.py` for this investigation. Inventory should
+precede any strict acceptance-mode decision; no new transport system, map edits, or
+automatic content repairs follow from this finding. Natural controls remain separate.
 
 ## Verified bounded A1 session recovery
 
@@ -95,9 +180,8 @@ A0 and all candidate decisions remain unaccepted.
   validation while the intermittent map-reload reliability finding remains open.
 - Recovery is Verified within this bounded scope; delivery is tracked by scoped
   commit history on the active development branch. Full A1/G2 and the intermittent
-  reload finding remain open. The next independent source task is Continue
-  accepted-versus-applied completion; save restoration and physical-input acceptance
-  remain separate. A successful unchanged retry does not close reload reliability.
+  reload finding remain open. Continue restoration was the next source task at this checkpoint; its later
+  bounded evidence is recorded above. Physical-input acceptance remains separate. A successful unchanged retry does not close reload reliability.
 
 Packaged dedicated-server distribution has an external requirement: the architect
 verified installed UE 5.8 supports Editor/Game configurations only (`BaseEngine.ini`
@@ -424,7 +508,23 @@ not validation of the later HUD readability or active A1/Q2 layout changes.
 | Campaign/content | Complete campaign and authored-content gates remain; this tactical acceptance slice is not full alpha. |
 | Package | Current FirstLightTopology package passes standalone and bounded two-player loopback configurations: fully packaged listen and hybrid Editor dedicated with packaged clients. Wider promised configurations, remote/menu/physical acceptance remain open; Q2 rendered proof is separate. |
 
-## Current session-recovery delivery files
+## Current Continue delivery files
+
+- `Source/BrokenHorizon/Private/BHSaveSubsystem.cpp`
+- `Source/BrokenHorizon/Public/BHSaveSubsystem.h`
+- `Source/BrokenHorizon/Private/BHSessionSubsystem.cpp`
+- `Source/BrokenHorizon/Public/BHSessionSubsystem.h`
+- `Source/BrokenHorizon/Private/BHMainMenuWidget.cpp`
+- `Source/BrokenHorizon/Private/BHContinueRecoveryTest.cpp`
+- `Scripts/Test-BrokenHorizonContinueRecovery.ps1`
+- `Source/BrokenHorizon/Private/Tests/BHSessionAutomationTests.cpp`
+- `Source/BrokenHorizon/Private/Tests/BHSaveLoadAutomationTests.cpp`
+- `Source/BrokenHorizon/Private/Tests/BHSaveLoadTestObserver.h`
+- `Docs/Production/Alpha_Progress.md`
+- `Docs/Production/Alpha_Roadmap.md`
+- `Docs/Production/Alpha_Manifest.md`
+
+## Prior session-recovery delivery files
 
 - `Source/BrokenHorizon/Private/BHSessionSubsystem.cpp`
 - `Source/BrokenHorizon/Public/BHSessionSubsystem.h`
