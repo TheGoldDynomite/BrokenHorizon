@@ -3,12 +3,13 @@
 Updated: 2026-09-05. Repository evidence overrides this compact continuation record.
 Completed slice: A1/Q2 health/stamina layout at 150% HUD scale.
 Status: **Verified** for bounded Q2 HUD layout.
-Delivery branch: `codex/first-light-acceptance`; commit history records the validated update.
+Delivered commit: `58d2380f524dff9812e204d42222d2d0d97f11b9`; pushed to
+`origin/codex/first-light-acceptance` and remote SHA verified.
 Physical input and full-alpha gates remain separate from this slice.
 
 A1 development has explicitly resumed. [Alpha Roadmap](Alpha_Roadmap.md) owns the
-G5 alpha order and gates; Q2 is complete. Next independent A1 work is exploration
-of packaged First Light listen/dedicated functional coverage. A0/A1/G2 remain
+G5 alpha order and gates; Q2 is complete. Packaged First Light functional runner
+coverage is now in progress, with fresh validation pending. A0/A1/G2 remain
 open. The earlier 127-test suite and Readability package below are prior-checkpoint proof,
 not fresh validation of this layout work.
 
@@ -19,6 +20,25 @@ Computer Use initialization, retry, and clean-reset third attempt all failed bef
 game input with `windows sandbox failed: helper_unknown_error: apply deny-read ACLs`.
 No custom input workaround was used. Actual controls/human feel remain open;
 automated source, rendered, and packaged checks can proceed. Current Q2 proof and remaining gates are below.
+
+Draft scope artifact: [Alpha Manifest](Alpha_Manifest.md) combines content candidates
+and proposed support coverage. It is unaccepted; A0 remains open.
+
+## Active A1 task: packaged First Light functional coverage
+
+- **Player outcome:** demonstrate direct-loopback First Light objective, loot, ammo,
+  and rejoin state using packaged clients while retaining the Editor default.
+- **Planned matrix:** fully packaged listen host plus one remote client; separately,
+  a hybrid Editor dedicated server plus two packaged remote clients. The hybrid
+  case is not proof of a packaged dedicated server.
+- **Writer scope:** existing First Light multiplayer runner and
+  `BHWarGameState.cpp/.h`, covering nonshipping readiness, standalone exit, and
+  owner markers. One production writer owns this source/tooling work.
+- **Status/proof:** implementation in progress; fresh matrix and final validation
+  pending. Neither planned configuration is accepted yet; this runner does not prove
+  session-menu flow or debrief acknowledgements.
+- **Open dependencies:** Q1 explicit map approval, actual controls, full G2/A0,
+  performance, and content acceptance remain open. Q2 evidence below is retained.
 
 ## Verified Q2 delivery and evidence
 
