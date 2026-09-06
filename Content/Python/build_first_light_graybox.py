@@ -193,8 +193,16 @@ def _place_gameplay():
         _warning("Red keycard material is unavailable; visual review remains pending.")
 
     door = _spawn_actor(classes["door"], unreal.Vector(4200, -50, 0), "FL_LockedSecurityDoor", FOLDERS["gameplay"])
+    free_door = unreal.load_asset("/Game/BrokenHorizon/Environment/FreeMetalDoor/bunkerdoor")
     security_mesh = unreal.load_asset("/Game/BrokenHorizon/Environment/WorldKit/Meshes/SM_FirstLightSecurityDoor")
-    if security_mesh:
+    if free_door:
+        import integrate_free_first_light_door as free_door_setup
+        free_mesh, free_material, panel_cube = free_door_setup.assets()
+        free_door_setup.configure_door(door, free_mesh, free_material)
+        side_panel = _spawn_actor(unreal.StaticMeshActor, unreal.Vector(*free_door_setup.PANEL_LOCATION),
+                                  free_door_setup.PANEL_LABEL, FOLDERS["geometry"])
+        free_door_setup.configure_panel(side_panel, panel_cube, free_material)
+    elif security_mesh:
         door_mesh = door.get_editor_property("door_mesh")
         door_mesh.set_static_mesh(security_mesh)
         door_mesh.set_editor_property("override_materials", [])

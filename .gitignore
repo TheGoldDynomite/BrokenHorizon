@@ -114,3 +114,5 @@ Desktop.ini
 .DS_Store
 # <<< Broken Horizon Codex Kit <<<
 
+# Acquired Fab content: local use; do not redistribute through the public repository.
+/Content/BrokenHorizon/Environment/FreeMetalDoor/

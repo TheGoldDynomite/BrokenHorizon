@@ -190,3 +190,15 @@ User clarified the current asset budget is zero: use free assets now and replace
 them with paid assets later only if needed and explicitly authorized. Import
 only the assets required for the current slice to limit disk usage. Keep art
 references replaceable without rebuilding the working gameplay systems.
+
+## Free door integration - 2026-09-06
+
+The user downloaded the free Fab Metal Door. It is imported and applied locally
+in First Light with its original proportions, the existing military material,
+a saved box collider and a stationary side panel. Downloaded texture maps are
+absent, so its preview's rust finish cannot be reproduced from the delivery.
+See Docs/Production/FreeMetalDoor.md for provenance, reproduction and evidence.
+The acquired assets are ignored by Git and the local map change remains
+uncommitted: the GitHub repository is public and source redistribution rights
+have not been established. Public scripts retain the authored fallback.
+The imported appearance/keycard/passage now needs a fresh user PIE check.
