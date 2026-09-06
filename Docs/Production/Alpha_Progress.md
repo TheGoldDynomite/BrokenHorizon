@@ -1,8 +1,9 @@
 # Alpha progress
 
 Updated: 2026-09-05. Repository evidence overrides this compact continuation record.
-Completed slice: A1 package-aware performance runner.
-Status: **Verified** for bounded performance measurement; all three runs failed at least one provisional budget.
+Completed slice: bounded A1 session-menu failure recovery.
+Status: **Verified** for bounded session recovery; intermittent reload reliability remains open.
+Performance commit: `ae20a5238db84418836419dff2aa06a3776be118`; pushed and remote SHA verified.
 Topology commit: `1df892b9e9c2b85929ae29cb586fdf3191790e96`; pushed and remote SHA verified.
 Prior Q2 commit: `58d2380f524dff9812e204d42222d2d0d97f11b9`; pushed to
 `origin/codex/first-light-acceptance` and remote SHA verified.
@@ -12,7 +13,7 @@ A1 development has explicitly resumed. [Alpha Roadmap](Alpha_Roadmap.md) owns th
 G5 alpha order and gates; Q2 and the bounded topology matrix are verified.
 The validated topology delivery is tracked by active development-branch history. A0/A1/G2 remain
 open. The earlier 127-test suite and Readability package below are prior-checkpoint proof,
-separate from the current performance-runner proof.
+separate from the completed bounded session-recovery proof.
 
 Q1 lighting remains approval-blocked: automatic approval review rejected the normal
 escalated map-save launch after resumption, before any process started. Explicit
@@ -26,6 +27,84 @@ Draft scope artifact: [Alpha Manifest](Alpha_Manifest.md) combines content candi
 and proposed support coverage. Draft commit `4470616664ee517c117c0d7d5c6671ac80ab8715`
 was pushed and its remote SHA verified. The working-scope question is unanswered;
 A0 and all candidate decisions remain unaccepted.
+
+## Verified bounded A1 session recovery
+
+- **Implemented source scope:** recover rejected travel and owned asynchronous
+  failures through existing API/Error state; reset pending intent and clean the old
+  named session before LAN Join retry. Four-file review is clear; inputs are frozen.
+- Editor build passed in 28.83 seconds:
+  `Saved/Logs/Codex/BuildEditor-20260905-214100.log`.
+  Six targeted tests passed (four successes, two warning-successes; zero
+  failed/not-run/in-process):
+  `Saved/Logs/Codex/AutomationReport-20260905-214147/index.json`.
+  These are five new registered tests plus Contract. Warnings are the scoped tests'
+  expected travel/network-failure messages, independently checked by the coordinator.
+- Actual-AST runner parser checks passed 59/59:
+  `Saved/Automation/SessionRecoveryParser/20260905-214529-8b509158/Summary.json`.
+  Frozen runner SHA256:
+  `EEBCFD615C5FB0A6EE3C7132BC5324CDF5EA7F179C4E38EA47E1CA2475855710`.
+- Editor fixture passed; coordinator read the entire summary:
+  `Saved/Automation/SessionRecovery/20260905-214812-15bec943/BH-A1-SessionRecovery-Editor-20260905-2147-Summary.json`.
+  Same-machine LAN discovery succeeded at port 8791; local reports retain both
+  resolved connect strings. No-match Join reached Error with actionable
+  buttons; actual `ServerTravel(false)` retained the named session, then the same
+  host retried through New Game. Host New Game/LAN Join succeeded before real owned
+  host termination caused ConnectionTimeout (about 60 seconds). Client recovered
+  to Error/nonpending with retained named session and actionable menu. Its new
+  widget showed ACTION FAILED and generic Host/Join instructions, not the original
+  specific failure detail. Restarted
+  host plus direct Join retry succeeded without hidden Leave.
+- Client PID `23220` and GameInstance `54590:4560` persisted across recovery;
+  connection identity changed `59211:5934` -> `55617:8883`. Each host had two
+  participants/one remote; cleanup-error array was empty.
+- The fixture exercised actual enabled, visible, bound `UButton.OnClicked` events,
+  not ProcessEvent or physical clicks. Host used configured `L_BrokenHorizon_World`
+  and menu `L_MainMenu`; no map asset edit. No new pixels, Continue/save-restoration,
+  or internet acceptance is claimed. Save completion remains a separate gate.
+- Fresh SessionRecovery package passed (exit 0, 98.73 seconds):
+  `Saved/Logs/Codex/PackageDevelopment-20260905-215056.log`;
+  archive `Builds/Alpha-Development-20260905-SessionRecovery/Windows`; executable SHA256
+  `5BCCD322394F764AF4F8F2C61C9E8DBD5207A9B37AE7C69A7EA1FF39FCF5EBE6`.
+  Packaged recovery passed:
+  `Saved/Automation/SessionRecovery/20260905-215311-afd8140d/BH-A1-SessionRecovery-Packaged-20260905-2153-Summary.json`.
+- **Unresolved regression:** SameProcessReconnect crashed in the retained client
+  during the second First Light load:
+  `Saved/Logs/Codex/BH-A1-SessionRecovery-Reconnect-20260905-2155-20260905-215522-1501fd76-Summary.json`.
+  Crash artifacts: `Saved/Crashes/UECC-Windows-4CFC9FFE4C1A258EE88FD5AF3C9DA6AD_0000`.
+  The matching `-RetainedClient.log`, line 1694, records
+  `EXCEPTION_ILLEGAL_INSTRUCTION`. This remains an **open intermittent First Light
+  reload reliability finding**. No supported cause or hardware attribution exists.
+  A passing retry does not resolve the first failure.
+- The exact unchanged SameProcessReconnect retry passed all 18 assertions;
+  coordinator audited:
+  `Saved/Logs/Codex/BH-A1-SessionRecovery-Reconnect-20260905-2155-20260905-220141-2f759b98-Summary.json`.
+  Client PID `18252`, GameInstance `54590:4560`, and WarSubsystem `54720:26691`
+  were retained; connection changed `57532:24486` -> `61442:27709`, revision
+  `4097` -> `2`, and host/client converged. Cleanup-error array was empty.
+- Final `Tools/Validate.ps1 -RequireTests -SkipReview` passed; coordinator independently
+  read build/test evidence. Up-to-date Editor build completed in 0.89 seconds:
+  `Saved/Logs/Codex/BuildEditor-20260905-220251.log`.
+  Full automation: 128 successes plus four warning-successes (132 total), zero
+  failed/not-run/in-process:
+  `Saved/Logs/Codex/AutomationReport-20260905-220252/index.json`.
+  No owned engine/build/game processes remain. Final scoped review found no supported
+  blocking defect in the unchanged four files. The first failure occurred after eight
+  assertions; the unchanged retry passed all 18. The reviewer cannot conclude that
+  the crash is unrelated or resolved. The 132-test gate closes bounded recovery
+  validation while the intermittent map-reload reliability finding remains open.
+- Recovery is Verified within this bounded scope; delivery is tracked by scoped
+  commit history on the active development branch. Full A1/G2 and the intermittent
+  reload finding remain open. The next independent source task is Continue
+  accepted-versus-applied completion; save restoration and physical-input acceptance
+  remain separate. A successful unchanged retry does not close reload reliability.
+
+Packaged dedicated-server distribution has an external requirement: the architect
+verified installed UE 5.8 supports Editor/Game configurations only (`BaseEngine.ini`
+3996-4007), and UBT rejects a Server target (1395-1403). It requires an approved
+server-capable source/custom engine installation. No Server build was attempted and
+no engine metadata workaround was applied. Existing hybrid proof remains valid.
+Q1 map approval, unanswered A0 scope, and actual Computer Use acceptance remain open.
 
 ## Verified performance runner and measured budget failures
 
@@ -345,7 +424,17 @@ not validation of the later HUD readability or active A1/Q2 layout changes.
 | Campaign/content | Complete campaign and authored-content gates remain; this tactical acceptance slice is not full alpha. |
 | Package | Current FirstLightTopology package passes standalone and bounded two-player loopback configurations: fully packaged listen and hybrid Editor dedicated with packaged clients. Wider promised configurations, remote/menu/physical acceptance remain open; Q2 rendered proof is separate. |
 
-## Current performance delivery files
+## Current session-recovery delivery files
+
+- `Source/BrokenHorizon/Private/BHSessionSubsystem.cpp`
+- `Source/BrokenHorizon/Public/BHSessionSubsystem.h`
+- `Source/BrokenHorizon/Private/Tests/BHSessionAutomationTests.cpp`
+- `Scripts/Test-BrokenHorizonSessionRecovery.ps1`
+- `Docs/Production/Alpha_Progress.md`
+- `Docs/Production/Alpha_Roadmap.md`
+- `Docs/Production/Alpha_Manifest.md`
+
+## Prior performance delivery files
 
 - `Scripts/Test-BrokenHorizonPerformance.ps1`
 - `Docs/Production/Alpha_Progress.md`

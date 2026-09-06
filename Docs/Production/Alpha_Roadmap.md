@@ -113,6 +113,26 @@ A3 closes regional coverage rather than postponing all art/content until the end
 Do not require a full repository audit or repeat all previously green tests before
 starting the next bounded task; rerun proof when changed dependencies warrant it.
 
+The bounded A1 session-recovery slice is Verified with Editor and packaged evidence: rejected travel,
+no-match Join, actual button events, real host loss, and same-client direct Join
+retry without hidden Leave. Build, six targeted tests (two expected-warning
+successes), 59 parser cases, and four-file review pass; see [Alpha Progress](Alpha_Progress.md).
+Fresh package and packaged recovery pass. SameProcessReconnect crashed during the
+retained client's second First Light load with EXCEPTION_ILLEGAL_INSTRUCTION;
+the exact unchanged retry passed all 18 assertions, but the first crash remains an
+open intermittent reload-reliability finding with no supported cause or hardware
+attribution. Final Validate passed with 132 tests (128 successes/four warning-successes)
+and an up-to-date build; final review found no supported blocker in the unchanged
+four files. The crash cannot be declared unrelated or resolved; its reliability
+finding and full A1/G2 remain open. Continue accepted-versus-applied completion is
+the next independent source task; save restoration, physical input, rendered
+appearance and internet acceptance remain separate, with no save API change in this delivery.
+Performance checkpoint `ae20a5238db84418836419dff2aa06a3776be118` is pushed and
+remote-SHA verified; its three valid captures still fail provisional budgets.
+Installed UE 5.8 lacks Server distribution support; packaged dedicated delivery
+requires an approved server-capable source/custom engine installation, not a metadata
+workaround. No Server build was attempted. A0/Q1/actual-control gates remain open.
+
 ## Active A1 task queue
 
 No item below starts from this document alone. Priority and readiness are separate:

@@ -2,11 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "Containers/Ticker.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "BHSessionSubsystem.generated.h"
 
+class UEngine;
+class UNetDriver;
 class UNetConnection;
 class UBHWarSubsystem;
 
@@ -89,12 +92,22 @@ private:
     {
         None,
         Host,
+        Join,
         Leave
     };
 
     bool ResolveSessionInterface();
     bool CreatePendingSession();
+    bool BeginPendingSearch();
     bool TravelToCampaign();
+    bool BeginCampaignTravel(UWorld* World, const FString& PackageName);
+    void TrackPendingTravel(UWorld* World, ENetMode ExpectedMode, const FString& ExpectedPackage = FString());
+    void ClearPendingTravel();
+    bool IsCurrentSessionWorld(const UWorld* World) const;
+    void BindTravelDelegates();
+    void ClearTravelDelegates();
+    void HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
+    void HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
     bool OpenMainMenu();
     void SetSessionState(
         EBHSessionState NewState,
@@ -118,6 +131,24 @@ private:
     void HandlePostLoadMap(UWorld* LoadedWorld);
 
 #if !UE_BUILD_SHIPPING
+    void StartSessionRecoveryTest();
+    bool TickSessionRecoveryTest(float DeltaTime);
+    void LogSessionRecoveryTest(const TCHAR* Phase, const TCHAR* Result, const FString& Detail = FString()) const;
+    bool bSessionRecoveryTestRequested = false;
+    bool bSessionRecoveryTestValid = false;
+    bool bSessionRecoveryRejectNextTravel = false;
+    bool bSessionRecoveryRejectedTravelObserved = false;
+    bool bSessionRecoveryNoMatchObserved = false;
+    bool bSessionRecoveryDisconnectObserved = false;
+    FTSTicker::FDelegateHandle SessionRecoveryTickerHandle;
+    TWeakObjectPtr<UGameInstance> SessionRecoveryGameInstance;
+    TWeakObjectPtr<UNetConnection> SessionRecoveryInitialConnection;
+    FString SessionRecoveryRunID;
+    FString SessionRecoveryRole;
+    FString SessionRecoveryControlDirectory;
+    double SessionRecoveryDeadline = 0.0;
+    int32 SessionRecoveryPhase = 0;
+
     void StartSameProcessReconnectTest();
     bool TickSameProcessReconnectTest(float DeltaTime);
     void LogSameProcessReconnectPhase(const TCHAR* Phase) const;
@@ -140,6 +171,16 @@ private:
     EReconnectTestPhase ReconnectTestPhase = EReconnectTestPhase::AwaitLeave;
 #endif
 
+#if WITH_DEV_AUTOMATION_TESTS
+    friend struct FBHSessionSubsystemTestAccess;
+#endif
+
+    TWeakObjectPtr<UEngine> BoundTravelEngine;
+    TWeakObjectPtr<UWorld> PendingTravelOrigin;
+    FString PendingTravelPackage;
+    ENetMode PendingTravelMode = NM_Standalone;
+    FDelegateHandle NetworkFailureDelegateHandle;
+    FDelegateHandle TravelFailureDelegateHandle;
     IOnlineSessionPtr SessionInterface;
     TSharedPtr<FOnlineSessionSearch> SessionSearch;
     FDelegateHandle CreateSessionDelegateHandle;

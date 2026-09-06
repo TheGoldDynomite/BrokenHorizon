@@ -4,9 +4,14 @@
 #include "BHSaveSubsystem.h"
 #if !UE_BUILD_SHIPPING
 #include "BHWarGameState.h"
+#include "BHMainMenuWidget.h"
+#include "BHCharacter.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Components/Button.h"
+#include "Components/TextBlock.h"
+#include "GameFramework/PlayerState.h"
+#include "UObject/UnrealType.h"
 #include "BHWarSubsystem.h"
-#include "Engine/NetConnection.h"
-#include "Engine/NetDriver.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformProcess.h"
 #include "HAL/PlatformTime.h"
@@ -16,7 +21,11 @@
 #include "String/LexFromString.h"
 #include "UObject/UObjectArray.h"
 #endif
+#include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
+#include "Engine/NetConnection.h"
+#include "Engine/NetDriver.h"
+#include "Engine/PendingNetGame.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
@@ -35,12 +44,9 @@ void UBHSessionSubsystem::Initialize(
 {
     Super::Initialize(Collection);
     ResolveSessionInterface();
-    PostLoadMapDelegateHandle =
-        FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
-            this,
-            &UBHSessionSubsystem::HandlePostLoadMap
-        );
+    BindTravelDelegates();
 #if !UE_BUILD_SHIPPING
+    StartSessionRecoveryTest();
     StartSameProcessReconnectTest();
 #endif
 }
@@ -48,22 +54,116 @@ void UBHSessionSubsystem::Initialize(
 void UBHSessionSubsystem::Deinitialize()
 {
 #if !UE_BUILD_SHIPPING
+    FTSTicker::GetCoreTicker().RemoveTicker(SessionRecoveryTickerHandle);
+    SessionRecoveryTickerHandle.Reset();
     FTSTicker::GetCoreTicker().RemoveTicker(ReconnectTestTickerHandle);
     ReconnectTestTickerHandle.Reset();
 #endif
     ClearSessionDelegates();
 
-    if (PostLoadMapDelegateHandle.IsValid())
-    {
-        FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(
-            PostLoadMapDelegateHandle
-        );
-        PostLoadMapDelegateHandle.Reset();
-    }
+    ClearTravelDelegates();
+    ClearPendingTravel();
 
     SessionSearch.Reset();
     SessionInterface.Reset();
     Super::Deinitialize();
+}
+
+bool UBHSessionSubsystem::IsCurrentSessionWorld(const UWorld* World) const
+{
+    const UGameInstance* GameInstance = GetGameInstance();
+    return IsValid(GameInstance) && IsValid(World) && World->GetGameInstance() == GameInstance &&
+        GameInstance->GetWorld() == World;
+}
+
+void UBHSessionSubsystem::TrackPendingTravel(UWorld* World, ENetMode ExpectedMode, const FString& ExpectedPackage)
+{
+    PendingTravelOrigin = World;
+    PendingTravelMode = ExpectedMode;
+    PendingTravelPackage = ExpectedPackage;
+}
+
+void UBHSessionSubsystem::ClearPendingTravel()
+{
+    PendingTravelOrigin.Reset();
+    PendingTravelPackage.Reset();
+    PendingTravelMode = NM_Standalone;
+}
+
+void UBHSessionSubsystem::BindTravelDelegates()
+{
+    ClearTravelDelegates();
+    PostLoadMapDelegateHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &UBHSessionSubsystem::HandlePostLoadMap);
+    if (IsValid(GEngine))
+    {
+        BoundTravelEngine = GEngine;
+        TravelFailureDelegateHandle = GEngine->OnTravelFailure().AddUObject(this, &UBHSessionSubsystem::HandleTravelFailure);
+        NetworkFailureDelegateHandle = GEngine->OnNetworkFailure().AddUObject(this, &UBHSessionSubsystem::HandleNetworkFailure);
+    }
+}
+
+void UBHSessionSubsystem::ClearTravelDelegates()
+{
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapDelegateHandle);
+    PostLoadMapDelegateHandle.Reset();
+    if (UEngine* Engine = BoundTravelEngine.Get())
+    {
+        Engine->OnTravelFailure().Remove(TravelFailureDelegateHandle);
+        Engine->OnNetworkFailure().Remove(NetworkFailureDelegateHandle);
+    }
+    TravelFailureDelegateHandle.Reset();
+    NetworkFailureDelegateHandle.Reset();
+    BoundTravelEngine.Reset();
+}
+
+void UBHSessionSubsystem::HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString)
+{
+    if (!IsCurrentSessionWorld(World) || !IsSessionActionPending() || SessionState == EBHSessionState::Leaving)
+    {
+        return;
+    }
+    UE_LOG(LogTemp, Warning, TEXT("BH_SESSION_TRAVEL_FAILURE type=%d detail=%s"), static_cast<int32>(FailureType), *ErrorString);
+    FailSessionAction(NSLOCTEXT("BrokenHorizon", "SessionTravelFailure", "Campaign travel failed. Please try again."));
+}
+
+void UBHSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
+{
+    if (!IsValid(NetDriver) || SessionState == EBHSessionState::Idle || SessionState == EBHSessionState::Error || SessionState == EBHSessionState::Leaving)
+    {
+        return;
+    }
+    const UGameInstance* GameInstance = GetGameInstance();
+    const FWorldContext* Context = IsValid(GameInstance) ? GameInstance->GetWorldContext() : nullptr;
+    const bool bOwnedCurrentDriver = IsCurrentSessionWorld(World) && World->GetNetDriver() == NetDriver;
+    // Pending connection failures legitimately carry no UWorld. Match the exact
+    // pending driver in this GameInstance's context, never a process-global guess.
+    const bool bOwnedPendingDriver = Context && Context->OwningGameInstance == GameInstance &&
+        IsValid(Context->PendingNetGame) && Context->PendingNetGame->NetDriver == NetDriver &&
+        (!World || IsCurrentSessionWorld(World));
+    if (!bOwnedCurrentDriver && !bOwnedPendingDriver)
+    {
+        return;
+    }
+    if (SessionState == EBHSessionState::InSession &&
+        (!bOwnedCurrentDriver || World->GetNetMode() != NM_Client))
+    {
+        return;
+    }
+    // A listen host losing one remote participant has not lost its own session.
+    if (bOwnedCurrentDriver && NetDriver->GetNetMode() != NM_Client &&
+        (FailureType == ENetworkFailure::ConnectionLost || FailureType == ENetworkFailure::ConnectionTimeout ||
+            FailureType == ENetworkFailure::NetGuidMismatch || FailureType == ENetworkFailure::NetChecksumMismatch))
+    {
+        return;
+    }
+#if !UE_BUILD_SHIPPING
+    if (bSessionRecoveryTestValid && SessionState == EBHSessionState::InSession && bOwnedCurrentDriver)
+    {
+        bSessionRecoveryDisconnectObserved = true;
+    }
+#endif
+    UE_LOG(LogTemp, Warning, TEXT("BH_SESSION_NETWORK_FAILURE type=%d detail=%s"), static_cast<int32>(FailureType), *ErrorString);
+    FailSessionAction(NSLOCTEXT("BrokenHorizon", "SessionNetworkFailure", "Campaign connection failed. Please try again."));
 }
 
 bool UBHSessionSubsystem::HostCampaign(
@@ -72,6 +172,13 @@ bool UBHSessionSubsystem::HostCampaign(
     bool bLANMatch
 )
 {
+#if !UE_BUILD_SHIPPING
+    if (bSessionRecoveryTestRequested && !bSessionRecoveryTestValid)
+    {
+        FailSessionAction(NSLOCTEXT("BrokenHorizon", "SessionFixtureInvalid", "Session acceptance configuration is invalid."));
+        return false;
+    }
+#endif
     if (IsSessionActionPending() || !ResolveSessionInterface())
     {
         return false;
@@ -125,15 +232,45 @@ bool UBHSessionSubsystem::HostCampaign(
 
 bool UBHSessionSubsystem::FindAndJoinCampaign(bool bLANMatch)
 {
+#if !UE_BUILD_SHIPPING
+    if (bSessionRecoveryTestRequested && !bSessionRecoveryTestValid)
+    {
+        FailSessionAction(NSLOCTEXT("BrokenHorizon", "SessionFixtureInvalid", "Session acceptance configuration is invalid."));
+        return false;
+    }
+#endif
     if (IsSessionActionPending() || !ResolveSessionInterface())
     {
         return false;
     }
 
-    PendingAction = EPendingAction::None;
+    PendingAction = EPendingAction::Join;
     bPendingLANMatch = bLANMatch;
+    SetSessionState(EBHSessionState::Searching, NSLOCTEXT("BrokenHorizon", "SessionPreparingSearch", "Preparing campaign search..."));
+    if (SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
+    {
+        DestroySessionDelegateHandle = SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(
+            FOnDestroySessionCompleteDelegate::CreateUObject(this, &UBHSessionSubsystem::HandleDestroySessionComplete));
+        if (!SessionInterface->DestroySession(NAME_GameSession))
+        {
+            FailSessionAction(NSLOCTEXT("BrokenHorizon", "SessionDestroyBeforeJoinFailed", "The previous campaign session could not be closed before joining."));
+            return false;
+        }
+        return SessionState != EBHSessionState::Error;
+    }
+    return BeginPendingSearch();
+}
+
+bool UBHSessionSubsystem::BeginPendingSearch()
+{
+    if (!SessionInterface.IsValid())
+    {
+        FailSessionAction(NSLOCTEXT("BrokenHorizon", "SessionSearchInterfaceLost", "The online session service became unavailable before search."));
+        return false;
+    }
+    PendingAction = EPendingAction::None;
     SessionSearch = MakeShared<FOnlineSessionSearch>();
-    SessionSearch->bIsLanQuery = bLANMatch;
+    SessionSearch->bIsLanQuery = bPendingLANMatch;
     SessionSearch->MaxSearchResults = 50;
     SessionSearch->PingBucketSize = 50;
 
@@ -312,6 +449,13 @@ bool UBHSessionSubsystem::CreatePendingSession()
         EOnlineDataAdvertisementType::ViaOnlineServiceAndPing
     );
 
+#if !UE_BUILD_SHIPPING
+    if (bSessionRecoveryTestValid)
+    {
+        Settings.Set(FName(TEXT("BHCampaignTestRun")), SessionRecoveryRunID, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+    }
+#endif
+
     CreateSessionDelegateHandle =
         SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(
             FOnCreateSessionCompleteDelegate::CreateUObject(
@@ -367,6 +511,24 @@ bool UBHSessionSubsystem::TravelToCampaign()
         return false;
     }
 
+#if !UE_BUILD_SHIPPING
+    if (bSessionRecoveryTestValid && bSessionRecoveryRejectNextTravel)
+    {
+        bSessionRecoveryRejectNextTravel = false;
+        return BeginCampaignTravel(World, TEXT("/Game/BH%SessionRejected"));
+    }
+#endif
+    return BeginCampaignTravel(World, PackageName);
+}
+
+bool UBHSessionSubsystem::BeginCampaignTravel(UWorld* World, const FString& PackageName)
+{
+    if (!IsCurrentSessionWorld(World) || PackageName.IsEmpty())
+    {
+        FailSessionAction(NSLOCTEXT("BrokenHorizon", "SessionTravelInvalid", "The campaign travel target is unavailable."));
+        return false;
+    }
+    TrackPendingTravel(World, NM_ListenServer, PackageName);
     SetSessionState(
         EBHSessionState::Traveling,
         bPendingContinueCampaign
@@ -382,7 +544,18 @@ bool UBHSessionSubsystem::TravelToCampaign()
             )
     );
     bLoadContinueAfterListenTravel = bPendingContinueCampaign;
-    World->ServerTravel(PackageName + TEXT("?listen"));
+    if (!World->ServerTravel(PackageName + TEXT("?listen")))
+    {
+#if !UE_BUILD_SHIPPING
+        if (bSessionRecoveryTestValid && PackageName == TEXT("/Game/BH%SessionRejected"))
+        {
+            bSessionRecoveryRejectedTravelObserved = true;
+            LogSessionRecoveryTest(TEXT("server_travel_rejected"), TEXT("observed"), TEXT("accepted=0"));
+        }
+#endif
+        FailSessionAction(NSLOCTEXT("BrokenHorizon", "SessionTravelRejected", "The shared campaign travel request was rejected."));
+        return false;
+    }
     return true;
 }
 
@@ -405,6 +578,9 @@ bool UBHSessionSubsystem::OpenMainMenu()
         return false;
     }
 
+    ClearPendingTravel();
+    bPendingContinueCampaign = false;
+    bLoadContinueAfterListenTravel = false;
     UGameplayStatics::OpenLevel(this, FName(*PackageName));
     SetSessionState(
         EBHSessionState::Idle,
@@ -428,8 +604,12 @@ void UBHSessionSubsystem::SetSessionState(
 
 void UBHSessionSubsystem::FailSessionAction(const FText& Message)
 {
+    ClearSessionDelegates();
+    SessionSearch.Reset();
     PendingAction = EPendingAction::None;
+    bPendingContinueCampaign = false;
     bLoadContinueAfterListenTravel = false;
+    ClearPendingTravel();
     SetSessionState(EBHSessionState::Error, Message);
     UE_LOG(
         LogTemp,
@@ -483,6 +663,8 @@ void UBHSessionSubsystem::HandleCreateSessionComplete(
     bool bWasSuccessful
 )
 {
+    if (SessionName != NAME_GameSession || SessionState != EBHSessionState::Hosting || PendingAction != EPendingAction::Host || !CreateSessionDelegateHandle.IsValid()) { return; }
+
     if (SessionInterface.IsValid() &&
         CreateSessionDelegateHandle.IsValid())
     {
@@ -506,7 +688,7 @@ void UBHSessionSubsystem::HandleCreateSessionComplete(
 
     PendingAction = EPendingAction::None;
 
-    if (!TravelToCampaign())
+    if (!TravelToCampaign() && SessionState != EBHSessionState::Error)
     {
         FailSessionAction(
             NSLOCTEXT(
@@ -522,6 +704,8 @@ void UBHSessionSubsystem::HandleFindSessionsComplete(
     bool bWasSuccessful
 )
 {
+    if (SessionState != EBHSessionState::Searching || !FindSessionsDelegateHandle.IsValid()) { return; }
+
     if (SessionInterface.IsValid() &&
         FindSessionsDelegateHandle.IsValid())
     {
@@ -557,6 +741,16 @@ void UBHSessionSubsystem::HandleFindSessionsComplete(
 
         if (bIsCampaign)
         {
+#if !UE_BUILD_SHIPPING
+            if (bSessionRecoveryTestValid)
+            {
+                FString AdvertisedRunID;
+                if (!Result.Session.SessionSettings.Get(FName(TEXT("BHCampaignTestRun")), AdvertisedRunID) || AdvertisedRunID != SessionRecoveryRunID)
+                {
+                    continue; // Fixture searches never fall back to unrelated LAN campaigns.
+                }
+            }
+#endif
             SelectedResult = &Result;
             break;
         }
@@ -564,6 +758,9 @@ void UBHSessionSubsystem::HandleFindSessionsComplete(
 
     if (!SelectedResult)
     {
+#if !UE_BUILD_SHIPPING
+        bSessionRecoveryNoMatchObserved = bSessionRecoveryTestValid;
+#endif
         SessionSearch.Reset();
         FailSessionAction(
             NSLOCTEXT(
@@ -618,6 +815,8 @@ void UBHSessionSubsystem::HandleJoinSessionComplete(
     EOnJoinSessionCompleteResult::Type Result
 )
 {
+    if (SessionName != NAME_GameSession || SessionState != EBHSessionState::Joining || !JoinSessionDelegateHandle.IsValid()) { return; }
+
     if (SessionInterface.IsValid() &&
         JoinSessionDelegateHandle.IsValid())
     {
@@ -678,6 +877,13 @@ void UBHSessionSubsystem::HandleJoinSessionComplete(
         return;
     }
 
+#if !UE_BUILD_SHIPPING
+    if (bSessionRecoveryTestValid)
+    {
+        LogSessionRecoveryTest(TEXT("resolved_join"), TEXT("observed"), FString::Printf(TEXT("address=%s"), *ConnectString));
+    }
+#endif
+    TrackPendingTravel(PlayerController->GetWorld(), NM_Client);
     SetSessionState(
         EBHSessionState::Traveling,
         NSLOCTEXT(
@@ -696,6 +902,11 @@ void UBHSessionSubsystem::HandleDestroySessionComplete(
     bool bWasSuccessful
 )
 {
+    if (SessionName != NAME_GameSession || !DestroySessionDelegateHandle.IsValid() ||
+        !((PendingAction == EPendingAction::Host && SessionState == EBHSessionState::Hosting) ||
+          (PendingAction == EPendingAction::Join && SessionState == EBHSessionState::Searching) ||
+          (PendingAction == EPendingAction::Leave && SessionState == EBHSessionState::Leaving))) { return; }
+
     if (SessionInterface.IsValid() &&
         DestroySessionDelegateHandle.IsValid())
     {
@@ -725,6 +936,12 @@ void UBHSessionSubsystem::HandleDestroySessionComplete(
         return;
     }
 
+    if (CompletedAction == EPendingAction::Join)
+    {
+        BeginPendingSearch();
+        return;
+    }
+
     PendingAction = EPendingAction::None;
 
     if (CompletedAction == EPendingAction::Leave &&
@@ -742,14 +959,23 @@ void UBHSessionSubsystem::HandleDestroySessionComplete(
 
 void UBHSessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
 {
-    if (!IsValid(LoadedWorld) ||
-        SessionState != EBHSessionState::Traveling)
+    if (SessionState != EBHSessionState::Traveling ||
+        !IsCurrentSessionWorld(LoadedWorld) ||
+        PendingTravelMode == NM_Standalone ||
+        LoadedWorld->GetNetMode() != PendingTravelMode ||
+        PendingTravelOrigin.Get() == LoadedWorld ||
+        (!PendingTravelPackage.IsEmpty() &&
+            UWorld::RemovePIEPrefix(LoadedWorld->GetOutermost()->GetName()) != PendingTravelPackage))
     {
         return;
     }
 
     if (bLoadContinueAfterListenTravel)
     {
+        // The existing Continue request may perform another travel to the saved map.
+        // Its deferred save-application semantics remain owned by the save subsystem.
+        PendingTravelOrigin.Reset();
+        PendingTravelPackage.Reset();
         bLoadContinueAfterListenTravel = false;
         UGameInstance* GameInstance = GetGameInstance();
         UBHSaveSubsystem* SaveSubsystem = IsValid(GameInstance)
@@ -776,6 +1002,8 @@ void UBHSessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
             );
         }
 
+        ClearPendingTravel();
+        bPendingContinueCampaign = false;
         SetSessionState(
             EBHSessionState::InSession,
             NSLOCTEXT(
@@ -787,6 +1015,8 @@ void UBHSessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
         return;
     }
 
+    ClearPendingTravel();
+    bPendingContinueCampaign = false;
     SetSessionState(
         EBHSessionState::InSession,
         NSLOCTEXT(
@@ -799,6 +1029,227 @@ void UBHSessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
 
 
 #if !UE_BUILD_SHIPPING
+namespace
+{
+UBHMainMenuWidget* FindSessionRecoveryMenu(UGameInstance* GameInstance)
+{
+    if (!IsValid(GameInstance)) { return nullptr; }
+    TArray<UUserWidget*> Widgets;
+    UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GameInstance, Widgets, UBHMainMenuWidget::StaticClass(), false);
+    for (UUserWidget* Widget : Widgets)
+    {
+        if (IsValid(Widget) && Widget->GetWorld() == GameInstance->GetWorld() && Widget->IsInViewport() && Widget->IsVisible() &&
+            Widget->GetOwningPlayer() == GameInstance->GetFirstLocalPlayerController())
+        {
+            return Cast<UBHMainMenuWidget>(Widget);
+        }
+    }
+    return nullptr;
+}
+template<typename T> T* GetSessionMenuField(UBHMainMenuWidget* Menu, const TCHAR* Name)
+{
+    const FObjectPropertyBase* Property = IsValid(Menu) ? FindFProperty<FObjectPropertyBase>(Menu->GetClass(), Name) : nullptr;
+    return Property ? Cast<T>(Property->GetObjectPropertyValue_InContainer(Menu)) : nullptr;
+}
+bool IsSessionMenuActionable(UBHMainMenuWidget* Menu)
+{
+    const UButton* Host = GetSessionMenuField<UButton>(Menu, TEXT("NewGameButton"));
+    const UButton* Join = GetSessionMenuField<UButton>(Menu, TEXT("JoinCampaignButton"));
+    return IsValid(Menu) && Menu->GetIsEnabled() && IsValid(Host) && IsValid(Join) &&
+        Host->GetIsEnabled() && Join->GetIsEnabled() && Host->IsVisible() && Join->IsVisible();
+}
+FString SessionRecoveryIdentity(const UObject* Object)
+{
+    if (!IsValid(Object)) { return TEXT("none"); }
+    const int32 Index = static_cast<int32>(Object->GetUniqueID());
+    return FString::Printf(TEXT("%d:%d"), Index, GUObjectArray.GetSerialNumber(Index));
+}
+}
+
+void UBHSessionSubsystem::StartSessionRecoveryTest()
+{
+    bSessionRecoveryTestRequested = FParse::Param(FCommandLine::Get(), TEXT("BHTestSessionRecovery"));
+    if (!bSessionRecoveryTestRequested) { return; }
+    FString UserDirectory, SaveSuffix, TimeoutText;
+    FParse::Value(FCommandLine::Get(), TEXT("BHTestSessionRunId="), SessionRecoveryRunID);
+    FParse::Value(FCommandLine::Get(), TEXT("BHTestSessionRole="), SessionRecoveryRole);
+    FParse::Value(FCommandLine::Get(), TEXT("BHTestSessionTimeout="), TimeoutText);
+    FParse::Value(FCommandLine::Get(), TEXT("UserDir="), UserDirectory);
+    FParse::Value(FCommandLine::Get(), TEXT("BHTestSaveSlotSuffix="), SaveSuffix);
+    bool bSafe = !SessionRecoveryRunID.IsEmpty() && SessionRecoveryRunID.Len() <= 48;
+    for (TCHAR Character : SessionRecoveryRunID)
+    {
+        bSafe &= (FChar::IsAlnum(Character) && Character < 128) || Character == TEXT('_') || Character == TEXT('-');
+    }
+    bSafe &= SessionRecoveryRole == TEXT("Host") || SessionRecoveryRole == TEXT("Client") || SessionRecoveryRole == TEXT("RestartHost");
+    int32 TimeoutSeconds = 600;
+    if (!TimeoutText.IsEmpty())
+    {
+        for (TCHAR Character : TimeoutText) { bSafe &= Character >= TEXT('0') && Character <= TEXT('9'); }
+        bSafe &= TimeoutText.Len() <= 4 && LexTryParseString(TimeoutSeconds, *TimeoutText);
+    }
+    bSafe &= TimeoutSeconds >= 120 && TimeoutSeconds <= 900;
+    const FString ExpectedSuffix = TEXT("SessionRecovery_") + SessionRecoveryRunID.Replace(TEXT("-"), TEXT("_")) + TEXT("_") + SessionRecoveryRole;
+    FPaths::NormalizeDirectoryName(UserDirectory);
+    bSafe &= !UserDirectory.IsEmpty() && UserDirectory.EndsWith(TEXT("/") + SessionRecoveryRunID + TEXT("/") + SessionRecoveryRole + TEXT("/User")) && SaveSuffix == ExpectedSuffix;
+    const FString SavedDirectory = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+    bSafe &= !UserDirectory.IsEmpty() && FPaths::IsUnderDirectory(SavedDirectory, FPaths::ConvertRelativePathToFull(UserDirectory));
+    if (!bSafe)
+    {
+        LogSessionRecoveryTest(TEXT("failed"), TEXT("failure"), TEXT("invalid_isolation_arguments"));
+        return;
+    }
+    bSessionRecoveryTestValid = true;
+    SessionRecoveryGameInstance = GetGameInstance();
+    SessionRecoveryControlDirectory = FPaths::Combine(SavedDirectory, TEXT("Automation/SessionRecovery"), SessionRecoveryRunID);
+    IFileManager::Get().MakeDirectory(*SessionRecoveryControlDirectory, true);
+    SessionRecoveryDeadline = FPlatformTime::Seconds() + TimeoutSeconds;
+    SessionRecoveryTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+        FTickerDelegate::CreateWeakLambda(this, [this](float DeltaTime) { return TickSessionRecoveryTest(DeltaTime); }), 0.1f);
+}
+
+void UBHSessionSubsystem::LogSessionRecoveryTest(const TCHAR* Phase, const TCHAR* Result, const FString& Detail) const
+{
+    UGameInstance* GameInstance = GetGameInstance();
+    UWorld* World = IsValid(GameInstance) ? GameInstance->GetWorld() : nullptr;
+    APlayerController* Local = IsValid(GameInstance) ? GameInstance->GetFirstLocalPlayerController() : nullptr;
+    const UNetDriver* Driver = IsValid(World) ? World->GetNetDriver() : nullptr;
+    const UNetConnection* Connection = IsValid(Driver) ? Driver->ServerConnection.Get() : nullptr;
+    UBHMainMenuWidget* Menu = FindSessionRecoveryMenu(GameInstance);
+    const UTextBlock* Status = GetSessionMenuField<UTextBlock>(Menu, TEXT("SessionStatusText"));
+    const UButton* HostButton = GetSessionMenuField<UButton>(Menu, TEXT("NewGameButton"));
+    const UButton* JoinButton = GetSessionMenuField<UButton>(Menu, TEXT("JoinCampaignButton"));
+    FString StatusText = IsValid(Status) ? Status->GetText().ToString() : TEXT("");
+    StatusText.ReplaceInline(TEXT("\n"), TEXT(" | ")); StatusText.ReplaceInline(TEXT("\r"), TEXT("")); StatusText.ReplaceInline(TEXT("\""), TEXT("'"));
+    int32 Players = 0, RemoteOpen = 0;
+    if (IsValid(World))
+    {
+        for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+        {
+            APlayerController* Player = It->Get();
+            if (IsValid(Player) && IsValid(Cast<ABHCharacter>(Player->GetPawn())) && IsValid(Player->PlayerState))
+            {
+                ++Players;
+                const UNetConnection* Remote = Player->GetNetConnection();
+                if (IsValid(Remote) && Remote->GetConnectionState() == USOCK_Open) { ++RemoteOpen; }
+            }
+        }
+    }
+    UE_LOG(LogTemp, Display, TEXT("BH_TEST_SESSION_RECOVERY run_id=%s role=%s phase=%s result=%s pid=%u state=%d pending=%d named_session=%d net_mode=%d players=%d remote_open=%d local_possessed=%d connection_open=%d game_instance=%s connection=%s widget=%d actionable=%d host_enabled=%d join_enabled=%d status=\"%s\" control_dir=\"%s\" detail=\"%s\""),
+        *SessionRecoveryRunID, *SessionRecoveryRole, Phase, Result, FPlatformProcess::GetCurrentProcessId(), static_cast<int32>(SessionState), IsSessionActionPending() ? 1 : 0,
+        SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession) ? 1 : 0,
+        IsValid(World) ? static_cast<int32>(World->GetNetMode()) : -1, Players, RemoteOpen,
+        IsValid(Local) && IsValid(Cast<ABHCharacter>(Local->GetPawn())) && IsValid(Local->PlayerState) ? 1 : 0,
+        IsValid(Connection) && Connection->GetConnectionState() == USOCK_Open ? 1 : 0,
+        *SessionRecoveryIdentity(GameInstance), *SessionRecoveryIdentity(Connection), IsValid(Menu) ? 1 : 0, IsSessionMenuActionable(Menu) ? 1 : 0,
+        IsValid(HostButton) && HostButton->GetIsEnabled() ? 1 : 0, IsValid(JoinButton) && JoinButton->GetIsEnabled() ? 1 : 0,
+        *StatusText, *SessionRecoveryControlDirectory, *Detail);
+}
+
+bool UBHSessionSubsystem::TickSessionRecoveryTest(float DeltaTime)
+{
+    const auto Fail = [this](const TCHAR* Reason)
+    {
+        LogSessionRecoveryTest(TEXT("failed"), TEXT("failure"), Reason);
+        SessionRecoveryTickerHandle.Reset();
+        return false;
+    };
+    if (FPlatformTime::Seconds() >= SessionRecoveryDeadline) { return Fail(TEXT("timeout")); }
+    UGameInstance* GameInstance = GetGameInstance();
+    if (!IsValid(GameInstance) || SessionRecoveryGameInstance != GameInstance) { return Fail(TEXT("game_instance_changed")); }
+    UWorld* World = GameInstance->GetWorld();
+    APlayerController* Local = GameInstance->GetFirstLocalPlayerController();
+    if (!IsCurrentSessionWorld(World) || !World->HasBegunPlay() || !IsValid(Local) || Local->GetWorld() != World || !Local->IsLocalController()) { return true; }
+    UBHMainMenuWidget* Menu = FindSessionRecoveryMenu(GameInstance);
+    const bool bActionable = IsSessionMenuActionable(Menu) && !IsSessionActionPending();
+    const auto Signal = [this](const TCHAR* Name) { return IFileManager::Get().FileExists(*FPaths::Combine(SessionRecoveryControlDirectory, Name)); };
+    const auto InvokeMenu = [this, Menu, bActionable](const TCHAR* ButtonName, const TCHAR* Phase)
+    {
+        UButton* Button = GetSessionMenuField<UButton>(Menu, ButtonName);
+        if (!bActionable || !IsValid(Button) || !Button->OnClicked.IsBound()) { return false; }
+        LogSessionRecoveryTest(Phase, TEXT("requested"));
+        Button->OnClicked.Broadcast();
+        return true;
+    };
+    UNetDriver* Driver = World->GetNetDriver();
+    UNetConnection* Connection = IsValid(Driver) ? Driver->ServerConnection.Get() : nullptr;
+    const bool bLocalPossessed = IsValid(Cast<ABHCharacter>(Local->GetPawn())) && IsValid(Local->PlayerState);
+    const bool bJoined = SessionState == EBHSessionState::InSession && World->GetNetMode() == NM_Client &&
+        bLocalPossessed && IsValid(Connection) && Connection->GetConnectionState() == USOCK_Open;
+    if (SessionRecoveryRole == TEXT("Client"))
+    {
+        switch (SessionRecoveryPhase)
+        {
+        case 0:
+            if (bActionable) { LogSessionRecoveryTest(TEXT("ready"), TEXT("observed")); SessionRecoveryPhase = 1; }
+            break;
+        case 1:
+            if (Signal(TEXT("search.ready")) && InvokeMenu(TEXT("JoinCampaignButton"), TEXT("search"))) { SessionRecoveryPhase = 2; }
+            break;
+        case 2:
+            if (SessionState == EBHSessionState::Error && bActionable && bSessionRecoveryNoMatchObserved) { LogSessionRecoveryTest(TEXT("no_match"), TEXT("observed")); SessionRecoveryPhase = 3; }
+            break;
+        case 3:
+            if (Signal(TEXT("join.ready")) && InvokeMenu(TEXT("JoinCampaignButton"), TEXT("join"))) { SessionRecoveryPhase = 4; }
+            break;
+        case 4:
+            if (bJoined) { SessionRecoveryInitialConnection = Connection; LogSessionRecoveryTest(TEXT("joined"), TEXT("observed")); SessionRecoveryPhase = 5; }
+            break;
+        case 5:
+            if (SessionState == EBHSessionState::Error && bActionable && bSessionRecoveryDisconnectObserved)
+            { LogSessionRecoveryTest(TEXT("disconnected"), TEXT("observed")); SessionRecoveryPhase = 6; }
+            break;
+        case 6:
+            if (Signal(TEXT("retry.ready")) && InvokeMenu(TEXT("JoinCampaignButton"), TEXT("retry"))) { SessionRecoveryPhase = 7; }
+            break;
+        case 7:
+            if (bJoined)
+            {
+                if (SessionRecoveryInitialConnection == Connection) { return Fail(TEXT("connection_not_replaced")); }
+                LogSessionRecoveryTest(TEXT("rejoined"), TEXT("observed")); SessionRecoveryTickerHandle.Reset(); return false;
+            }
+            break;
+        }
+    }
+    else
+    {
+        switch (SessionRecoveryPhase)
+        {
+        case 0:
+            if (bActionable) { LogSessionRecoveryTest(TEXT("ready"), TEXT("observed")); SessionRecoveryPhase = SessionRecoveryRole == TEXT("Host") ? 1 : 3; }
+            break;
+        case 1:
+            if (Signal(TEXT("reject.ready")) && bActionable)
+            {
+                bSessionRecoveryRejectNextTravel = true;
+                if (InvokeMenu(TEXT("NewGameButton"), TEXT("reject"))) { SessionRecoveryPhase = 2; }
+            }
+            break;
+        case 2:
+            if (SessionState == EBHSessionState::Error && bActionable && bSessionRecoveryRejectedTravelObserved)
+            { LogSessionRecoveryTest(TEXT("rejected"), TEXT("observed")); SessionRecoveryPhase = 3; }
+            break;
+        case 3:
+            if (Signal(TEXT("host.ready")) && InvokeMenu(TEXT("NewGameButton"), TEXT("host"))) { SessionRecoveryPhase = 4; }
+            break;
+        case 4:
+            if (SessionState == EBHSessionState::InSession && World->GetNetMode() == NM_ListenServer && bLocalPossessed)
+            { LogSessionRecoveryTest(TEXT("hosted"), TEXT("observed")); SessionRecoveryPhase = 5; }
+            break;
+        case 5:
+            if (IsValid(Driver) && Driver->ClientConnections.Num() == 1 &&
+                IsValid(Driver->ClientConnections[0]) && Driver->ClientConnections[0]->GetConnectionState() == USOCK_Open)
+            {
+                const APlayerController* Remote = Driver->ClientConnections[0]->PlayerController;
+                if (IsValid(Remote) && IsValid(Cast<ABHCharacter>(Remote->GetPawn())) && IsValid(Remote->PlayerState))
+                { LogSessionRecoveryTest(TEXT("participants"), TEXT("observed")); SessionRecoveryTickerHandle.Reset(); return false; }
+            }
+            break;
+        }
+    }
+    return true;
+}
+
 void UBHSessionSubsystem::StartSameProcessReconnectTest()
 {
     const TCHAR* CommandLine = FCommandLine::Get();
