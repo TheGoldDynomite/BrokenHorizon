@@ -9,7 +9,7 @@ MESH = "/Engine/BasicShapes/Cube.Cube"
 MATERIAL = "/Game/BrokenHorizon/Environment/Materials/M_BH_Terrain_Prototype"
 
 SHORES = (
-    ("FirstLightWaterShoreWest", unreal.Vector(4300.0, 300.0, 80.0), unreal.Vector(7.0, 10.0, 0.8)),
+    ("FirstLightWaterShoreWest", unreal.Vector(4300.0, 300.0, -41.0), unreal.Vector(7.0, 10.0, 0.8)),
     ("FirstLightWaterShoreEast", unreal.Vector(12700.0, 300.0, 80.0), unreal.Vector(7.0, 10.0, 0.8)),
 )
 
