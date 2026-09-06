@@ -158,3 +158,30 @@ and walk through. Fire some rounds, then reload while actively bleeding; the
 reload should finish while health continues to drain. Physical-input and
 listen-server host/client proof remain pending; local RPC implementation tests
 do not prove network delivery. Attack A acceptance remains in progress.
+
+## User acceptance and asset sourcing - 2026-09-06
+
+User reports that the door and bleeding/reload fixes all work in their Editor
+playtest. Record this as user-reported acceptance of the two reported defects;
+it does not establish multiplayer or the complete Attack A loop.
+
+Going forward, source existing free or paid assets instead of making custom
+art assets by default. Present a short list of suitable assets, prices when
+verifiable, visual fit, formats, integration needs and storage impact before
+acquisition. Paid purchases require the user's explicit choice/authorization.
+Check the applicable license and UE 5.8 import compatibility before integration.
+Keep changes scoped to the current playable slice and test in Editor without
+cooking or packaging. Existing gameplay code remains the integration owner.
+
+Initial door candidates (research only; no download/purchase/import):
+- Metal Door, Guadalupe Munoz, free FBX. Sparse listing; quality/materials and
+  import readiness need inspection. https://www.fab.com/listings/3a42f5a7-65ef-44d0-8532-15dd4ee276e4
+- Doors - Armored Door, Nick Abrams, Unreal Engine format, no Blueprints.
+  Candidate to combine with the working native door interaction.
+  https://www.fab.com/listings/19b7db02-8a5a-4d32-9d5b-c77c3c416fb2
+- Bunker and Bay Doors, swizzle, Unreal Engine format, ten animated Blueprints
+  and 41 static meshes. Broader future bunker/base use; more integration scope.
+  https://www.fab.com/listings/c5ee7ffa-260a-4ba7-862a-55bd6068ff51
+
+Paid listing pages did not expose selectable current prices to the research
+reader; confirm exact license-tier price and download size before acquisition.
