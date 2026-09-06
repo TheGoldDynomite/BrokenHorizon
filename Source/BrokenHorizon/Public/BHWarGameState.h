@@ -348,6 +348,7 @@ private:
     int32 RenderedTraversalTestSubstep = 0;
     int32 RenderedTraversalTestDwellTicks = 0;
     int32 FirstLightPlayableRouteTestPhase = 0;
+    int32 FirstLightPlayableRouteReadinessAttempts = 0;
     int32 FirstLightPlayableRouteCombatPasses = 0;
     int32 FirstLightPlayableRouteEnemiesDefeated = 0;
     TWeakObjectPtr<ABHCharacter> FirstLightPlayableRouteTestPlayer;

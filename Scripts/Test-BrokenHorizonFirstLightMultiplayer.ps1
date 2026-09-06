@@ -1,58 +1,102 @@
 [CmdletBinding()]
 param(
-    [ValidateRange(1024, 65535)]
-    [int]$Port = 0,
-    [ValidateRange(30, 180)]
-    [int]$TimeoutSeconds = 150,
-    [string]$LogPrefix = "G1-FirstLightCompletion",
+    [ValidateRange(0, 65535)][int]$Port = 0,
+    [ValidateRange(30, 180)][int]$TimeoutSeconds = 150,
+    [ValidatePattern('^[A-Za-z0-9_-]{1,80}$')][string]$LogPrefix = 'G1-FirstLightCompletion',
     [switch]$RequireInventoryTransfer,
-    [switch]$RequireWeaponRoleRuntime
+    [switch]$RequireWeaponRoleRuntime,
+    [ValidateSet('Editor', 'Packaged')][string]$Runtime = 'Editor',
+    [ValidateSet('Dedicated', 'Listen')][string]$Topology = 'Dedicated',
+    [string]$PackageRoot = 'Builds\FirstLight-Development\Windows'
 )
-
-$ErrorActionPreference = "Stop"
-
+$ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$manifest = Get-Content -Raw `
-    -LiteralPath (Join-Path $projectRoot "Config\ProjectManifest.json") |
-    ConvertFrom-Json
+$manifest = Get-Content -Raw -LiteralPath (Join-Path $projectRoot 'Config\ProjectManifest.json') | ConvertFrom-Json
 $uproject = Join-Path $projectRoot $manifest.uproject
-$editor = Join-Path `
-    $manifest.engineRoot `
-    "Engine\Binaries\Win64\UnrealEditor.exe"
-$logDirectory = Join-Path $projectRoot "Saved\Logs"
-$runId = Get-Date -Format "yyyyMMdd-HHmmss"
+$editor = Join-Path $manifest.engineRoot 'Engine\Binaries\Win64\UnrealEditor.exe'
+if ($Topology -eq 'Listen' -and $Runtime -ne 'Packaged') { throw 'Listen topology requires -Runtime Packaged.' }
+if ($Port -ne 0 -and $Port -lt 1024) { throw 'Port must be zero (automatic) or 1024..65535.' }
+if ($Port -eq 0) { $Port = 8600 + (Get-Random -Minimum 0 -Maximum 500) }
+$resolvedPackageRoot = if ([IO.Path]::IsPathRooted($PackageRoot)) {
+    [IO.Path]::GetFullPath($PackageRoot)
+} else { [IO.Path]::GetFullPath((Join-Path $projectRoot $PackageRoot)) }
+# Launch the actual runtime executable, not the package bootstrapper and its child process.
+$packaged = Join-Path $resolvedPackageRoot 'BrokenHorizon\Binaries\Win64\BrokenHorizon.exe'
+if ($Runtime -eq 'Packaged' -and -not (Test-Path -LiteralPath $packaged -PathType Leaf)) { throw "Missing packaged runtime: $packaged" }
+if ($Topology -eq 'Dedicated' -and -not (Test-Path -LiteralPath $editor -PathType Leaf)) { throw "Missing Editor host: $editor" }
+$runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $safeRunId = $runId -replace '-', '_'
-if ($Port -eq 0) {
-    $Port = 8600 + (Get-Random -Minimum 0 -Maximum 500)
-}
-
-New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
+$runDirectory = Join-Path $projectRoot "Saved\Automation\FirstLightMultiplayer\$runId"
+$logDirectory = Join-Path $projectRoot 'Saved\Logs'
+New-Item -ItemType Directory -Force -Path $runDirectory, $logDirectory | Out-Null
 $hostLog = Join-Path $logDirectory "$LogPrefix-$runId-Host.log"
-$clientALog = Join-Path $logDirectory "$LogPrefix-$runId-ClientA.log"
-$clientBLog = Join-Path $logDirectory "$LogPrefix-$runId-ClientB.log"
 $rejoinALog = Join-Path $logDirectory "$LogPrefix-$runId-RejoinA.log"
 $summaryPath = Join-Path $logDirectory "$LogPrefix-$runId-Summary.json"
-$launchedProcesses =
-    [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+$remoteRoles = if ($Topology -eq 'Listen') { @('ClientA') } else { @('ClientA', 'ClientB') }
+$mode = if ($Topology -eq 'Listen') { 'PackagedListenHostAndOnePackagedRemote' } elseif ($Runtime -eq 'Packaged') {
+    'HybridEditorDedicatedHostAndTwoPackagedClients'
+} else { 'EditorDedicatedHostAndTwoEditorClients' }
+$summary = [ordered]@{
+    result = 'Failed'; runId = $runId; mode = $mode; topology = $Topology; clientRuntime = $Runtime
+    port = $Port; map = $manifest.maps.firstLight; playerCount = 2; remoteClientCount = $remoteRoles.Count
+    expectedPlayerReadiness = @{ count = 2; attempts = 120; intervalSeconds = 0.5 }
+    packageRoot = $(if ($Runtime -eq 'Packaged') { $resolvedPackageRoot } else { $null })
+    roles = [ordered]@{}; evidence = [ordered]@{}; cleanupErrors = @(); failure = $null
+    # Logs and isolated role directories are retained as evidence; no shared/user saves are removed.
+    retainedRunDirectory = $runDirectory; realDebriefPresentationVerified = $false
+}
+$launchedProcesses = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+$runningProcesses = @{}
+$commonArguments = @('-nullrhi', '-unattended', '-nosound', '-NoSplash', '-DDC-ForceMemoryCache', '-DisablePython')
+$runtimeFailurePattern =
+        "Fatal error:|Assertion failed:|Unhandled Exception:|" +
+        "NetworkFailure|TravelFailure|PIE: Error:|" +
+        "Checkpoint save failed|BH_(WAR|FIELD)_AUTOSAVE_FAILED|" +
+        "BH_TEST_WEAPON_ROLE_RUNTIME_RESTORE result=failure|" +
+        "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE result=failure|" +
+        "Supply .*BHAmmoSupply_.* has no persistence ID"
 
 function Start-BHProcess {
-    param([Parameter(Mandatory = $true)][string[]]$Arguments)
-
-    $process = Start-Process `
-        -FilePath $editor `
-        -ArgumentList $Arguments `
-        -WindowStyle Hidden `
-        -PassThru
+    param([string]$Role, [string]$RoleRuntime, [string]$Address, [string]$LogPath, [string[]]$ExtraArguments)
+    $executable = if ($RoleRuntime -eq 'Editor') { $editor } else { $packaged }
+    $roleDirectory = Join-Path $runDirectory $Role
+    New-Item -ItemType Directory -Path $roleDirectory | Out-Null
+    $arguments = @()
+    if ($RoleRuntime -eq 'Editor') { $arguments += $uproject }
+    $arguments += @($Address, "-abslog=$LogPath", "-UserDir=$roleDirectory", "-BHTestSaveSlotSuffix=${safeRunId}_$Role")
+    $arguments += $ExtraArguments
+    $arguments += $commonArguments
+    $quotedArguments = foreach ($argument in $arguments) {
+        if ($argument -match '["\r\n]' -or $argument.EndsWith('\')) { throw "Unsupported launch argument: $argument" }
+        '"' + $argument + '"'
+    }
+    $summary.roles[$Role] = [ordered]@{
+        runtime = $RoleRuntime; executable = $executable; arguments = $arguments
+        log = $LogPath; userDirectory = $roleDirectory; saveSuffix = "${safeRunId}_$Role"
+        processId = $null; stopped = $false
+    }
+    $process = Start-Process -FilePath $executable -ArgumentList $quotedArguments -WindowStyle Hidden -PassThru
     $launchedProcesses.Add($process)
+    $runningProcesses[$Role] = $process
+    $summary.roles[$Role].processId = $process.Id
     return $process
 }
-
 function Stop-OwnedProcess {
     param([System.Diagnostics.Process]$Process)
-
-    if ($null -ne $Process -and -not $Process.HasExited) {
+    if ($null -eq $Process) { return }
+    foreach ($role in @($runningProcesses.Keys)) {
+        if ($runningProcesses[$role].Id -eq $Process.Id) { $runningProcesses.Remove($role); $summary.roles[$role].stopped = $true }
+    }
+    $Process.Refresh()
+    if (-not $Process.HasExited) {
         Stop-Process -Id $Process.Id
-        $Process.WaitForExit(5000) | Out-Null
+        if (-not $Process.WaitForExit(10000)) { throw "Owned process $($Process.Id) did not exit." }
+    }
+}
+function Assert-OwnedProcessesAlive {
+    foreach ($role in @($runningProcesses.Keys)) {
+        $process = $runningProcesses[$role]; $process.Refresh()
+        if ($process.HasExited) { throw "Owned $role process exited unexpectedly ($($process.ExitCode)); see $($summary.roles[$role].log)" }
     }
 }
 
@@ -63,15 +107,10 @@ function Wait-ForMarker {
         [Parameter(Mandatory = $true)][string]$Label
     )
 
-    $failurePattern =
-        "Fatal error:|Assertion failed:|Unhandled Exception:|" +
-        "NetworkFailure|TravelFailure|PIE: Error:|" +
-        "Checkpoint save failed|BH_(WAR|FIELD)_AUTOSAVE_FAILED|" +
-        "BH_TEST_WEAPON_ROLE_RUNTIME_RESTORE result=failure|" +
-        "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE result=failure|" +
-        "Supply .*BHAmmoSupply_.* has no persistence ID"
+    $failurePattern = $runtimeFailurePattern
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
+        Assert-OwnedProcessesAlive
         if (Test-Path -LiteralPath $LogPath) {
             $content = Get-Content -Raw -LiteralPath $LogPath
             if ($content -match $failurePattern) {
@@ -87,40 +126,38 @@ function Wait-ForMarker {
     throw "$Label timed out waiting for '$Pattern'. See $LogPath"
 }
 
-function Wait-ForAnyMarker {
-    param(
-        [Parameter(Mandatory = $true)][string[]]$LogPaths,
-        [Parameter(Mandatory = $true)][string]$Pattern,
-        [Parameter(Mandatory = $true)][string]$Label
-    )
-
-    $failurePattern =
-        "Fatal error:|Assertion failed:|Unhandled Exception:|" +
-        "NetworkFailure|TravelFailure|PIE: Error:|" +
-        "Checkpoint save failed|BH_(WAR|FIELD)_AUTOSAVE_FAILED|" +
-        "BH_TEST_WEAPON_ROLE_RUNTIME_RESTORE result=failure|" +
-        "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE result=failure|" +
-        "Supply .*BHAmmoSupply_.* has no persistence ID"
+function Find-OwnerAmmoObservation {
+    param([string]$Content, [int]$PlayerId, [uint64]$AfterCycles)
+    $pattern = '(?s)BH_TEST_FIRST_LIGHT_AMMO_OBSERVATION phase=begin player_id=(?<player>[0-9]+) magazine=30 reserve=180 qpc=(?<qpc>[0-9]+)' +
+        '(?<body>.*?)BH_TEST_FIRST_LIGHT_AMMO_OBSERVATION phase=end player_id=\k<player> magazine=30 reserve=180 qpc=\k<qpc>(?:\s|$)'
+    foreach ($block in [regex]::Matches($Content, $pattern)) {
+        [uint64]$cycles = 0
+        if ([int]$block.Groups['player'].Value -ne $PlayerId -or
+            -not [uint64]::TryParse($block.Groups['qpc'].Value, [ref]$cycles) -or $cycles -le $AfterCycles) { continue }
+        $body = $block.Groups['body'].Value
+        if ($body -notmatch 'BH_TEST_FIRST_LIGHT_AMMO_OBSERVATION' -and
+            $body -match 'BH_BATTLEFIELD_LOOT_HUD_UPDATED result=success magazine=30 reserve=180 text="[^"]*30 / 180') {
+            return [pscustomobject]@{ PlayerId = $PlayerId; ObservationCycles = $cycles }
+        }
+    }
+    return $null
+}
+function Wait-ForOwnerAmmoObservation {
+    param([int]$PlayerId, [uint64]$AfterCycles)
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
-        foreach ($logPath in $LogPaths) {
-            if (Test-Path -LiteralPath $logPath) {
-                $content = Get-Content -Raw -LiteralPath $logPath
-                if ($content -match $failurePattern) {
-                    throw "$Label encountered a failure marker. See $logPath"
-                }
-                if ($content -match $Pattern) {
-                    return [pscustomobject]@{
-                        LogPath = $logPath
-                        Content = $content
-                    }
-                }
+        Assert-OwnedProcessesAlive
+        foreach ($role in $remoteRoles) {
+            $content = if (Test-Path -LiteralPath $remoteLogs[$role]) { Get-Content -Raw -LiteralPath $remoteLogs[$role] } else { '' }
+            if ($content -match $runtimeFailurePattern) { throw "Owner ammo observation encountered a failure: $($remoteLogs[$role])" }
+            $observation = Find-OwnerAmmoObservation -Content $content -PlayerId $PlayerId -AfterCycles $AfterCycles
+            if ($null -ne $observation) {
+                return [pscustomobject]@{ Role = $role; LogPath = $remoteLogs[$role]; ObservationCycles = $observation.ObservationCycles }
             }
         }
         Start-Sleep -Milliseconds 250
     } while ([DateTime]::UtcNow -lt $deadline)
-
-    throw "$Label timed out waiting for '$Pattern'. See $($LogPaths -join ', ')"
+    throw "Selected player $PlayerId has no post-transaction OnRep block containing the actual owner HUD update."
 }
 
 function Get-ReplicatedLootState {
@@ -163,216 +200,136 @@ function Assert-LootIdentitySet {
     }
 }
 
+
+function Wait-ForExactLoot {
+    param([string]$LogPath, [string[]]$Available, [AllowEmptyCollection()][string[]]$Consumed, [string]$Label)
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        Assert-OwnedProcessesAlive
+        $content = if (Test-Path -LiteralPath $LogPath) { Get-Content -Raw -LiteralPath $LogPath } else { '' }
+        if ($content -match $runtimeFailurePattern) {
+            throw "$Label encountered a failure marker: $LogPath"
+        }
+        $state = Get-ReplicatedLootState -Content $content
+        if (@($state.AvailableIds | Where-Object { $_ -notin $Available }).Count -gt 0 -or
+            @($state.ConsumedIds | Where-Object { $_ -notin $Consumed }).Count -gt 0) { throw "$Label observed unexpected loot identities." }
+        if (($state.AvailableIds -join ',') -ceq ($Available -join ',') -and
+            ($state.ConsumedIds -join ',') -ceq ($Consumed -join ',')) { return $state }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "$Label timed out waiting for exact loot identities: $LogPath"
+}
+
 try {
-    $commonArguments = @(
-        "-nullrhi",
-        "-unattended",
-        "-nosound",
-        "-NoSplash",
-        "-DDC-ForceMemoryCache"
-    )
-    $hostArguments = @(
-        $uproject,
-        $manifest.maps.firstLight,
-        "-server",
-        "-port=$Port",
-        "-abslog=$hostLog",
-        "-BHTestSaveSlotSuffix=$runId",
-        "-BHTestFirstLightPlayableRoute",
-        "-BHTestFirstLightPlayableRouteAfterSeconds=30"
-    )
-    if ($RequireInventoryTransfer) {
-        $hostArguments += "-BHTestInventoryTransferRuntime"
+    $hostRuntime = if ($Topology -eq 'Listen') { 'Packaged' } else { 'Editor' }
+    $hostAddress = $manifest.maps.firstLight + $(if ($Topology -eq 'Listen') { '?listen' } else { '' })
+    $hostFlags = @("-port=$Port", '-BHTestFirstLightPlayableRoute', '-BHTestFirstLightExpectedPlayers=2',
+        '-BHTestFirstLightPlayableRouteAfterSeconds=30', '-BHTestBattlefieldLootHUD')
+    $hostFlags += $(if ($Topology -eq 'Listen') { '-game' } else { '-server' })
+    if ($RequireInventoryTransfer) { $hostFlags += '-BHTestInventoryTransferRuntime' }
+    if ($RequireWeaponRoleRuntime) { $hostFlags += '-BHTestWeaponRoleRuntime' }
+    $hostProcess = Start-BHProcess -Role Host -RoleRuntime $hostRuntime -Address $hostAddress -LogPath $hostLog -ExtraArguments $hostFlags
+    $null = Wait-ForMarker $hostLog 'BH_WAR_GAME_STATE_READY' 'First Light host readiness'
+    $remoteLogs = @{}
+    $remoteProcesses = @{}
+    foreach ($role in $remoteRoles) {
+        $remoteLogs[$role] = Join-Path $logDirectory "$LogPrefix-$runId-$role.log"
+        $remoteProcesses[$role] = Start-BHProcess -Role $role -RoleRuntime $Runtime -Address "127.0.0.1:$Port" -LogPath $remoteLogs[$role] `
+            -ExtraArguments @('-game', '-BHTestRuntimeSupplyReplication', '-BHTestBattlefieldLootAmmoReplication', '-BHTestBattlefieldLootHUD', '-BHTestFirstLightAmmoObservation')
+        $null = Wait-ForMarker $remoteLogs[$role] 'BH_WAR_SNAPSHOT_APPLIED' "$role connection"
     }
+    $hostContent = Wait-ForMarker $hostLog 'BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=ammo_drop result=success' 'Authoritative loot transaction'
+    if ($RequireInventoryTransfer) { $null = Wait-ForMarker $hostLog 'BH_TEST_INVENTORY_TRANSFER_RUNTIME result=success' 'Inventory transfer' }
     if ($RequireWeaponRoleRuntime) {
-        $hostArguments += "-BHTestWeaponRoleRuntime"
+        $null = Wait-ForMarker $hostLog 'BH_TEST_WEAPON_ROLE_RUNTIME result=success' 'Weapon roles'
+        $null = Wait-ForMarker $hostLog 'BH_TEST_WEAPON_ROLE_RUNTIME_RESTORE result=success' 'Weapon role restoration'
     }
-    $hostProcess = Start-BHProcess -Arguments ($hostArguments + $commonArguments)
-    $hostContent = Wait-ForMarker `
-        -LogPath $hostLog `
-        -Pattern "BH_WAR_GAME_STATE_READY" `
-        -Label "First Light host readiness"
-
-    $clientA = Start-BHProcess -Arguments (@(
-        $uproject,
-        "127.0.0.1:$Port",
-        "-game",
-        "-abslog=$clientALog",
-        "-BHTestRuntimeSupplyReplication",
-        "-BHTestBattlefieldLootAmmoReplication",
-        "-BHTestBattlefieldLootHUD"
-    ) + $commonArguments)
+    $hostContent = Wait-ForMarker $hostLog 'BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE_COMPLETE result=success objectives=4 players=2 completed=2' 'Exact two-player route completion'
+    if ($hostContent -notmatch 'BH_TEST_FIRST_LIGHT_READINESS result=success expected=2 connected=2') { throw 'Missing exact pre-route player readiness.' }
+    $authority = [regex]::Match($hostContent, 'BH_TEST_FIRST_LIGHT_LOOT_AUTHORITY result=success spawned=([0-9,]+) consumed=([0-9,]+) remaining=([0-9,]+)')
+    if (-not $authority.Success) { throw 'Missing authoritative runtime loot identity inventory.' }
+    $spawnedIds = @($authority.Groups[1].Value.Split(',') | Sort-Object)
+    $consumedIds = @($authority.Groups[2].Value.Split(',') | Sort-Object)
+    $remainingIds = @($authority.Groups[3].Value.Split(',') | Sort-Object)
+    foreach ($id in @($spawnedIds + $consumedIds + $remainingIds)) {
+        [uint64]$numeric = 0
+        if (-not [uint64]::TryParse($id, [ref]$numeric) -or $numeric -le 1) { throw "Invalid authoritative loot ID: $id" }
+    }
+    if ($consumedIds.Count -ne 1 -or $remainingIds.Count -eq 0 -or @($spawnedIds | Select-Object -Unique).Count -ne $spawnedIds.Count) {
+        throw 'Authoritative loot set is not a unique set with exactly one consumed pickup and remaining loot.'
+    }
+    Assert-LootIdentitySet -Expected $spawnedIds -Actual @(@($consumedIds + $remainingIds) | Sort-Object) -Label 'Authoritative loot partition'
+    $initialLoot = @{}
+    foreach ($role in $remoteRoles) {
+        $null = Wait-ForMarker $remoteLogs[$role] 'BH_MISSION_STATE_REPLICATED .*completed=4 complete=1 failed=0' "$role replicated completion"
+        $initialLoot[$role] = Wait-ForExactLoot -LogPath $remoteLogs[$role] -Available $spawnedIds -Consumed $consumedIds -Label "$role initial loot"
+    }
+    $owner = [regex]::Match($hostContent, 'BH_TEST_FIRST_LIGHT_AMMO_OWNER role=(local_authority|remote) player_id=(-?[0-9]+)')
+    if (-not $owner.Success) { throw 'Missing selected route/ammo owner marker.' }
+    $transaction = [regex]::Match($hostContent, 'BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=ammo_drop result=success before=([0-9]+) after=180 rounds=([0-9]+) qpc=([0-9]+)')
+    [uint64]$transactionCycles = 0
+    if (-not $transaction.Success -or -not [uint64]::TryParse($transaction.Groups[3].Value, [ref]$transactionCycles) -or $transactionCycles -eq 0) {
+        throw 'Authoritative ammo transaction lacks the verified 180 reserve and QPC timestamp.'
+    }
+    $ownerObservationCycles = $null
+    $ownerRole = $owner.Groups[1].Value
+    if ($ownerRole -eq 'local_authority') {
+        if ($Topology -ne 'Listen') { throw 'Dedicated host cannot own a local player HUD.' }
+        $ownerLog = $hostLog
+        $ownerParticipant = 'Host'
+        $ownerContent = Wait-ForMarker $hostLog '(?s)BH_TEST_FIRST_LIGHT_AMMO_OWNER role=local_authority.*BH_BATTLEFIELD_LOOT_HUD_UPDATED result=success magazine=30 reserve=180 text="[^"]*30 / 180' 'Local authority owner HUD after loot owner selection'
+        $ammoObservation = 'AuthoritativeTransactionAndLocalHUD'
+    } else {
+        $remoteEvidence = Wait-ForOwnerAmmoObservation -PlayerId ([int]$owner.Groups[2].Value) -AfterCycles $transactionCycles
+        $ownerLog = $remoteEvidence.LogPath
+        $ownerParticipant = $remoteEvidence.Role
+        $ownerObservationCycles = $remoteEvidence.ObservationCycles
+        # Preserve the previous diagnostic contract too; it is no longer the owner-correlation proof.
+        $null = Wait-ForMarker $ownerLog 'BH_BATTLEFIELD_LOOT_AMMO_REPLICATED result=success .*magazine=30 reserve=180' 'Legacy owner ammo replication marker'
+        $ammoObservation = 'SelectedOwnerPostTransactionOnRepWithSynchronousHUD'
+    }
+    $summary.evidence = [ordered]@{
+        canonicalObjectiveCount = 4; authoritativeCompletedParticipants = 2; replicatedCompletionRoles = $remoteRoles
+        runtimeLootSpawnedIds = $spawnedIds; consumedIds = $consumedIds; remainingIds = $remainingIds
+        initialLootReplicatedRoles = $remoteRoles; ownerKind = $ownerRole; ammoOwnerParticipant = $ownerParticipant
+        serverOwnerPlayerId = [int]$owner.Groups[2].Value; ammoObservation = $ammoObservation
+        transactionQpc = $transactionCycles; ownerObservationQpc = $ownerObservationCycles
+        ownerAmmoReserve = 180; ownerAmmoHUD = '30 / 180'; ownerLog = $ownerLog
+        inventoryTransfer = [bool]$RequireInventoryTransfer; weaponRoleRuntime = [bool]$RequireWeaponRoleRuntime
+    }
+    Stop-OwnedProcess $remoteProcesses['ClientA']
+    $rejoinA = Start-BHProcess -Role RejoinA -RoleRuntime $Runtime -Address "127.0.0.1:$Port" -LogPath $rejoinALog `
+        -ExtraArguments @('-game', '-BHTestRuntimeSupplyReplication')
+    $null = Wait-ForMarker $rejoinALog 'BH_MISSION_STATE_REPLICATED .*completed=4 complete=1 failed=0' 'Fresh remote inherited completion'
+    $null = Wait-ForMarker $hostLog 'BH_SHARED_MISSION_ADOPTED .*completed=4 complete=1 result=success' 'Authoritative late-join shared completion'
+    $null = Wait-ForMarker $rejoinALog 'BH_SALVAGE_STATE_REPLICATED id=FirstLightSalvageCache01 type=AMMO quantity=30' 'Rejoin authored salvage'
+    $rejoinLoot = Wait-ForExactLoot -LogPath $rejoinALog -Available $remainingIds -Consumed @() -Label 'Fresh remote remaining loot'
     Start-Sleep -Seconds 2
-    $clientB = Start-BHProcess -Arguments (@(
-        $uproject,
-        "127.0.0.1:$Port",
-        "-game",
-        "-abslog=$clientBLog",
-        "-BHTestRuntimeSupplyReplication",
-        "-BHTestBattlefieldLootAmmoReplication",
-        "-BHTestBattlefieldLootHUD"
-    ) + $commonArguments)
-
-    $clientAContent = Wait-ForMarker `
-        -LogPath $clientALog `
-        -Pattern "BH_WAR_SNAPSHOT_APPLIED" `
-        -Label "First Light Client A connection"
-    $clientBContent = Wait-ForMarker `
-        -LogPath $clientBLog `
-        -Pattern "BH_WAR_SNAPSHOT_APPLIED" `
-        -Label "First Light Client B connection"
-    $hostContent = Wait-ForMarker `
-        -LogPath $hostLog `
-        -Pattern "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=ammo_drop result=success" `
-        -Label "Authoritative First Light battlefield-loot interaction"
-    if ($RequireInventoryTransfer) {
-        $hostContent = Wait-ForMarker `
-            -LogPath $hostLog `
-            -Pattern "BH_TEST_INVENTORY_TRANSFER_RUNTIME result=success" `
-            -Label "Authoritative multiplayer inventory transfer"
+    $rejoinLoot = Get-ReplicatedLootState -Content (Get-Content -Raw -LiteralPath $rejoinALog)
+    Assert-LootIdentitySet -Expected $remainingIds -Actual $rejoinLoot.AvailableIds -Label 'Settled rejoin available loot'
+    Assert-LootIdentitySet -Expected @() -Actual $rejoinLoot.ConsumedIds -Label 'Settled rejoin consumed loot'
+    $summary.evidence.rejoin = [ordered]@{
+        kind = 'FreshRemoteProcess'; originalRole = 'ClientA'; newRole = 'RejoinA'
+        completionInherited = $true; authoredSalvageReplicated = $true
+        availableIds = $rejoinLoot.AvailableIds; consumedAbsent = $true; retainedHostProcessId = $hostProcess.Id
     }
-    if ($RequireWeaponRoleRuntime) {
-        $hostContent = Wait-ForMarker `
-            -LogPath $hostLog `
-            -Pattern "BH_TEST_WEAPON_ROLE_RUNTIME result=success" `
-            -Label "Authoritative weapon role runtime contract"
-        $hostContent = Wait-ForMarker `
-            -LogPath $hostLog `
-            -Pattern "BH_TEST_WEAPON_ROLE_RUNTIME_RESTORE result=success" `
-            -Label "Authoritative weapon role fixture restoration"
+    Assert-OwnedProcessesAlive
+    foreach ($role in @($runningProcesses.Keys)) {
+        $finalContent = Get-Content -Raw -LiteralPath $summary.roles[$role].log
+        if ($finalContent -match $runtimeFailurePattern) { throw "Final $role log contains a runtime failure: $($summary.roles[$role].log)" }
     }
-    $hostContent = Wait-ForMarker `
-        -LogPath $hostLog `
-        -Pattern "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE_COMPLETE result=success objectives=4 players=2 completed=2" `
-        -Label "Authoritative two-player production First Light route"
-    $clientAContent = Wait-ForMarker `
-        -LogPath $clientALog `
-        -Pattern "BH_MISSION_STATE_REPLICATED .*completed=4 complete=1 failed=0" `
-        -Label "Client A replicated mission completion"
-    $clientBContent = Wait-ForMarker `
-        -LogPath $clientBLog `
-        -Pattern "BH_MISSION_STATE_REPLICATED .*completed=4 complete=1 failed=0" `
-        -Label "Client B replicated mission completion"
-    $clientAContent = Wait-ForMarker `
-        -LogPath $clientALog `
-        -Pattern "BH_RUNTIME_SUPPLY_CONSUMED_REPLICATED result=success" `
-        -Label "Client A replicated consumed battlefield loot"
-    $clientBContent = Wait-ForMarker `
-        -LogPath $clientBLog `
-        -Pattern "BH_RUNTIME_SUPPLY_CONSUMED_REPLICATED result=success" `
-        -Label "Client B replicated consumed battlefield loot"
-    $ammoOwnerEvidence = Wait-ForAnyMarker `
-        -LogPaths @($clientALog, $clientBLog) `
-        -Pattern "BH_BATTLEFIELD_LOOT_AMMO_REPLICATED result=success .*reserve=180" `
-        -Label "Owning client replicated battlefield-loot ammunition"
-    $ammoOwnerClient = if (
-        $ammoOwnerEvidence.LogPath -eq $clientALog
-    ) { "ClientA" } else { "ClientB" }
-    $ammoOwnerContent = Wait-ForMarker `
-        -LogPath $ammoOwnerEvidence.LogPath `
-        -Pattern 'BH_BATTLEFIELD_LOOT_HUD_UPDATED result=success magazine=30 reserve=180' `
-        -Label "Owning client updated battlefield-loot ammo HUD"
-
-    $clientALoot = Get-ReplicatedLootState -Content (
-        Get-Content -Raw -LiteralPath $clientALog
-    )
-    $clientBLoot = Get-ReplicatedLootState -Content (
-        Get-Content -Raw -LiteralPath $clientBLog
-    )
-    Assert-LootIdentitySet -Expected $clientALoot.AvailableIds `
-        -Actual $clientBLoot.AvailableIds -Label 'Initial clients available loot'
-    Assert-LootIdentitySet -Expected $clientALoot.ConsumedIds `
-        -Actual $clientBLoot.ConsumedIds -Label 'Initial clients consumed loot'
-    if ($clientALoot.ConsumedIds.Count -ne 1 -or
-        $clientALoot.RemainingIds.Count -eq 0 -or
-        @($clientALoot.ConsumedIds | Where-Object {
-            $_ -notin $clientALoot.AvailableIds
-        }).Count -ne 0) {
-        throw "Initial clients did not observe exactly one consumed pickup from the available loot set. See $clientALog and $clientBLog"
-    }
-    $expectedRemainingLootCount = $clientALoot.RemainingIds.Count
-
-    Stop-OwnedProcess -Process $clientA
-    $rejoinA = Start-BHProcess -Arguments (@(
-        $uproject,
-        "127.0.0.1:$Port",
-        "-game",
-        "-abslog=$rejoinALog",
-        "-BHTestRuntimeSupplyReplication"
-    ) + $commonArguments)
-    $rejoinContent = Wait-ForMarker `
-        -LogPath $rejoinALog `
-        -Pattern "BH_MISSION_STATE_REPLICATED .*completed=4 complete=1 failed=0" `
-        -Label "Rejoining Client A inherited shared completion"
-    $hostContent = Wait-ForMarker `
-        -LogPath $hostLog `
-        -Pattern "BH_SHARED_MISSION_ADOPTED .*completed=4 complete=1 result=success" `
-        -Label "Authoritative late-join shared mission adoption"
-    $rejoinContent = Wait-ForMarker `
-        -LogPath $rejoinALog `
-        -Pattern "BH_SALVAGE_STATE_REPLICATED id=FirstLightSalvageCache01 type=AMMO quantity=30" `
-        -Label "Rejoining Client A received authored salvage state"
-    $rejoinContent = Wait-ForMarker `
-        -LogPath $rejoinALog `
-        -Pattern "(?s)(BH_RUNTIME_SUPPLY_AVAILABLE_REPLICATED result=success[^\r\n]* network_id=[0-9]+.*){$expectedRemainingLootCount}" `
-        -Label "Rejoining Client A received remaining battlefield loot"
-    Start-Sleep -Seconds 2
-    $rejoinContent = Get-Content -Raw -LiteralPath $rejoinALog
-    $rejoinLoot = Get-ReplicatedLootState -Content $rejoinContent
-    $rejoinAvailableLootCount = $rejoinLoot.AvailableIds.Count
-    Assert-LootIdentitySet -Expected $clientALoot.RemainingIds `
-        -Actual $rejoinLoot.AvailableIds -Label 'Rejoining Client A available loot'
-    Assert-LootIdentitySet -Expected @() `
-        -Actual $rejoinLoot.ConsumedIds -Label 'Rejoining Client A consumed loot'
-
-    $summary = [ordered]@{
-        result = "Passed"
-        runId = $runId
-        port = $Port
-        map = $manifest.maps.firstLight
-        playerCount = 2
-        canonicalObjectiveCount = 4
-        authoritativeCompletion = $true
-        productionActorRoute = $true
-        battlefieldLootConsumed = $true
-        inventoryTransfer = [bool]$RequireInventoryTransfer
-        weaponRoleRuntime = [bool]$RequireWeaponRoleRuntime
-        ammoOwnerClient = $ammoOwnerClient
-        ownerAmmoReserveReplicated = 180
-        ownerAmmoHUDText = "30 / 180"
-        clientAConsumedLootReplicated = $true
-        clientBConsumedLootReplicated = $true
-        rejoinAuthoredSalvageStateReplicated = $true
-        rejoinAvailableLootCount = $rejoinAvailableLootCount
-        initialAvailableLootNetworkIds = $clientALoot.AvailableIds
-        consumedLootNetworkIds = $clientALoot.ConsumedIds
-        expectedRemainingLootNetworkIds = $clientALoot.RemainingIds
-        rejoinAvailableLootNetworkIds = $rejoinLoot.AvailableIds
-        rejoinConsumedLootAbsent = $true
-        clientACompletionReplicated = $true
-        clientBCompletionReplicated = $true
-        rejoinCompletionInherited = $true
-        hostLog = $hostLog
-        clientALog = $clientALog
-        clientBLog = $clientBLog
-        rejoinALog = $rejoinALog
-    }
-    $summary | ConvertTo-Json | Set-Content -LiteralPath $summaryPath
-    Write-Host "Two-player First Light completion passed: $summaryPath"
+    $summary.result = 'Passed'
+}
+catch {
+    $summary.failure = $_.Exception.Message
+    throw
 }
 finally {
     foreach ($process in $launchedProcesses) {
-        Stop-OwnedProcess -Process $process
+        try { Stop-OwnedProcess $process } catch { $summary.cleanupErrors += $_.Exception.Message }
     }
-
-    $saveDirectory = Join-Path $projectRoot "Saved\SaveGames"
-    foreach ($saveName in @(
-        "BrokenHorizon_Checkpoint_$safeRunId.sav",
-        "BrokenHorizon_Checkpoint_Backup_$safeRunId.sav"
-    )) {
-        $savePath = Join-Path $saveDirectory $saveName
-        if (Test-Path -LiteralPath $savePath) {
-            Remove-Item -LiteralPath $savePath -Force
-        }
-    }
+    if ($summary.cleanupErrors.Count -gt 0) { $summary.result = 'Failed' }
+    $summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $summaryPath -Encoding UTF8
+    Write-Host "First Light $mode result=$($summary.result): $summaryPath"
+    if ($summary.cleanupErrors.Count -gt 0) { throw ($summary.cleanupErrors -join '; ') }
 }

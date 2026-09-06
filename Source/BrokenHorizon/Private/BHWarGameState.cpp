@@ -7,6 +7,7 @@
 #include "BHAmbientWarDirector.h"
 #include "BHCombatStatusWidget.h"
 #include "BHAmmoSupply.h"
+#include "BHSupplyBase.h"
 #include "BHArmoredThreat.h"
 #include "BHEnemySoldier.h"
 #include "BHDoor.h"
@@ -36,6 +37,8 @@
 #include "Engine/Channel.h"
 #include "Engine/NetConnection.h"
 #include "Engine/NetDriver.h"
+#include "Engine/PackageMapClient.h"
+#include "HAL/PlatformTime.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Containers/Ticker.h"
@@ -4103,6 +4106,49 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
         return;
     }
 
+    FString ExpectedPlayersText;
+    const bool bExpectedPlayersRequested = FCString::Strifind(FCommandLine::Get(), TEXT("-BHTestFirstLightExpectedPlayers")) != nullptr;
+    int32 ExpectedPlayers = 0;
+    if (bExpectedPlayersRequested)
+    {
+        if (!FParse::Value(FCommandLine::Get(), TEXT("BHTestFirstLightExpectedPlayers="), ExpectedPlayersText) ||
+            ExpectedPlayersText.Len() != 1 || ExpectedPlayersText[0] < TEXT('1') || ExpectedPlayersText[0] > TEXT('4'))
+        {
+            FailTest(TEXT("expected_players_invalid"));
+            return;
+        }
+        ExpectedPlayers = ExpectedPlayersText[0] - TEXT('0');
+    }
+    TArray<ABHCharacter*> ConnectedPlayers;
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+    {
+        APlayerController* Controller = It->Get();
+        ABHCharacter* Character = IsValid(Controller) ? Cast<ABHCharacter>(Controller->GetPawn()) : nullptr;
+        UNetConnection* Connection = IsValid(Controller) ? Controller->GetNetConnection() : nullptr;
+        const bool bConnectedRemote = IsValid(Connection) && Connection->GetConnectionState() == USOCK_Open;
+        const bool bLocalParticipant = World->GetNetMode() == NM_ListenServer && IsValid(Controller) &&
+            Controller->IsLocalController() && Controller->GetLocalPlayer() != nullptr;
+        if (IsValid(Character) && Character->HasAuthority() && IsValid(Character->GetPlayerState()) &&
+            Character->GetController() == Controller && Character->IsPlayerControlled() && (bConnectedRemote || bLocalParticipant))
+        {
+            ConnectedPlayers.AddUnique(Character);
+        }
+    }
+    if (ExpectedPlayers > 0 && FirstLightPlayableRouteTestPhase == 0)
+    {
+        if (ConnectedPlayers.Num() > ExpectedPlayers) { FailTest(TEXT("too_many_players")); return; }
+        if (ConnectedPlayers.Num() < ExpectedPlayers)
+        {
+            // This timer ticks every 0.5s: at most 120 attempts / 60 seconds before route mutation.
+            if (++FirstLightPlayableRouteReadinessAttempts >= 120) { FailTest(TEXT("player_readiness_timeout")); return; }
+            UE_LOG(LogTemp, Display, TEXT("BH_TEST_FIRST_LIGHT_READINESS expected=%d connected=%d attempt=%d"),
+                ExpectedPlayers, ConnectedPlayers.Num(), FirstLightPlayableRouteReadinessAttempts);
+            return;
+        }
+        FirstLightPlayableRouteReadinessAttempts = 0;
+        UE_LOG(LogTemp, Display, TEXT("BH_TEST_FIRST_LIGHT_READINESS result=success expected=%d connected=%d"), ExpectedPlayers, ConnectedPlayers.Num());
+    }
+
     if (FirstLightPlayableRouteTestPhase == 0)
     {
         ABHCharacter* Player = nullptr;
@@ -4112,7 +4158,8 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
         for (TActorIterator<ABHCharacter> It(World); It; ++It)
         {
             if (It->HasAuthority() &&
-                IsValid(It->GetPlayerState()))
+                IsValid(It->GetPlayerState()) &&
+                (ExpectedPlayers == 0 || ConnectedPlayers.Contains(*It)))
             {
                 Player = *It;
                 break;
@@ -4128,7 +4175,8 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
                     ? Cast<ABHCharacter>(Controller->GetPawn())
                     : nullptr;
                 if (IsValid(PossessedPlayer) &&
-                    PossessedPlayer->HasAuthority())
+                    PossessedPlayer->HasAuthority() &&
+                    (ExpectedPlayers == 0 || ConnectedPlayers.Contains(PossessedPlayer)))
                 {
                     Player = PossessedPlayer;
                     break;
@@ -4533,6 +4581,32 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
             return;
         }
 
+        TMap<ABHSupplyBase*, FNetworkGUID> SpawnedSupplyIds;
+        const bool bAuditNetworkLoot = ExpectedPlayers > 0 && World->GetNetMode() != NM_Standalone;
+        UNetDriver* Driver = World->GetNetDriver();
+        if (bAuditNetworkLoot)
+        {
+            bool bIdsReady = IsValid(Driver) && Driver->GuidCache.IsValid();
+            for (TActorIterator<ABHSupplyBase> It(World); It; ++It)
+            {
+                if (!It->IsRuntimeSupply()) { continue; }
+                const FNetworkGUID Guid = bIdsReady ? Driver->GuidCache->GetNetGUID(*It) : FNetworkGUID();
+                bIdsReady &= Guid.IsValid() && !Guid.IsDefault();
+                SpawnedSupplyIds.Add(*It, Guid);
+            }
+            if (!bIdsReady || SpawnedSupplyIds.IsEmpty())
+            {
+                if (++FirstLightPlayableRouteReadinessAttempts >= 120) { FailTest(TEXT("loot_identity_readiness_timeout")); }
+                return;
+            }
+            FirstLightPlayableRouteReadinessAttempts = 0;
+            const APlayerController* OwnerController = Cast<APlayerController>(Player->GetController());
+            UE_LOG(LogTemp, Display, TEXT("BH_TEST_FIRST_LIGHT_AMMO_OWNER role=%s player_id=%d"),
+                IsValid(OwnerController) && OwnerController->IsLocalController() && OwnerController->GetLocalPlayer()
+                    ? TEXT("local_authority") : TEXT("remote"),
+                IsValid(Player->GetPlayerState()) ? Player->GetPlayerState()->GetPlayerId() : -1);
+        }
+
         const int32 PickupRounds =
             RuntimeAmmoDrop->GetReserveAmmoAmount();
         const int32 MaxReserveAmmo = Weapon->GetMaxReserveAmmo();
@@ -4565,16 +4639,42 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
             return;
         }
 
+        // Windows Cycles64 is raw QPC, shared by the loopback host/client processes.
+        const uint64 AmmoTransactionCycles = FPlatformTime::Cycles64();
+        if (bAuditNetworkLoot)
+        {
+            TArray<FString> SpawnedIds, ConsumedIds, RemainingIds;
+            int32 CurrentSupplyCount = 0;
+            for (TActorIterator<ABHSupplyBase> It(World); It; ++It)
+            {
+                if (It->IsRuntimeSupply()) { ++CurrentSupplyCount; }
+            }
+            if (CurrentSupplyCount != SpawnedSupplyIds.Num()) { FailTest(TEXT("loot_actor_set_changed")); return; }
+            for (const TPair<ABHSupplyBase*, FNetworkGUID>& Entry : SpawnedSupplyIds)
+            {
+                if (!IsValid(Entry.Key) || Driver->GuidCache->GetNetGUID(Entry.Key) != Entry.Value)
+                { FailTest(TEXT("loot_identity_changed")); return; }
+                const FString Id = Entry.Value.ToString();
+                SpawnedIds.Add(Id);
+                (Entry.Key->IsConsumed() ? ConsumedIds : RemainingIds).Add(Id);
+            }
+            if (ConsumedIds.Num() != 1 || RemainingIds.IsEmpty()) { FailTest(TEXT("loot_consumed_partition")); return; }
+            SpawnedIds.Sort(); ConsumedIds.Sort(); RemainingIds.Sort();
+            UE_LOG(LogTemp, Display, TEXT("BH_TEST_FIRST_LIGHT_LOOT_AUTHORITY result=success spawned=%s consumed=%s remaining=%s"),
+                *FString::Join(SpawnedIds, TEXT(",")), *FString::Join(ConsumedIds, TEXT(",")), *FString::Join(RemainingIds, TEXT(",")));
+        }
+
         UE_LOG(
             LogTemp,
             Display,
             TEXT(
                 "BH_TEST_FIRST_LIGHT_PLAYABLE_ROUTE step=ammo_drop "
-                "result=success before=%d after=%d rounds=%d"
+                "result=success before=%d after=%d rounds=%d qpc=%llu"
             ),
             ReserveAmmoBefore,
             ReserveAmmoAfter,
-            PickupRounds
+            PickupRounds,
+            AmmoTransactionCycles
         );
     }
     else if (FirstLightPlayableRouteTestPhase == 5)
@@ -4656,7 +4756,8 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
         int32 CompletedPlayerCount = 0;
         for (TActorIterator<ABHCharacter> It(World); It; ++It)
         {
-            if (It->HasAuthority() && IsValid(It->GetPlayerState()))
+            if (It->HasAuthority() && IsValid(It->GetPlayerState()) &&
+                (ExpectedPlayers == 0 || ConnectedPlayers.Contains(*It)))
             {
                 Players.Add(*It);
                 if (It->IsMissionComplete() &&
@@ -4674,6 +4775,7 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
             Player->IsObjectiveCompleted(
                 BHObjectiveIds::ReachExtraction) &&
             Players.Num() > 0 &&
+            (ExpectedPlayers == 0 || Players.Num() == ExpectedPlayers) &&
             CompletedPlayerCount == Players.Num();
         if (!bCompleted)
         {
@@ -4694,7 +4796,7 @@ void ABHWarGameState::RunFirstLightPlayableRouteTest()
         GetWorldTimerManager().ClearTimer(
             FirstLightPlayableRouteTestTimer
         );
-        if (!IsRunningDedicatedServer() &&
+        if (World->GetNetMode() == NM_Standalone &&
             !FParse::Param(
                 FCommandLine::Get(),
                 TEXT("BHTestNavigationGrenade")))

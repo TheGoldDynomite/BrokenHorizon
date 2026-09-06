@@ -12,6 +12,8 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Net/UnrealNetwork.h"
@@ -1090,7 +1092,27 @@ void UBHWeaponComponent::ClientDryFirePresentation_Implementation()
 
 void UBHWeaponComponent::OnRep_Ammo()
 {
+#if !UE_BUILD_SHIPPING
+    const APawn* ObservedPawn = Cast<APawn>(GetOwner());
+    const APlayerState* ObservedPlayerState = IsValid(ObservedPawn) ? ObservedPawn->GetPlayerState() : nullptr;
+    const bool bObserveFirstLightAmmo = IsValid(ObservedPlayerState) && ObservedPawn->IsLocallyControlled() &&
+        FParse::Param(FCommandLine::Get(), TEXT("BHTestFirstLightAmmoObservation"));
+    const uint64 ObservationCycles = bObserveFirstLightAmmo ? FPlatformTime::Cycles64() : 0;
+    const int32 ObservedPlayerId = bObserveFirstLightAmmo ? ObservedPlayerState->GetPlayerId() : -1;
+    if (bObserveFirstLightAmmo)
+    {
+        UE_LOG(LogTemp, Display, TEXT("BH_TEST_FIRST_LIGHT_AMMO_OBSERVATION phase=begin player_id=%d magazine=%d reserve=%d qpc=%llu"),
+            ObservedPlayerId, MagazineAmmo, ReserveAmmo, ObservationCycles);
+    }
+#endif
     OnAmmoChanged.Broadcast(MagazineAmmo, ReserveAmmo);
+#if !UE_BUILD_SHIPPING
+    if (bObserveFirstLightAmmo)
+    {
+        UE_LOG(LogTemp, Display, TEXT("BH_TEST_FIRST_LIGHT_AMMO_OBSERVATION phase=end player_id=%d magazine=%d reserve=%d qpc=%llu"),
+            ObservedPlayerId, MagazineAmmo, ReserveAmmo, ObservationCycles);
+    }
+#endif
 
 #if !UE_BUILD_SHIPPING
     const APawn* OwnerPawn = Cast<APawn>(GetOwner());

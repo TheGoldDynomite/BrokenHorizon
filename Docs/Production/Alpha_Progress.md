@@ -1,17 +1,17 @@
 # Alpha progress
 
 Updated: 2026-09-05. Repository evidence overrides this compact continuation record.
-Completed slice: A1/Q2 health/stamina layout at 150% HUD scale.
-Status: **Verified** for bounded Q2 HUD layout.
-Delivered commit: `58d2380f524dff9812e204d42222d2d0d97f11b9`; pushed to
+Completed slice: bounded A1 First Light topology coverage.
+Status: **Verified** for the recorded First Light topology matrix.
+Prior Q2 commit: `58d2380f524dff9812e204d42222d2d0d97f11b9`; pushed to
 `origin/codex/first-light-acceptance` and remote SHA verified.
 Physical input and full-alpha gates remain separate from this slice.
 
 A1 development has explicitly resumed. [Alpha Roadmap](Alpha_Roadmap.md) owns the
-G5 alpha order and gates; Q2 is complete. Packaged First Light functional runner
-coverage is now in progress, with fresh validation pending. A0/A1/G2 remain
+G5 alpha order and gates; Q2 and the bounded topology matrix are verified.
+The validated topology delivery is tracked by active development-branch history. A0/A1/G2 remain
 open. The earlier 127-test suite and Readability package below are prior-checkpoint proof,
-not fresh validation of this layout work.
+not validation of the current topology changes.
 
 Q1 lighting remains approval-blocked: automatic approval review rejected the normal
 escalated map-save launch after resumption, before any process started. Explicit
@@ -22,23 +22,49 @@ No custom input workaround was used. Actual controls/human feel remain open;
 automated source, rendered, and packaged checks can proceed. Current Q2 proof and remaining gates are below.
 
 Draft scope artifact: [Alpha Manifest](Alpha_Manifest.md) combines content candidates
-and proposed support coverage. It is unaccepted; A0 remains open.
+and proposed support coverage. Draft commit `4470616664ee517c117c0d7d5c6671ac80ab8715`
+was pushed and its remote SHA verified. The working-scope question is unanswered;
+A0 and all candidate decisions remain unaccepted.
 
-## Active A1 task: packaged First Light functional coverage
+## Verified A1 First Light topology coverage
 
-- **Player outcome:** demonstrate direct-loopback First Light objective, loot, ammo,
-  and rejoin state using packaged clients while retaining the Editor default.
-- **Planned matrix:** fully packaged listen host plus one remote client; separately,
-  a hybrid Editor dedicated server plus two packaged remote clients. The hybrid
-  case is not proof of a packaged dedicated server.
-- **Writer scope:** existing First Light multiplayer runner and
-  `BHWarGameState.cpp/.h`, covering nonshipping readiness, standalone exit, and
-  owner markers. One production writer owns this source/tooling work.
-- **Status/proof:** implementation in progress; fresh matrix and final validation
-  pending. Neither planned configuration is accepted yet; this runner does not prove
-  session-menu flow or debrief acknowledgements.
-- **Open dependencies:** Q1 explicit map approval, actual controls, full G2/A0,
-  performance, and content acceptance remain open. Q2 evidence below is retained.
+- **Delivered behavior:** direct-loopback First Light objective, loot, ammo, and
+  fresh-remote rejoin proof across the preserved Editor default, hybrid Editor
+  dedicated server with packaged remotes, and fully packaged listen configuration.
+- Four source/tooling files include guarded nonshipping diagnostics in
+  `BHWeaponComponent.cpp`; no new gameplay API, RPC, or asset change was introduced.
+- Final validation passed: Project Doctor zero errors/warnings, Editor build
+  `Saved/Logs/Codex/BuildEditor-20260905-201540.log`, and 127 tests (125 successes,
+  two expected-warning successes, zero failed/not-run/in-process):
+  `Saved/Logs/Codex/AutomationReport-20260905-201542/index.json`.
+- Fresh package passed in 98.86 seconds:
+  `Saved/Logs/Codex/PackageDevelopment-20260905-201649.log`;
+  archive `Builds/Alpha-Development-20260905-FirstLightTopology/Windows`.
+- Positive reports under `Saved/Logs`:
+  `BH-A1-FirstLight-Editor-20260905-200942-76e70e9e-Summary.json`,
+  `BH-A1-FirstLight-Hybrid-20260905-201943-70c3f786-Summary.json`, and
+  `BH-A1-FirstLight-Listen-20260905-202144-6912d1ac-Summary.json`.
+  Each records four objectives/two completed players and exact GUID convergence
+  after fresh remote rejoin: six spawned minus one consumed equals five remaining.
+- Default/hybrid selected remote ID 256 and observed real `OnRep` after the server
+  transaction, with synchronous actual HUD-widget text `30 / 180`. Listen selected
+  local-authority Host and its actual local HUD; no remote `OnRep` proof is claimed
+  for that selected listen observer. The coordinator independently inspected all
+  summaries and the raw hybrid owner/OnRep/HUD block.
+- Fresh packaged standalone omitted ExpectedPlayers, completed four objectives for
+  one player, and exited normally with code 0:
+  `Saved/Reports/BH-A1-Packaged-FirstLightTopology-20260905-202304-Summary.json`.
+- Eight negative cases passed expected reason/no-route assertions:
+  `Saved/Automation/FirstLightTopology/Negatives/20260905-201145-1600c1e1/Summary.json`.
+  All cleanup-error arrays are empty; no owned live processes remain and execution
+  was released. Final scoped source review is clear.
+- **Evidence limits:** NullRHI, same-machine direct-loopback functional/widget state.
+  No new rendered pixels, physical input, session-menu/debrief flow, remote internet,
+  or packaged dedicated-server executable proof. Optional inventory-transfer and
+  weapon-role modes were not rerun. Prior Q2 visual proof remains separate below.
+- **Open gates:** unanswered scope question/A0, full A1/G2, actual controls,
+  performance, content, and Q1 explicit map approval remain open. A passing bounded
+  matrix does not accept proposed support promises.
 
 ## Verified Q2 delivery and evidence
 
@@ -106,9 +132,10 @@ and proposed support coverage. It is unaccepted; A0 remains open.
 | Fresh package and packaged acceptance | Vitals package, four-objective route, and inspected 720p HUD150 capture passed. |
 | Final scoped review | Passed, including diagnostic removal and fixture readiness delta. |
 
-Q2 is Verified within this bounded HUD scope. A0/A1/G2 remain open for actual controls, packaged
-listen/dedicated functional proof, performance acceptance, and the remaining
-quality/content gates; a HUD correction cannot close those requirements.
+Q2 is Verified within its prior visual/HUD scope. The current topology evidence
+above separately proves bounded packaged listen and hybrid dedicated functionality.
+A0/A1/G2 remain open for wider promised configurations, remote/menu/physical-input
+acceptance, performance, and quality/content; neither bounded result closes those gates.
 
 ## Release boundary and preceding checkpoints
 
@@ -250,9 +277,19 @@ not validation of the later HUD readability or active A1/Q2 layout changes.
 | Rendered/player | Prior targeted medical rerenders and wounded runtime rerun pass; selected fresh multiplayer images inspected. Prior Defense A inspected ten 1280x720 frames. Actual Enter/M Continue, scrolling, combat feel, localization, and broader safe-area coverage remain. |
 | Presentation/performance | HUD contrast correction built and targeted static visuals inspected. Black sky/overbright world remains; Q2 150% vitals correction is verified for the recorded cases. Lighting map-save launch was denied by automatic approval review. Earlier local two-client VRAM warnings do not constitute performance acceptance. |
 | Campaign/content | Complete campaign and authored-content gates remain; this tactical acceptance slice is not full alpha. |
-| Package | Current Vitals package, four-objective First Light route, and inspected 720p HUD150 pass. Packaged multiplayer and physical play remain open. |
+| Package | Current FirstLightTopology package passes standalone and bounded two-player loopback configurations: fully packaged listen and hybrid Editor dedicated with packaged clients. Wider promised configurations, remote/menu/physical acceptance remain open; Q2 rendered proof is separate. |
 
-## Current Q2 delivery files
+## Current topology delivery files
+
+- `Scripts/Test-BrokenHorizonFirstLightMultiplayer.ps1`
+- `Source/BrokenHorizon/Private/BHWarGameState.cpp`
+- `Source/BrokenHorizon/Public/BHWarGameState.h`
+- `Source/BrokenHorizon/Private/BHWeaponComponent.cpp`
+- `Docs/Production/Alpha_Progress.md`
+- `Docs/Production/Alpha_Roadmap.md`
+- `Docs/Production/Alpha_Manifest.md`
+
+## Prior Q2 delivery files
 
 - `Source/BrokenHorizon/Private/BHCombatStatusWidget.cpp`
 - `Source/BrokenHorizon/Public/BHCombatStatusWidget.h`
@@ -275,6 +312,9 @@ its map-authoring approval and execution evidence are resolved.
 Use `powershell.exe -NoProfile -ExecutionPolicy Bypass -File` from the project root:
 
 - `Tools/BuildEditor.ps1`
+- `Scripts/Test-BrokenHorizonFirstLightMultiplayer.ps1` (preserved Editor default)
+- `Scripts/Test-BrokenHorizonFirstLightMultiplayer.ps1 -Runtime Packaged -Topology Dedicated -PackageRoot Builds/Alpha-Development-20260905-FirstLightTopology/Windows` (hybrid Editor dedicated host)
+- `Scripts/Test-BrokenHorizonFirstLightMultiplayer.ps1 -Runtime Packaged -Topology Listen -PackageRoot Builds/Alpha-Development-20260905-FirstLightTopology/Windows` (fully packaged listen)
 - `Scripts/Test-BrokenHorizonRenderedUI.ps1` (use the scoped HUD case filter)
 - `Scripts/Validate-BrokenHorizon.ps1 -DefenseAGarrison`
 - `Scripts/Test-BrokenHorizonDefenseAMultiplayer.ps1 -Rendered`

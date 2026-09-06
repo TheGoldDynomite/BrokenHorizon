@@ -25,6 +25,45 @@ recorded evidence with the limits stated below.
   describe authored geometry/actors; a strategic name is not proof of the same
   physical location or a connected regional route.
 
+## Current-source strategic graph — not accepted physical connectivity
+
+The architect verified six default sectors in
+[BHWarSubsystem.cpp](../../Source/BrokenHorizon/Private/BHWarSubsystem.cpp)
+(lines 477-593). The reciprocal strategic graph is connected and has six edges.
+These are current defaults, not a locked alpha sector count or a traversal pass.
+
+| Strategic candidate | Default control / type | Reciprocal neighbors |
+| --- | --- | --- |
+| NorthPass | Neutral / Checkpoint | DovrenVillage, KoronaCrossroads |
+| KoronaCrossroads | Enemy / Town | NorthPass, DovrenVillage, SouthBridge |
+| EasternDepot | Enemy / LogisticsDepot | SouthBridge |
+| WesternFOB | Friendly / HQ | DovrenVillage |
+| DovrenVillage | Friendly / Village | WesternFOB, NorthPass, KoronaCrossroads |
+| SouthBridge | Enemy / Bridge | KoronaCrossroads, EasternDepot |
+
+```mermaid
+graph LR
+  WesternFOB --- DovrenVillage
+  DovrenVillage --- NorthPass
+  NorthPass --- KoronaCrossroads
+  DovrenVillage --- KoronaCrossroads
+  KoronaCrossroads --- SouthBridge
+  SouthBridge --- EasternDepot
+```
+
+WesternFOB -> EasternDepot is an endpoint corridor, not one adjacent convoy edge.
+Its shortest strategic chain is four edges: WesternFOB -> DovrenVillage ->
+KoronaCrossroads -> SouthBridge -> EasternDepot. The convoy contract checks
+`ConnectedSectorIDs` (same source, line 8148); physical field-transport delivery is
+separate proof. Restore (line 6933) retains default IDs/adjacency and rejects unknown
+saved IDs. Scope decisions must respect that save-compatibility constraint; this
+manifest does not propose a migration.
+
+[create_broken_horizon_world.py](../../Content/Python/create_broken_horizon_world.py)
+(lines 6, 62-129) declares matching routes in the separate `L_BrokenHorizon_World`.
+No fresh map or traversal inspection is claimed. First Light operation markers,
+facility kits, and watercraft remain separate physical candidates below.
+
 ## Region, operations, and logistics candidates
 
 | ID / candidate | Decision / purpose | Known owner or provenance | Dependencies | Existing technical evidence | Remaining actual-player/content acceptance |
@@ -32,11 +71,12 @@ recorded evidence with the limits stated below.
 | C01 NorthPass / FirstLightAttackA | Candidate; Attack family checkpoint route. NorthPass is strategic; FirstLightAttackA is the physical site marker. | Native operation director/site contract; five BP_EnemySoldier actors and eight cover points recorded. Final asset owner/licensing unresolved by this draft. | Operation-gated activation, ground/navigation, accepted facility/route template. | Authored activation/replicated startup and deterministic completion/travel fixture recorded in operation matrix. | Natural approach/combat/secure/extract/debrief, tactical cover quality, final terrain and readable enemy silhouettes. Deterministic completion is not natural combat proof. |
 | C02 DovrenVillage / DefenseA | Candidate; Defense family hold/recovery. Strategic sector and physical Defense A site remain distinct. | Existing Defense A director/garrison fixture; facility art provenance/owner still to assign. | Facility/perimeter/fallback geometry, casualty recovery access. | Q2 records corrected two-client waves, securing, Continue/checkpoints, and ten inspected frames. | Natural controls/tactical quality, facility art, recovery route, and regional reachability. Reuse passed lifecycle rather than implement again. |
 | C03 KoronaCrossroads / RaidA | Candidate; Raid family depot sabotage/exfiltration. Strategic sector is not an accepted physical depot assignment. | Existing authored operation-site contract; final patrol/site art owner unknown. | Depot/patrol layout, sabotage interaction, quiet/contested exfil route. | Operation matrix records native variation/site foundation; no natural Raid A acceptance claimed here. | Natural reconnaissance, patrol response, sabotage, extraction, consequences, readable facility/interaction cues. |
-| C04 WesternFOB -> EasternDepot | Candidate; Resupply family personnel/supply corridor. Strategic endpoints require physical route verification. | Existing cargo/resupply/transport systems; route production owner unknown. | Reachable staging/delivery sites, cargo vehicle, casualty handling and persisted resources. | Inventory records playable cargo/resupply foundations and authoritative watercraft delivery. | Natural boarding/travel/delivery/recovery, road/water choice, save/reload, and no supply dead end. |
+| C04 WesternFOB -> EasternDepot | Candidate; Resupply family personnel/supply corridor. Strategic endpoints span the four-edge chain above, not an adjacent convoy edge; physical delivery requires separate verification. | Existing cargo/resupply/transport systems; route production owner unknown. | Reachable staging/delivery sites, cargo vehicle, casualty handling and persisted resources. | Inventory records playable cargo/resupply foundations and authoritative watercraft delivery. | Natural boarding/travel/delivery/recovery, road/water choice, save/reload, and no supply dead end. |
 | C05 FirstLightWesternFOBKit01 | Candidate; physical resistance-base staging kit. | ABHWorldKitModule, idempotent authored kit; final mesh/material ownership review open. | C04 staging, base interactions and readable signage. | Inventory records three authored kit variants with six valid components. | Base geometry/interiors, material/LOD/collision look review, screenshots, traversal and interaction acceptance. |
 | C06 FirstLightDovrenCheckpoint01 | Candidate; physical checkpoint kit; no automatic mapping to every strategic Dovren operation. | ABHWorldKitModule; final asset provenance/owner unresolved. | Selected operation placement and approach/cover template. | Same recorded kit/component foundation as C05. | Verify actual site assignment, tactical geometry, silhouette/signage, collision/interiors and player captures. |
 | C07 FirstLightEasternDepotKit01 | Candidate; physical depot/delivery kit. | ABHWorldKitModule; final asset provenance/owner unresolved. | C04 delivery, selected Raid site assignment if adopted. | Same recorded kit/component foundation as C05. | Verify functional placement, delivery/sabotage access, readable depot routes, final art/interiors and captures. |
 | C08 FirstLightWaterRoute01 / FirstLightWatercraft01 | Candidate; alternate Resupply traversal, dependent on adopting meaningful water route. | ABHWaterSurface and ABHFieldTransport; recorded project water footstep cue. Final boat/shoreline art provenance unresolved. | C04 endpoints, shoreline access, cargo/waterborne eligibility, safe casualty entry/exit. | Inventory records water surface/wading and occupied-player authoritative delivery fixture; stable watercraft carries WesternFOB-to-EasternDepot supplies. | Natural boarding/crossing/delivery/casualty recovery, final boat/material/shoreline, VFX/audio and multiplayer readability. |
+| C09 SouthBridge | Candidate; strategic bridge connector between KoronaCrossroads and EasternDepot. | Current BHWarSubsystem default; physical asset/provenance and production owner unknown. | Reciprocal strategic edges, separately verified physical route and save-compatible IDs. | Architect verified default Enemy/Bridge state and adjacency; no fresh physical traversal proof. | Choose inclusion, map the actual crossing, and accept natural traversal/logistics and readable bridge content. |
 
 ## Required presentation and equipment coverage
 
@@ -58,13 +98,19 @@ the entire 1.0 roster. Resolve actual assets and provenance before including a r
 | ID / proposed support | Decision | Existing evidence or current gap | Acceptance required |
 | --- | --- | --- | --- |
 | S01 2-4 players | Candidate planning default; cap/settings not locked. | Existing scoped two-client fixtures do not accept every proposed count. | Name supported counts/settings, then execute each promised configuration. |
-| S02 Listen hosting | Candidate implementation/distribution plan; functional path required by G2. | Fully packaged listen host plus one remote client is in-progress direct-loopback coverage, not yet accepted. | Fresh objective/loot/ammo/rejoin matrix, then actual remote/impairment and player controls. Session-menu flow is separate. |
-| S03 Dedicated hosting | Candidate distribution plan; functional path required by G2. | Planned hybrid Editor dedicated server plus two packaged remotes; executable distribution gap remains for a packaged dedicated server. | Prove hybrid case without mislabeling it; explicitly select/package/validate promised dedicated executable and real deployment. |
-| S04 Late join / reconnect | Candidate scenario matrix. | Prior same-process reconnect passed its bounded fixture; current packaged direct-loopback rejoin matrix pending. | Every promised topology/count, objective/world/loot/ammo convergence and actual connection paths. |
+| S02 Listen hosting | Candidate implementation/distribution plan; functional path required by G2. | Fully packaged listen direct-loopback matrix passed: four objectives/two completed, exact rejoin GUIDs, selected local Host actual HUD; no selected remote OnRep claim. NullRHI only; support promise remains unaccepted. | Actual remote/impairment and player controls for promised settings/counts. Session-menu/debrief and wider support acceptance remain separate. |
+| S03 Dedicated hosting | Candidate distribution plan; functional path required by G2. | Hybrid Editor dedicated plus two packaged remotes passed direct-loopback objectives/loot/ammo/rejoin and selected remote ID256 OnRep/actual HUD. Packaged dedicated executable distribution gap remains. | Retain hybrid evidence limits; explicitly select/package/validate promised dedicated executable and real deployment. |
+| S04 Late join / reconnect | Candidate scenario matrix. | Prior same-process reconnect passed its fixture; current default/hybrid/listen direct-loopback matrix passed fresh remote rejoin with exact six-spawned/one-consumed/five-remaining GUID convergence. Wider support remains unaccepted. | Every promised topology/count, objective/world/loot/ammo convergence and actual connection paths. |
 | S05 Host recovery / travel | Candidate scenario matrix. | Prior continuity/travel evidence is scoped; complete campaign host-recovery support not accepted. | Define failure/recovery/save behavior, execute travel/recovery, demonstrate no save loss or stale world state. |
 | S06 Actual controls / settings | Candidate input/settings matrix. | Q2 HUD is verified; Computer Use failed before game input with host ACL error. | Real controls, combat feel, menu/scrolling, supported settings/scales, accessibility and navigation review. |
 | S07 Performance | Candidate budgets; hardware/resolution/preset/frame-time/memory targets unlocked. | No performance acceptance inferred from rendering or fixture completion. | Lock measured A1 targets and rerun representative packaged worst cases at A5. |
 | S08 Endurance / remote | Candidate remote, impairment and two-hour-soak scenarios. | No current full support-matrix pass claimed. | Execute promised configurations, record latency/loss scenarios, soak, crashes/desync/save integrity and cleanup. |
+
+Current topology evidence is recorded in [Alpha Progress](Alpha_Progress.md): final
+127-test suite, fresh package, matrix/standalone and eight negative cases pass.
+These are same-machine NullRHI functional/widget-state checks, not new rendered
+pixels, session-menu/debrief, physical-input, internet, or packaged-dedicated-server
+acceptance. Optional inventory-transfer/weapon-role modes were not rerun.
 
 ## Scope decisions still needed
 

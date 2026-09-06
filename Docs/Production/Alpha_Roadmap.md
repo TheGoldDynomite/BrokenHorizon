@@ -2,8 +2,7 @@
 
 Updated: 2026-09-05. Target: **G5 Alpha**, a complete playable limited-region
 resistance campaign (M6). **A1 development has explicitly resumed.** Q2 health/stamina
-150% HUD layout is Verified for its bounded scope. Next independent A1 work is
-packaged First Light functional runner coverage, currently in progress. A0/A1/G2 remain open;
+150% HUD layout is Verified for its bounded scope. Bounded First Light topology coverage is now Verified. A0/A1/G2 remain open;
 resumption does not authorize the blocked lighting map edit.
 
 ## Document ownership and gate names
@@ -98,7 +97,7 @@ satisfy individual checks; writing the roadmap does not complete a gate.
 | ID | Dependency and status | Concrete deliverable | Exit proof |
 | --- | --- | --- | --- |
 | A0 Scope and support lock | First; open | Named alpha content manifest, supported player/topology/settings matrix, four required families, save/recovery expectations, and explicit deferred 1.0 items. | Every included row has an owner, integration dependency, and player-facing acceptance check; working scope accepted before content multiplication. |
-| A1 First Light quality and G2 acceptance | Q2 verified; packaged functional coverage in progress, gate open and A0 scope lock required | Accepted world/combat/UI template with readable lighting, actual controls, coherent weapon/arms/enemy/animation/audio/VFX, measured performance targets, and multiplayer vertical slice. | Two-player natural First Light play plus visual/input review; listen AND dedicated functional paths with packaged clients hosting/joining as appropriate, reconnecting, and completing an operation; first-quality hardware/preset/frame-time/memory record. |
+| A1 First Light quality and G2 acceptance | Q2 and bounded topology matrix verified; full gate open and A0 scope lock required | Accepted world/combat/UI template with readable lighting, actual controls, coherent weapon/arms/enemy/animation/audio/VFX, measured performance targets, and multiplayer vertical slice. | Two-player natural First Light play plus visual/input review; listen AND dedicated functional paths with packaged clients hosting/joining as appropriate, reconnecting, and completing an operation; first-quality hardware/preset/frame-time/memory record. |
 | A2 Connected prototype and four families | A0 plus A1/G2 acceptance; open | Connected three-sector prototype with Attack, Defense, Raid, and Resupply proving the full preparation-to-next-operation loop. | Natural operation routes, traversal, casualty handling, extraction/debrief, logistics, saves, and world-state consequences; reuse existing Defense A fixture evidence. |
 | A3 Included regional content and logistics | A2; open | Playable alpha manifest across the included region, authored facilities/routes and required content, functioning movement of personnel/supplies/transport. | Every included inventory row reachable and accepted; corridor delivery/casualty recovery, transport persistence, and no supply dead ends. |
 | A4 Complete campaign progression | A3; open | World-state-driven progression from fresh campaign to victory and a meaningful defeat/recovery path. | Recorded complete campaign run, deliberate setbacks, persistence checks, measured first-campaign duration, and no debug intervention. |
@@ -138,15 +137,19 @@ package with four-objective route and inspected 720p HUD150 pass; see
 [Alpha Progress](Alpha_Progress.md). Q2 commit
 `58d2380f524dff9812e204d42222d2d0d97f11b9` was pushed to
 `origin/codex/first-light-acceptance`; its remote SHA was verified.
-The next A1 task is in-progress direct-loopback First Light objective/loot/ammo/rejoin
-runner coverage, not session-menu or debrief-acknowledgement proof: retain the
-Editor default, then prove a fully packaged listen host plus one remote client
-and, separately, a hybrid Editor dedicated server plus two packaged remotes.
-The hybrid case does not prove a packaged dedicated server. Fresh matrix and final
-validation are pending; neither configuration is accepted yet. The source writer
-owns the existing runner and nonshipping `BHWarGameState.cpp/.h` readiness,
-standalone-exit, and owner-marker changes. Actual controls, Q1 explicit map approval,
-performance, content, and A0/A1/G2 acceptance remain open.
+Bounded First Light topology coverage is Verified: preserved Editor default,
+hybrid Editor dedicated server with packaged remotes, fully packaged listen, and
+packaged standalone. The final 127-test suite, scoped review, fresh topology package,
+and eight negative cases pass; exact reports are in [Alpha Progress](Alpha_Progress.md).
+The validated delivery is tracked by active development-branch history.
+
+This is NullRHI same-machine direct-loopback objective/loot/ammo/rejoin and actual
+widget-state proof, not new pixels, physical input, session-menu/debrief flow,
+remote-internet play, or a packaged dedicated-server executable. Optional inventory
+transfer and weapon-role modes were not rerun. Q2 visual evidence remains separate.
+The manifest support rows remain candidates; unanswered A0 scope, full A1/G2,
+performance/content, actual controls, and Q1 explicit map approval remain open.
+The recorded six-sector graph does not accept physical traversal or regional scope.
 
 The [operation matrix](Broken_Horizon_1.0_OperationMatrix.md) still has all eight
 A/B rows in progress for authored/manual criteria. Do not schedule already
