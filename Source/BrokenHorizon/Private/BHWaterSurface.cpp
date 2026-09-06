@@ -17,7 +17,6 @@ ABHWaterSurface::ABHWaterSurface()
     SetRootComponent(WaterVolume);
     WaterVolume->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
     WaterVolume->SetGenerateOverlapEvents(true);
-    WaterVolume->SetBoxExtent(SurfaceExtents);
 
     WaterMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WaterMesh"));
     WaterMesh->SetupAttachment(WaterVolume);
@@ -35,26 +34,52 @@ ABHWaterSurface::ABHWaterSurface()
     {
         WaterMesh->SetMaterial(0, WaterMaterialFinder.Object);
     }
-    // The gameplay volume remains tall enough to detect wading, but the
-    // player-facing water should be a thin surface plane rather than a solid
-    // cube that occludes the route from inside the volume.
-    WaterMesh->SetRelativeLocation(
-        FVector(0.0f, 0.0f, SurfaceHeight)
-    );
-    WaterMesh->SetRelativeScale3D(
-        FVector(
-            SurfaceExtents.X / 100.0f,
-            SurfaceExtents.Y / 100.0f,
-            0.02f
-        )
-    );
-
     WaterLabel = CreateDefaultSubobject<UTextRenderComponent>(TEXT("WaterLabel"));
     WaterLabel->SetupAttachment(WaterVolume);
     WaterLabel->SetText(NSLOCTEXT("BrokenHorizon", "WaterLabel", "WATER ROUTE"));
     WaterLabel->SetHorizontalAlignment(EHorizTextAligment::EHTA_Center);
     WaterLabel->SetWorldSize(48.0f);
     WaterLabel->SetRelativeLocation(FVector(0.0f, 0.0f, 80.0f));
+    SynchronizeGeometry();
+}
+
+void ABHWaterSurface::OnConstruction(const FTransform& Transform)
+{
+    Super::OnConstruction(Transform);
+    SynchronizeGeometry();
+}
+
+void ABHWaterSurface::PostRegisterAllComponents()
+{
+    Super::PostRegisterAllComponents();
+    SynchronizeGeometry();
+}
+
+void ABHWaterSurface::SynchronizeGeometry()
+{
+    const FVector Extents = GetSurfaceExtents();
+    if (IsValid(WaterVolume))
+    {
+        WaterVolume->SetBoxExtent(Extents);
+    }
+    UStaticMesh* Mesh = IsValid(WaterMesh) ? WaterMesh->GetStaticMesh() : nullptr;
+    if (!IsValid(Mesh)) { return; }
+
+    const FBox LocalBounds = Mesh->GetBoundingBox();
+    if (!LocalBounds.IsValid) { return; }
+    const FVector LocalExtents = LocalBounds.GetExtent();
+    const FVector LocalCenter = LocalBounds.GetCenter();
+    if (LocalExtents.ContainsNaN() || LocalCenter.ContainsNaN() ||
+        LocalExtents.X <= 0.0 || LocalExtents.Y <= 0.0) { return; }
+
+    // Actor extents are half sizes. Preserve the thin native surface, and fit
+    // XY to the assigned asset's local bounds rather than assuming a 100cm half size.
+    const FVector Scale(Extents.X / LocalExtents.X, Extents.Y / LocalExtents.Y, 0.02);
+    const FVector CenterOffset = WaterMesh->GetRelativeRotation().Quaternion().RotateVector(LocalCenter * Scale);
+    const FVector Location = FVector(0.0, 0.0, GetSurfaceHeight()) - CenterOffset;
+    if (Scale.ContainsNaN() || Location.ContainsNaN()) { return; }
+    WaterMesh->SetRelativeScale3D(Scale);
+    WaterMesh->SetRelativeLocation(Location);
 }
 
 bool ABHWaterSurface::ContainsWorldLocation(FVector WorldLocation) const
@@ -65,7 +90,7 @@ bool ABHWaterSurface::ContainsWorldLocation(FVector WorldLocation) const
 
 float ABHWaterSurface::GetSurfaceHeight() const
 {
-    return SurfaceHeight;
+    return FMath::IsFinite(SurfaceHeight) ? SurfaceHeight : 0.0f;
 }
 
 float ABHWaterSurface::GetInfantrySpeedMultiplier() const
@@ -75,5 +100,9 @@ float ABHWaterSurface::GetInfantrySpeedMultiplier() const
 
 FVector ABHWaterSurface::GetSurfaceExtents() const
 {
-    return SurfaceExtents;
+    const auto EffectiveExtent = [](double Value)
+    {
+        return FMath::IsFinite(Value) ? FMath::Max(100.0, Value) : 100.0;
+    };
+    return FVector(EffectiveExtent(SurfaceExtents.X), EffectiveExtent(SurfaceExtents.Y), EffectiveExtent(SurfaceExtents.Z));
 }

@@ -15,6 +15,8 @@ class BROKENHORIZON_API ABHWaterSurface : public AActor
 
 public:
     ABHWaterSurface();
+    virtual void OnConstruction(const FTransform& Transform) override;
+    virtual void PostRegisterAllComponents() override;
 
     UFUNCTION(BlueprintPure, Category = "Water")
     bool ContainsWorldLocation(FVector WorldLocation) const;
@@ -49,4 +51,7 @@ protected:
 
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Water", meta = (ClampMin = "0.25", ClampMax = "1.0"))
     float InfantrySpeedMultiplier = 0.60f;
+
+private:
+    void SynchronizeGeometry();
 };

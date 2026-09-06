@@ -1,6 +1,6 @@
 # Alpha roadmap
 
-Updated: 2026-09-05. Target: **G5 Alpha**, a complete playable limited-region
+Updated: 2026-09-06. Target: **G5 Alpha**, a complete playable limited-region
 resistance campaign (M6). **A1 development has explicitly resumed.** Q2 health/stamina
 150% HUD layout is Verified for its bounded scope. Bounded First Light topology coverage is now Verified. A0/A1/G2 remain open;
 resumption does not authorize the blocked lighting map edit. The package-aware
@@ -139,13 +139,25 @@ pre-apply failure path, not partial rollback; NullRHI/bound button events do not
 physical controls, rendered appearance, natural pickup/removal, or internet operation.
 Physically activating ordinary Continue on a real checkpoint and inspecting restored
 HUD/state/presentation remains the quick manual gate. No user-induced fault is required.
-Next focus is Q5 read-only inventory of actual boat/route, authored cargo, existing
-WesternFOB/EasternDepot stations, and geometry. The current helper spawns a receiving
-station if absent and teleports before transfer, so its integration result does not
-prove the authored corridor or destination supply delta. No production defect or Q5
-pass/failure was established. Extend the read-only staging inventory without saving,
-spawning, teleporting, map repair, or invoking `add_first_light_water_route.py`.
-Inventory precedes a strict acceptance-mode decision; natural controls remain separate.
+Continue delivery `23ce431bee47cf9bf5b26b6d3592c30fd2520c68` is pushed and remote-SHA verified.
+Current Q5 water geometry is **Code-complete; quick Editor/PIE validation remains**.
+The read-only schema-2 inventory exposed six authored 4200/900/120 water extents
+whose old volume was 5000/1600/120 and visual footprint half that size. Construction/
+post-registration synchronization now uses actual assigned-mesh bounds, including
+its offset center, while preserving actor identities, rotation, profiles, raw authored
+values, and .02 Z scale. Post-fix inventory and ordinary Editor/packaged runtime
+geometry pass; three water tests, fresh package, scoped review, and final 141-test
+Validate pass. The map hash is unchanged. Exact reports are in Alpha Progress.
+Inventory completion does not imply raw transport-property coverage, uniqueness,
+passability, rendered appearance, crossing, or delivery. The next quick manual step
+is overhead water-volume/visual comparison and one Simulate inspection, stopping
+without saving. No Blueprint connection or asset write is required for this check.
+Six overlapping actors share a WaterID; the boat retains 90-degree pitch at observed
+normal startup, and no authored or sampled-startup receiving stations were found.
+Station observation is limited to the recorded 3.199/3.760-second window. These remain
+separate content/approval work; synthetic-station/teleport integration is not an
+authored corridor acceptance test. Full Q5 and G5 Alpha remain open, as does the prior
+unexplained First Light reload crash. Do not infer a content repair authorization.
 Performance checkpoint `ae20a5238db84418836419dff2aa06a3776be118` is pushed and
 remote-SHA verified; its three valid captures still fail provisional budgets.
 Installed UE 5.8 lacks Server distribution support; packaged dedicated delivery

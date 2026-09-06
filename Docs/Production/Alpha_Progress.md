@@ -1,9 +1,10 @@
 # Alpha progress
 
-Updated: 2026-09-05. Repository evidence overrides this compact continuation record.
-Completed slice: bounded A1 Continue restoration and checkpoint protection.
-Previous completed slice: bounded A1 session-menu failure recovery.
-Status: **Verified** within automated Continue recovery scope; full A1/G2/alpha acceptance remains open.
+Updated: 2026-09-06. Repository evidence overrides this compact continuation record.
+Current slice: bounded Q5 water geometry synchronization and read-only corridor inventory.
+Previous completed slice: bounded A1 Continue restoration and checkpoint protection.
+Status: **Code-complete; quick Editor/PIE validation remains**. Full A1/G2/Q5/alpha acceptance remains open.
+Continue commit: `23ce431bee47cf9bf5b26b6d3592c30fd2520c68`; pushed and remote SHA verified.
 Recovery commit: `71dd1ac875eac6015a47d4aa59cf03a598982180`; pushed and remote SHA verified.
 Intermittent First Light reload reliability remains open.
 Performance commit: `ae20a5238db84418836419dff2aa06a3776be118`; pushed and remote SHA verified.
@@ -30,6 +31,56 @@ Draft scope artifact: [Alpha Manifest](Alpha_Manifest.md) combines content candi
 and proposed support coverage. Draft commit `4470616664ee517c117c0d7d5c6671ac80ab8715`
 was pushed and its remote SHA verified. The working-scope question is unanswered;
 A0 and all candidate decisions remain unaccepted.
+
+## Current Q5 water geometry correction
+
+- Authored finite extents (minimum 100) and effective finite surface height now
+  synchronize during construction and post-registration. Actual assigned-mesh bounds
+  determine the XY footprint and offset center. The correction preserves .02 Z scale,
+  rotation, actor identities, profiles, and authored raw property values.
+- The six actual water actors authored 4200/900/120 extents, but previously had volume
+  5000/1600/120 and cube visual half-extents 2500/800. They now have volume
+  4200/900/120, mesh half-extents 4200/900/1, and mesh scale 84/18/.02.
+- Read-only schema-2 inventory completed with no read errors:
+  pre-fix `Saved/Reports/FirstLightLogistics-20260906-063557-20a92ab8.json`;
+  post-fix `Saved/Reports/FirstLightLogistics-20260906-065922-f3d5a0a2.json`.
+  Inventory completion does not establish uniqueness, passability, or raw cargo/fuel/
+  hull availability: transport getters clamp values and
+  `rawTransportPropertyCoverageComplete=false` remains explicit.
+  First Light map bytes were unchanged, SHA256:
+  `46CABE0BEA1711C4CA7C7543F22014BE1FF311C36F046D9C9990C058FF22978C`.
+- Editor build passed after correcting test `TestNotNull` access with `.Get()`:
+  `Saved/Logs/Codex/BuildEditor-20260905-235810.log`.
+  Three targeted water tests passed with zero warnings/failures/not-run/in-process:
+  `Saved/Logs/Codex/AutomationReport-20260905-235822/index.json`.
+- Ordinary Editor game geometry passed after genuine BeginPlay:
+  `Saved/Automation/Q5Runtime/20260906-000049-b1f493e1/Summary.json`.
+  `geometryVerified=true`: 12 actor samples, 120 values, 14 query events at
+  9.612/10.156 seconds after BeginPlay. Numeric geometry is not rendered inspection.
+- Fresh package passed, exit 0, wrapper 98.91 seconds:
+  `Saved/Logs/Codex/PackageDevelopment-20260906-000733.log`;
+  archive `Builds/Alpha-Development-20260906-WaterGeometry/Windows`.
+  Inner executable SHA256:
+  `CEC16733D7D65AEF38970A8570095CCBC388F8D10142E7C7DB1BCCBD96927A0A`.
+  Packaged geometry passed:
+  `Saved/Automation/Q5Runtime/20260906-000924-14930a12/Summary.json`;
+  12 actor samples, 120 values, 14 query events at .264/.678 seconds after BeginPlay.
+  A raw signed-zero comparison was corrected only in the Saved verifier; the earlier
+  attempt is retained. No production change was required for that verifier correction.
+- Final `Tools/Validate.ps1 -RequireTests -SkipReview` passed: Project Doctor zero
+  errors/warnings; up-to-date build .84 seconds:
+  `Saved/Logs/Codex/BuildEditor-20260906-001025.log`.
+  Full automation passed 141 tests (135 successes/six reviewed prior warning-successes),
+  zero failed/not-run/in-process:
+  `Saved/Logs/Codex/AutomationReport-20260906-001026/index.json`.
+  Scoped review cleared all four source/test/probe files with no supported blocker.
+  Execution is released. Delivery is identified by the containing scoped commit;
+  this record does not invent a new SHA or assert a push before delivery.
+- **Minimum Editor/PIE handoff:** open First Light, select the water volume, frame it
+  from above, and compare the visual footprint with the volume outline. Inspect once
+  in Simulate, then stop without saving. No new Blueprint connections or asset writes
+  are required. Geometry is verified; rendered appearance, crossing, delivery, and
+  full Q5 acceptance are not. The G5 Alpha goal remains active.
 
 ## Verified bounded A1 Continue restoration
 
@@ -98,20 +149,21 @@ A0 and all candidate decisions remain unaccepted.
   and the earlier unexplained First Light reload crash remain open. This update does
   not establish that the earlier crash is unrelated or resolved.
 
-## Next focus: Q5 authored corridor inventory
+## Remaining Q5 corridor findings
 
-A bounded read-only pass found no production defect. The existing watercraft-delivery
-helper creates an Eastern Depot receiving station if absent and teleports the boat
-before transfer; it proves transfer integration, not authored corridor presence,
-reachability, crossing, or destination supply delta. This is not a Q5 pass or failure.
-`Content/Python/inspect_first_light_staging.py` is an existing read-only map-load and
-actor-log probe, but omits receiving stations, cargo, and water extents. No complete
-current corridor inventory was found. Next inspect the actual named boat/route,
-authored cargo, existing WesternFOB/EasternDepot stations, and geometry without
-saving, spawning, teleporting, or creating a synthetic station. Do not execute the
-map-mutating `add_first_light_water_route.py` for this investigation. Inventory should
-precede any strict acceptance-mode decision; no new transport system, map edits, or
-automatic content repairs follow from this finding. Natural controls remain separate.
+The inventory is now complete within its recorded schema. Six overlapping water
+actors share the same WaterID due to generator name/label mismatch. The real boat's
+90-degree pitch persists at normal startup; native movement uses its forward vector
+before snapping Z. No authored receiving stations were found; no stations were
+observed during the startup samples at 3.199/3.760 seconds after BeginPlay:
+`Saved/Automation/Q5Runtime/20260905-234202-1b5594cc/Summary.json`.
+That observation does not prove permanent runtime absence. Duplicate actors, boat
+orientation, and the eventual receiving facility remain separate content/approval
+work. The prior helper's synthetic station and teleport prove transfer integration,
+not authored reachability, crossing, or destination supply delta. Do not infer natural
+controls or full Q5 acceptance. Q1 map approval, A0 draft scope, remote/physical-input,
+dedicated-engine/performance gates, and the earlier unexplained First Light
+`EXCEPTION_ILLEGAL_INSTRUCTION` reload crash remain open and unresolved.
 
 ## Verified bounded A1 session recovery
 
@@ -501,14 +553,24 @@ not validation of the later HUD readability or active A1/Q2 layout changes.
 
 | Gate | Evidence boundary and remaining work |
 | --- | --- |
-| Code/unit | Prior HUD checkpoint build/review/127-test suite pass. Q2 final source build/review/127-test suite and bounded package acceptance pass. |
+| Code/unit | Latest water correction: Editor build, scoped review, three targeted water tests, and final 141-test suite pass. Earlier HUD/Q2 127-test and bounded package results remain historical evidence. |
 | Live network | Two-client tactical lifecycle/Continue passes under controlled fixture damage/positioning and natural director clocks. Remote networking, campaign crash/save recovery, and soak remain. |
 | Rendered/player | Prior targeted medical rerenders and wounded runtime rerun pass; selected fresh multiplayer images inspected. Prior Defense A inspected ten 1280x720 frames. Actual Enter/M Continue, scrolling, combat feel, localization, and broader safe-area coverage remain. |
 | Presentation/performance | HUD contrast correction built and targeted static visuals inspected. Black sky/overbright world remains; Q2 150% vitals correction is verified for the recorded cases. Lighting map-save launch was denied by automatic approval review. Earlier local two-client VRAM warnings do not constitute performance acceptance. |
 | Campaign/content | Complete campaign and authored-content gates remain; this tactical acceptance slice is not full alpha. |
-| Package | Current FirstLightTopology package passes standalone and bounded two-player loopback configurations: fully packaged listen and hybrid Editor dedicated with packaged clients. Wider promised configurations, remote/menu/physical acceptance remain open; Q2 rendered proof is separate. |
+| Package | Latest WaterGeometry package passes ordinary numeric startup geometry only. Prior FirstLightTopology retains its scoped standalone and loopback proof (fully packaged listen and hybrid Editor dedicated with packaged clients); the water geometry check does not refresh that evidence. Wider packaged, remote, menu, physical-input, and dedicated-distribution acceptance remain open. |
 
-## Current Continue delivery files
+## Current water geometry delivery files
+
+- `Content/Python/inspect_first_light_logistics.py`
+- `Source/BrokenHorizon/Private/BHWaterSurface.cpp`
+- `Source/BrokenHorizon/Public/BHWaterSurface.h`
+- `Source/BrokenHorizon/Private/Tests/BHWaterSurfaceAutomationTests.cpp`
+- `Docs/Production/Alpha_Progress.md`
+- `Docs/Production/Alpha_Roadmap.md`
+- `Docs/Production/Alpha_Manifest.md`
+
+## Prior Continue delivery files
 
 - `Source/BrokenHorizon/Private/BHSaveSubsystem.cpp`
 - `Source/BrokenHorizon/Public/BHSaveSubsystem.h`
