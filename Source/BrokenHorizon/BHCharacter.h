@@ -386,7 +386,7 @@ public:
 
     void PresentSharedOperationDebrief(const FText& Message);
     FText GetMissionCompleteMessage() const;
-    void ApplyRapidOperationRedeployment();
+    bool ApplyRapidOperationRedeployment();
 
     UFUNCTION(BlueprintCallable, Category = "Game Shell")
     bool RestartCheckpoint();

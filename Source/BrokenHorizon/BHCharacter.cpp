@@ -1,4 +1,5 @@
 #include "BHCharacter.h"
+#include "Private/BHOperationPlacement.h"
 #include "Private/BHDefenseAMultiplayerTest.h"
 
 // Strategic map input contract: EKeys::M,
@@ -13216,52 +13217,36 @@ bool ABHCharacter::CanEnterCooperativeCasualty(
         !bAlreadyDownedThisLife;
 }
 
-void ABHCharacter::ApplyRapidOperationRedeployment()
+bool ABHCharacter::ApplyRapidOperationRedeployment()
 {
     if (!IsValid(OpenWorldOperationDirector))
     {
-        return;
+        return false;
     }
 
-    const FVector OperationCenter =
-        OpenWorldOperationDirector->GetOperationCenter();
-    const FVector TravelDirection =
-        (OperationCenter - GetActorLocation()).GetSafeNormal2D();
-    FVector InsertionLocation =
-        OperationCenter -
-        (TravelDirection.IsNearlyZero()
-            ? GetActorForwardVector().GetSafeNormal2D()
-            : TravelDirection) * 20000.0f;
-    FRotator InsertionRotation =
-        (OperationCenter - InsertionLocation).Rotation();
-
-    if (GetWorld() &&
-        GetWorld()->FindTeleportSpot(
-            this,
-            InsertionLocation,
-            InsertionRotation))
+    const FVector OperationCenter = OpenWorldOperationDirector->GetOperationCenter();
+    FVector InsertionLocation;
+    FRotator InsertionRotation;
+    if (!BHOperationPlacement::TryFindGroundedInsertion(
+            *this, OperationCenter, 20000.0f, InsertionLocation, InsertionRotation) ||
+        !SetActorLocationAndRotation(InsertionLocation, InsertionRotation,
+            false, nullptr, ETeleportType::TeleportPhysics))
     {
-        SetActorLocationAndRotation(
-            InsertionLocation,
-            InsertionRotation,
-            false,
-            nullptr,
-            ETeleportType::TeleportPhysics
-        );
-        ShowStatusNotification(NSLOCTEXT(
-            "BrokenHorizon",
-            "RapidOperationRedeployment",
-            "RAPID REDEPLOYMENT // 200m from active operation"
-        ));
-        UE_LOG(
-            LogTemp,
-            Display,
-            TEXT("BH_OPERATION_RAPID_REDEPLOYMENT center=%s"),
-            *OperationCenter.ToCompactString()
-        );
+        UE_LOG(LogTemp, Warning, TEXT("BH_OPERATION_RAPID_REDEPLOYMENT result=failure center=%s"),
+            *OperationCenter.ToCompactString());
+        return false;
     }
-}
 
+    GetCharacterMovement()->StopMovementImmediately();
+    const float DistanceMeters = FVector::Dist2D(GetActorLocation(), OperationCenter) / 100.0f;
+    ShowStatusNotification(FText::Format(NSLOCTEXT(
+        "BrokenHorizon", "RapidOperationRedeploymentGrounded",
+        "RAPID REDEPLOYMENT // {0}m from active operation"), FText::AsNumber(FMath::RoundToInt(DistanceMeters))));
+    UE_LOG(LogTemp, Display,
+        TEXT("BH_OPERATION_RAPID_REDEPLOYMENT result=success distance_m=%.1f location=%s center=%s"),
+        DistanceMeters, *GetActorLocation().ToCompactString(), *OperationCenter.ToCompactString());
+    return true;
+}
 void ABHCharacter::PrepareDeploymentModeForTest()
 {
     if (!FParse::Param(
@@ -17498,23 +17483,24 @@ void ABHCharacter::RespawnAfterDeath()
         OpenWorldOperationDirector->IsOperationActivated())
     {
         bIsHandlingDeath = false;
+        GetWorldTimerManager().ClearTimer(RespawnTimerHandle);
+        GetCharacterMovement()->StopMovementImmediately();
         GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-        if (IsValid(HealthComponent))
-        {
-            HealthComponent->ResetHealth();
-        }
+        ApplyMovementSpeed();
         if (IsValid(PlayerController))
         {
             EnableInput(PlayerController);
             PlayerController->SetIgnoreMoveInput(false);
             PlayerController->SetIgnoreLookInput(false);
         }
-        ApplyRapidOperationRedeployment();
-        ShowStatusNotification(NSLOCTEXT(
-            "BrokenHorizon",
-            "RapidOperationRedeploymentImmediate",
-            "RAPID REDEPLOYMENT // ACTIVE OPERATION PRESERVED"
-        ));
+        const bool bRedeployed = ApplyRapidOperationRedeployment();
+        ClientCompleteFieldRespawn();
+        if (!bRedeployed)
+        {
+            ShowStatusNotification(NSLOCTEXT(
+                "BrokenHorizon", "RapidOperationRedeploymentUnavailable",
+                "OPERATOR RECOVERED // No safe insertion found. Active operation preserved."));
+        }
         return;
     }
 

@@ -2,6 +2,8 @@
 
 #include "BHCharacter.h"
 #include "BHOperationSiteMarker.h"
+#include "BHOperationPlacement.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "BHEnemyAIController.h"
 #include "BHEnemySoldier.h"
 #include "BHHealthComponent.h"
@@ -204,19 +206,27 @@ bool ABHOpenWorldOperationDirector::StartOperation(
     // remains physical while avoiding an unnecessary quarter-hour drive.
     if (!bSuppressInitialCheckpoint && IsValid(SectorAnchor))
     {
-        const FVector ToOperation = OperationCenter - PlayerCharacter->GetActorLocation();
-        const FVector TravelDirection = ToOperation.GetSafeNormal2D();
-        constexpr float RapidInsertionDistance = 40000.0f;
-        FVector InsertionLocation = OperationCenter - TravelDirection * RapidInsertionDistance;
-        FRotator InsertionRotation = TravelDirection.IsNearlyZero() ? PlayerCharacter->GetActorRotation() : TravelDirection.Rotation();
-        if (GetWorld()->FindTeleportSpot(PlayerCharacter, InsertionLocation, InsertionRotation))
+        FVector InsertionLocation;
+        FRotator InsertionRotation;
+        if (BHOperationPlacement::TryFindGroundedInsertion(*PlayerCharacter,
+                OperationCenter, 40000.0f, InsertionLocation, InsertionRotation) &&
+            PlayerCharacter->SetActorLocationAndRotation(InsertionLocation, InsertionRotation,
+                false, nullptr, ETeleportType::TeleportPhysics))
         {
-            PlayerCharacter->SetActorLocationAndRotation(InsertionLocation, InsertionRotation, false, nullptr, ETeleportType::TeleportPhysics);
+            PlayerCharacter->GetCharacterMovement()->StopMovementImmediately();
             bRapidInsertionApplied = true;
+            const float DistanceMeters = FVector::Dist2D(PlayerCharacter->GetActorLocation(), OperationCenter) / 100.0f;
+            UE_LOG(LogTemp, Display,
+                TEXT("BH_OPERATION_RAPID_INSERTION result=success distance_m=%.1f location=%s center=%s"),
+                DistanceMeters, *PlayerCharacter->GetActorLocation().ToCompactString(), *OperationCenter.ToCompactString());
             PlayerCharacter->ShowStatusNotification(NSLOCTEXT("BrokenHorizon", "RapidInsertionAccepted", "RAPID INSERTION // Final approach remains on foot or by vehicle."));
         }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("BH_OPERATION_RAPID_INSERTION result=failure center=%s"),
+                *OperationCenter.ToCompactString());
+        }
     }
-
     SetActorLocation(OperationCenter);
 
     if (bRapidInsertionApplied)

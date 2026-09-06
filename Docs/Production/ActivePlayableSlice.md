@@ -202,3 +202,53 @@ The acquired assets are ignored by Git and the local map change remains
 uncommitted: the GitHub repository is public and source redistribution rights
 have not been established. Public scripts retain the authored fallback.
 User subsequently confirmed "it all works good" after the requested Editor test of the imported door, keycard and passage. This closes the reported free-door replacement for single-player PIE. Multiplayer and the full Attack A loop remain separate pending acceptance gates.
+
+## Attack A deployment and death recovery - 2026-09-06
+
+Status: Code-complete; quick Editor/PIE validation remains.
+
+Fresh source inspection found active-operation RespawnAfterDeath returned before
+ClientCompleteFieldRespawn, leaving the owner death screen/HUD/input unrecovered.
+The branch now invokes that existing owner recovery even when insertion fails,
+clears the respawn timer and old velocity, restores movement/speed and preserves
+the director and operation progress. No checkpoint reload is introduced.
+
+Initial rapid insertion (400 m preference) and death redeployment (200 m
+preference) now share BHOperationPlacement::TryFindGroundedInsertion. It queries
+a bounded set of closer/angular fallback candidates with the actual character
+capsule, requires nonpenetrating walkable support and destination clearance,
+rejects pawn support, and leaves outputs unchanged on failure. Teleport success
+is checked before notifications/activation; redeployment reports actual distance.
+
+Evidence:
+- BuildEditor-20260906-081303 compiled source but linking was blocked by the
+  interactive Editor DLL lock. User saved/closed Editor; BuildEditor-20260906-081530
+  then linked successfully. No compiler fix was required.
+- Five real-physics placement tests passed without warnings in
+  Saved/Logs/Codex/AutomationReport-20260906-081538/index.json: grounded query,
+  missing floor/output preservation, penetration, steep slope, closer fallback.
+- Full Tools/Validate.ps1 -RequireTests -SkipReview passed: report
+  Saved/Logs/Codex/AutomationReport-20260906-081728/index.json contains 141
+  successes, 9 successes with warnings, zero failures/not-run/in-process.
+- Saved/Logs/BH-AttackInsertion-Grounded.log records actual character deployment
+  of NorthPass Attack A, five initial hostiles, operation checkpoints and normal
+  exit. A unique BHTestSaveSlotSuffix and UserDir isolated campaign writes.
+  This fixture forces Attack variation A. Its anchorless First Light route
+  bypasses initial rapid insertion, so it does not prove that branch or death
+  recovery; actual collision tests provide the placement evidence.
+- No rendered death recovery, physical controls after respawn, complete wave
+  victory/debrief or multiplayer recovery is claimed. Existing owner RPC call
+  was independently source-reviewed; it still needs interactive/network proof.
+- Agents: bh_code_explorer, bh_architect, bh_cpp_implementer, bh_test_engineer,
+  bh_reviewer and bh_build_debugger. Main thread owned engine execution.
+
+Runtime fixture note: -DisablePython avoids unnecessary Python dependency
+installation when using a fresh -UserDir. An initial baseline attempt was stopped
+when startup began that setup; the successful isolated baseline and post-change
+runs used -DisablePython. No cook or package was generated.
+
+Next PIE check: open First Light, press M, select an Attack and deploy. Record
+its route label. During the operation, after death and respawn, confirm the death
+screen clears, HUD and movement/look/fire work again, the character is standing
+on ground, and the same operation continues. Then continue the original full
+Attack A acceptance steps through completion/debrief/next deployment.
