@@ -201,4 +201,4 @@ See Docs/Production/FreeMetalDoor.md for provenance, reproduction and evidence.
 The acquired assets are ignored by Git and the local map change remains
 uncommitted: the GitHub repository is public and source redistribution rights
 have not been established. Public scripts retain the authored fallback.
-The imported appearance/keycard/passage now needs a fresh user PIE check.
+User subsequently confirmed "it all works good" after the requested Editor test of the imported door, keycard and passage. This closes the reported free-door replacement for single-player PIE. Multiplayer and the full Attack A loop remain separate pending acceptance gates.
